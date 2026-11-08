@@ -272,7 +272,7 @@ end
 
 -- Ring + legend in one card body
 function W.RingWithLegend(body, bw, bh)
-    local size = math.floor(math.min(bh, bw * 0.5, 150))
+    local size = math.floor(math.min(bh, bw * 0.44, 150))
     local ring = W.TickRing(body, size, 72, math.floor(size / 9), 3)
     ring:SetPoint("RIGHT", body, "RIGHT", -6, 0)
     local rows = {}
@@ -280,8 +280,9 @@ function W.RingWithLegend(body, bw, bh)
     for i = 1, 7 do
         local sw = W.Fill(body, T.amber, "ARTWORK"); sw:SetSize(9, 9)
         sw:SetPoint("TOPLEFT", 2, -6 - (i - 1) * step)
-        local tx = W.Text(body, 11, T.text); tx:SetPoint("LEFT", sw, "RIGHT", 6, 0)
-        local val = W.Text(body, 12, T.amber, W.NUM, "RIGHT"); val:SetPoint("RIGHT", ring, "LEFT", -10, 0); val:SetPoint("TOP", sw, "TOP", 0, 2)
+        local val = W.Text(body, 12, T.amber, W.NUM, "RIGHT"); val:SetPoint("RIGHT", ring, "LEFT", -8, 0); val:SetPoint("TOP", sw, "TOP", 0, 2)
+        local tx = W.Text(body, 11, T.text); tx:SetPoint("LEFT", sw, "RIGHT", 6, 0); tx:SetPoint("RIGHT", val, "LEFT", -6, 0)
+        tx:SetJustifyH("LEFT"); tx:SetWordWrap(false)
         rows[i] = { sw = sw, tx = tx, val = val }
     end
     local o = { ring = ring }
@@ -293,6 +294,7 @@ function W.RingWithLegend(body, bw, bh)
                 W.Color(r.sw, p[3])
                 r.tx:SetText(p[1])
                 r.val:SetText((fmt or ns.FormatInt)(p[2]))
+                r.val:SetWidth(0); r.val:SetWidth(math.ceil(r.val:GetStringWidth()) + 1)
             else
                 r.sw:Hide(); r.tx:Hide(); r.val:Hide()
             end

@@ -7,7 +7,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 550 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level)
+- **Tracks:** 616 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -22,7 +22,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 | ![Social and silly](docs/screenshots/social.png) Social & Silly | ![Timeline](docs/screenshots/timeline.png) Timeline |
 | ![How it works](docs/screenshots/how-it-works.png) How it works | |
 
-In-game captures from versions 1.7 to 1.9 (Mage, level 5–6, class-colour accent). Later versions add the Legend card, Week/Month ranges, themes and the dungeon book.
+The dashboard is from 1.10; the other captures are from versions 1.7 to 1.9 (Mage, level 5–6, class-colour accent). Later versions add the Legend card, Week/Month ranges, themes and the dungeon book.
 </details>
 
 ## Download
@@ -55,7 +55,7 @@ Steps, jumps, kills and deaths counters · kills vs deaths in your five deadlies
 | Social & Silly | Chat, whispers (and whispers while AFK), emotes (dances, hugs, waves, laughs, cheers, bows, chickens, rude), /roll count, average and perfect rolls, inspects, assists, targets selected, NPC conversations, food, drink, bandages, AFK time, bags/character/spellbook/talents/quest log/friends/map opened, red error messages, screenshots, logins, reloads, and how often you opened this window |
 | Records | Biggest hit, crit, heal, crit heal, hit and crit taken; most crits in a row; **biggest fall survived (damage and % of health) and biggest fatal fall; longest airtime, survived and fatal; longest corpse run by time and by distance**; longest wait for a resurrection; longest life between deaths; longest fight and most kills in one fight; kill streak; slowest quest and level; longest flight; most gold carried; fastest speed; longest session |
 | Fastest & Uniques | **Fastest:** level-up, fight won, 10 kills, quest accept → turn-in, corpse run, flight, session start → first death, battleground win, and a fastest clear for every dungeon and raid. **Uniques:** NPCs met, vendors, trainers, flight masters, bankers, auctioneers, creature types killed, different players killed, dungeon/raid/world bosses, instances, zones, subzones, quests, items, spells, groupmates, duel opponents, emotes. **Firsts:** first kill, death, jump, quest, NPC, level-up, green, blue, epic, dungeon, boss, raid, player kill, duel won, battleground win, mount ride, fish |
-| Top Lists | Dungeon book (every instance: bosses found / total, runs, clears, fastest), then top 100 of: creatures killed, players killed by class, killers, dungeon bosses, raid bosses, instance runs, zones by time/distance/kills/deaths, capital cities by time, continents by time/distance, instances by time, spells cast, time in each form, emotes, NPCs visited, reputation, skill-ups, time per level, red error messages, epic loot |
+| Top Lists | Dungeon book (every instance: bosses found / total, runs, clears, fastest), session history, battlegrounds won and lost, then top 100 of: creatures killed, players killed by class, killers, dungeon bosses, raid bosses, instance runs, zones by time/distance/kills/deaths, capital cities by time, continents by time/distance, instances by time, spells cast, time in each form, emotes, NPCs visited, reputation, skill-ups, time per level, red error messages, epic loot |
 | Timeline | Today's counters, a 30-day chart (steps, kills, deaths, XP, gold, online time) and a day-by-day table |
 
 Search finds any statistic by name across all pages.
@@ -102,7 +102,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-v1.11.0-forever.zip`.
+1. Download `LifeTimeStats-v1.12.0-forever.zip`.
 2. Unzip into `World of Warcraft\_classic_beta_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -126,6 +126,8 @@ Upgrading from any earlier version keeps all your existing stats.
 | `/lts sheet` | Copyable character sheet |
 | `/lts title` | Cycle earned titles |
 | `/lts recap` | One-line summary of this session |
+| `/lts score` | Your Adventurer score and how it is made |
+| `/lts csv` | Your play sessions as CSV, in a copyable window |
 | `/lts debug` | Which game data sources work this session, in a copyable window |
 
 `/lifetimestats` works too. Minimap button: left-click opens the window, right-click opens settings, drag to move.

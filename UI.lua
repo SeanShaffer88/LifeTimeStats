@@ -210,11 +210,11 @@ local function BuildDashboard()
         self.goldInfo:SetText("Net, last 30 days\nEarned " .. Money(inn) .. "\nSpent " .. Money(out) .. "\nBest day " .. Money(best))
         self.goldCols:Set(vals, { C.amber }, labels, { labels[1], labels[15], "Today" }, Money, { "Net gold" })
         -- deaths
-        local o = c(base, "deaths_fatigue") + c(base, "deaths_lava")
+        local o = c(base, "deaths_fatigue") + c(base, "deaths_slime")
         self.deathRing:Set({
             { "Creatures", c(base, "deaths_npc"), C.amber }, { "Players", c(base, "deaths_pvp"), C.rust },
             { "Falling", c(base, "deaths_fall"), C.cream2 }, { "Drowning", c(base, "deaths_drown"), C.teal },
-            { "Other", o, C.dim },
+            { "Fire / lava", c(base, "deaths_lava"), C.amber2 or C.rust }, { "Other", o, C.dim },
         }, Int(c(base, "deaths")), "deaths")
         -- bands
         local bv, bLabels = {}, {}
@@ -1189,7 +1189,8 @@ function ns.RefreshWindow()
             Int(d.deaths or 0), Int(d.quests_done or 0), Time(d.time_online or 0) }
         for i, fs in ipairs(win.today) do fs:SetText(vals[i]) end
     end
-    win.level:SetText(string.format("%s · Level %d", UnitClass("player") or "", UnitLevel("player") or 0))
+    win.level:SetText(string.format("%s · Level %d%s", UnitClass("player") or "", UnitLevel("player") or 0,
+        ns.Score and ("  ·  " .. ns.FormatInt((ns.Score(ns.char))) .. " pts") or ""))
 end
 
 local function DefaultScale()

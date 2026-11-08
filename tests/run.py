@@ -343,7 +343,7 @@ eq(ns.AchNewCount(), 0, "viewing the page marks achievements seen")
 for _, cn in ipairs({"Travel","Fastest","All"}) do end
 ns.settings.scope = "account"; ns.ShowPage("achievements"); ns.settings.scope = "char"
 print("ACH " .. #ns.ACHIEVEMENTS .. " achievements, " .. t .. " tiers, " .. mx .. " points")
-print("STATS " .. ns.CountStats())
+print("STATS " .. ns.CountStats() .. " ACHS " .. #ns.ACHIEVEMENTS)
 
 -- ===== v1.4 compare + share =====
 -- second character in the account file
@@ -983,6 +983,48 @@ do
   GetInstanceInfo = real; IsInInstance = realIn; ns.char.run = nil
   fire("PLAYER_ENTERING_WORLD", false, false)
   ns.ShowPage("lists")
+end
+
+-- ===== v1.12.0 character: sessions, score, peak stats, battlegrounds =====
+do
+  ns.char.sessionlog = nil
+  NOW = NOW + 600
+  ns.LogSession(); ns.LogSession()
+  eq(#ns.char.sessionlog, 1, "one entry per session (updates in place)")
+  local st = ns.SessionStats()
+  eq(st.n, 1, "session count"); eq(st.avg > 0, true, "session average")
+  local csv = ns.SessionCSV()
+  eq(select(2, csv:gsub("\n", "")) , 1, "csv header + 1 row")
+  local total, parts = ns.Score()
+  eq(total > 0, true, "score positive"); eq(#parts, #ns.SCORE_PARTS, "score parts")
+  eq(ns.ScoreText():find("Adventurer score", 1, true) ~= nil, true, "score text")
+  -- peak stats
+  UnitStat = function(_, i) return 10, 20 + i end
+  UnitArmor = function() return 50, 120 end
+  GetCritChance = function() return 5.25 end
+  GetInventoryItemLink = function(_, slot) if slot <= 10 then return "item:" .. slot end end
+  GetItemInfo = function(link) return "x", link, 2, 15 end
+  ns.ScanCharacterStats()
+  eq(ns.char.r.max_str, 21, "peak strength"); eq(ns.char.r.max_armor, 120, "peak armor")
+  eq(ns.char.r.max_crit_pct, 5.25, "peak crit"); eq(ns.char.r.max_ilvl, 15, "best item level")
+  -- battleground end
+  ns.char.meta.bgStreak = 0
+  ns.OnBattlegroundEnd({ name = "Warsong Gulch" }, true)
+  ns.OnBattlegroundEnd({ name = "Warsong Gulch" }, true)
+  eq(ns.char.t.bgwins["Warsong Gulch"], 2, "wins by battleground"); eq(ns.char.r.max_bg_streak, 2, "win streak")
+  ns.OnBattlegroundEnd({ name = "Arathi Basin" }, false)
+  eq(ns.char.meta.bgStreak, 0, "streak reset on loss")
+  local f0 = ns.char.c.bg_flags_captured or 0
+  fire("CHAT_MSG_BG_SYSTEM_HORDE", UnitName("player") .. " captured the Alliance flag!")
+  eq(ns.char.c.bg_flags_captured, f0 + 1, "flag capture")
+  fire("CHAT_MSG_BG_SYSTEM_HORDE", "Someone captured the Alliance flag!")
+  eq(ns.char.c.bg_flags_captured, f0 + 1, "others' captures ignored")
+  -- slash commands go to the text window
+  local shown = 0; local real = ns.ShowText; ns.ShowText = function() shown = shown + 1 end
+  SlashCmdList.LIFETIMESTATS("score"); SlashCmdList.LIFETIMESTATS("csv"); ns.ShowText = real
+  eq(shown, 2, "score and csv windows")
+  for _, l in ipairs(ns.LISTS) do if l.rows then eq(type(l.rows(ns.char, ns.session)), "table", "rows " .. l.id); eq(type(l.count(ns.char)), "number", "count " .. l.id) end end
+  ns.ShowPage("records"); ns.ShowPage("lists"); ns.ShowPage("life"); ns.ShowPage("combat"); ns.ShowPage("achievements")
 end
 
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))

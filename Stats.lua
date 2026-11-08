@@ -213,6 +213,16 @@ ns.STATS = {
         { label = "Battlegrounds played", fmt = "int", key = "runs_pvp" },
         { label = "Battlegrounds won", fmt = "int", key = "bg_won" },
         { label = "Battlegrounds lost", fmt = "int", key = "bg_lost" },
+        { label = "Battleground win rate", fmt = "pct", get = function(v) local w, l = C(v, "bg_won"), C(v, "bg_lost") return (w + l) > 0 and w * 100 / (w + l) or 0 end },
+        { label = "Battleground killing blows", fmt = "int", key = "bg_killing_blows", tip = "From the battleground scoreboard at the end of each game." },
+        { label = "Battleground honorable kills", fmt = "int", key = "bg_hks" },
+        { label = "Battleground deaths", fmt = "int", key = "bg_deaths" },
+        { label = "Honor from battlegrounds", fmt = "int", key = "bg_honor" },
+        { label = "Flags captured", fmt = "int", key = "bg_flags_captured" },
+        { label = "Flags returned", fmt = "int", key = "bg_flags_returned" },
+        { label = "Flags picked up", fmt = "int", key = "bg_flags_picked" },
+        { label = "Bases assaulted", fmt = "int", key = "bg_bases_assaulted" },
+        { label = "Bases defended", fmt = "int", key = "bg_bases_defended" },
     },
     deaths = {
         { label = "Deaths", fmt = "int", key = "deaths" },
@@ -406,6 +416,11 @@ ns.STATS = {
         { label = "Bandages applied", fmt = "int", key = "bandages" },
         { label = "Times gone AFK", fmt = "int", key = "afk_count" },
         { label = "Time AFK", fmt = "time", key = "time_afk" },
+        { label = "Active time (not AFK)", fmt = "time", get = function(v) return math.max(0, C(v, "time_online") - C(v, "time_afk")) end },
+        { label = "Play sessions", fmt = "int", get = function(v) return ns.SessionStats and ns.SessionStats(v).n or 0 end, tip = "A /reload continues the same session." },
+        { label = "Average session", fmt = "time", get = function(v) return ns.SessionStats and ns.SessionStats(v).avg or 0 end },
+        { label = "Average play per day played", fmt = "time", get = function(v) return ns.SessionStats and ns.SessionStats(v).perDay or 0 end },
+        { label = "Daily average, last 7 days", fmt = "time", get = function(v) return ns.SessionStats and ns.SessionStats(v).weekPerDay or 0 end },
         { label = "Bags opened", fmt = "int", key = "bags_opened" },
         { label = "Character sheet opened", fmt = "int", key = "char_opens" },
         { label = "Spellbook opened", fmt = "int", key = "spellbook_opens" },
@@ -485,6 +500,35 @@ ns.STATS = {
         { label = "Killed by something 5+ levels below you", fmt = "int", key = "deaths_lowbie" },
     },
     records = {
+        { label = "Adventurer score", fmt = "int", get = function(v) return ns.Score and ns.Score(v) or 0 end, tip = "One number for how far you have come: levels, quests, exploration, dungeons, achievements, professions, gear and gold, minus 25 per death. /lts score shows the breakdown." },
+        { label = "Best average item level", fmt = "num1", rec = "max_ilvl" },
+        { label = "Highest strength", fmt = "int", rec = "max_str" },
+        { label = "Highest agility", fmt = "int", rec = "max_agi" },
+        { label = "Highest stamina", fmt = "int", rec = "max_sta" },
+        { label = "Highest intellect", fmt = "int", rec = "max_int" },
+        { label = "Highest spirit", fmt = "int", rec = "max_spi" },
+        { label = "Highest armor", fmt = "int", rec = "max_armor" },
+        { label = "Highest attack power", fmt = "int", rec = "max_ap" },
+        { label = "Highest spell power", fmt = "int", rec = "max_spellpower" },
+        { label = "Highest healing power", fmt = "int", rec = "max_healpower" },
+        { label = "Highest crit chance", fmt = "pct", rec = "max_crit_pct" },
+        { label = "Highest spell crit chance", fmt = "pct", rec = "max_spellcrit_pct" },
+        { label = "Highest dodge chance", fmt = "pct", rec = "max_dodge_pct" },
+        { label = "Highest parry chance", fmt = "pct", rec = "max_parry_pct" },
+        { label = "Highest block chance", fmt = "pct", rec = "max_block_pct" },
+        { label = "Highest fire resistance", fmt = "int", rec = "max_res_fire" },
+        { label = "Highest nature resistance", fmt = "int", rec = "max_res_nature" },
+        { label = "Highest frost resistance", fmt = "int", rec = "max_res_frost" },
+        { label = "Highest shadow resistance", fmt = "int", rec = "max_res_shadow" },
+        { label = "Highest arcane resistance", fmt = "int", rec = "max_res_arcane" },
+        { label = "Factions at Friendly or better", fmt = "int", rec = "max_friendly" },
+        { label = "Factions at Honored or better", fmt = "int", rec = "max_honored" },
+        { label = "Factions at Revered or better", fmt = "int", rec = "max_revered" },
+        { label = "Factions at Exalted", fmt = "int", rec = "max_exalted" },
+        { label = "Longest play session", fmt = "time", rec = "max_session_time" },
+        { label = "Longest battleground win streak", fmt = "int", rec = "max_bg_streak" },
+        { label = "Most killing blows in one battleground", fmt = "int", rec = "max_bg_kb" },
+        { label = "Most honorable kills in one battleground", fmt = "int", rec = "max_bg_hks" },
         { label = "Biggest hit", fmt = "int", rec = "max_hit" },
         { label = "Biggest crit", fmt = "int", rec = "max_crit" },
         { label = "Highest health", fmt = "int", rec = "max_health" },
@@ -650,6 +694,22 @@ ns.LISTS = {
           end
           return rows
       end },
+    { id = "sessionlog", name = "Session history",
+      count = function(v) return #(v.sessionlog or {}) end,
+      rows = function(v)
+          local rows, log = {}, v.sessionlog or {}
+          local longest = 1
+          for _, e in ipairs(log) do if (e.d or 0) > longest then longest = e.d end end
+          for i = #log, math.max(1, #log - 99), -1 do
+              local e = log[i]
+              rows[#rows + 1] = { tostring(#log - i + 1), date("%a %b %d  %H:%M", e.s or 0) .. "  |cff8a8a8alevel " .. (e.l or "?") .. (e.z and (" · " .. e.z) or "") .. "|r",
+                  (e.d or 0) / longest, Time(e.d or 0), Int(e.k or 0) .. " kills · " .. Int(e.steps or 0) .. " steps" }
+          end
+          return rows
+      end },
+    { id = "bgwins", name = "Battlegrounds won", fmt = "int" },
+    { id = "bglosses", name = "Battlegrounds lost", fmt = "int" },
+    { id = "bgobjectives", name = "Battleground objectives", fmt = "int" },
     { id = "dungeonruns", name = "Dungeon runs", fmt = "int" },
     { id = "dungeonclears", name = "Dungeon full clears", fmt = "int" },
     { id = "killedwith", name = "What killed you", fmt = "int" },

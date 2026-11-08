@@ -2,7 +2,23 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [1.11.0-forever] - 2026-11-08
+## [1.12.0-forever] - 2026-11-08
+
+Ideas from TimePlayed+, PlayedTracker, PvP Stats Tracker, Classic Score, Siouxx Classic Stats, Extended Character Stats and CharacterStatsClassic (public descriptions only).
+
+### Added
+- **Adventurer score**: one number for how far your character has come (levels, quests, exploration, dungeons, achievements, professions, gear, gold, minus 25 per death). Shown next to your level in the header and on Records; `/lts score` shows the breakdown. Achievement: Living Legend.
+- **Session history**: one entry per play session (a /reload continues it) with length, AFK time, level, zone, steps, kills, deaths, quests, XP and damage. Top Lists → Session history; `/lts csv` exports it for a spreadsheet. Play sessions, average session, average per day played, daily average over the last 7 days, longest session.
+- **Active time** (online minus AFK).
+- **Peak character stats** on Records: best average item level, highest strength / agility / stamina / intellect / spirit, armor, attack power, spell power, healing power, crit, spell crit, dodge, parry, block and each resistance.
+- **Reputation standings**: factions at Friendly, Honored, Revered and Exalted. Achievement: Best Friends Forever.
+- **Battlegrounds**: wins and losses per battleground, win rate, win streak, and your scoreboard row at the end of each game (killing blows, honorable kills, deaths, honor, objectives); flags captured, returned and picked up, bases assaulted and defended. Achievements: Capture the Flag, On a Roll.
+
+### Fixed
+- Dashboard: legend values no longer run into their labels (e.g. "Vendors4s 65c"); long labels are cut instead.
+- Deaths by cause has its own Fire / lava slice (fire deaths were under Other).
+
+ - 2026-11-08
 
 ### Added: dungeon book
 - All 35 Forever dungeons and 3 raids (Onyxia's Lair, Barrow Deeps, Hyjal Summit) with level range, zone and boss list, including the 9 new dungeons.

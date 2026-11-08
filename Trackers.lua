@@ -241,8 +241,10 @@ local function CheckBattleground()
         Add("bg_won")
         ns.Min("bg_win", time() - run.start, run.name)
         ns.First("bg_win", run.name)
+        if ns.OnBattlegroundEnd then pcall(ns.OnBattlegroundEnd, run, true) end
     else
         Add("bg_lost")
+        if ns.OnBattlegroundEnd then pcall(ns.OnBattlegroundEnd, run, false) end
     end
 end
 On("UPDATE_BATTLEFIELD_STATUS", CheckBattleground)

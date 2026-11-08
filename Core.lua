@@ -590,6 +590,10 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         local t = ns.CycleTitle()
         ns.Print("Title: " .. ns.TitledName() .. (t and "" or " (no title)"))
         if ns.RefreshWindow then ns.RefreshWindow() end
+    elseif cmd == "score" then
+        ns.ShowText("Adventurer score", "How your score is made. Ctrl+A, Ctrl+C to copy.", ns.ScoreText())
+    elseif cmd == "csv" or cmd == "sessions" then
+        ns.ShowText("Session history (CSV)", "One line per play session. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.SessionCSV())
     elseif cmd == "recap" then
         ns.Print("This session: " .. RecapText(ns.session.c, GetTime() - ns.session.start, SessionTopSpell()))
     elseif cmd == "debug" then
@@ -614,6 +618,8 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("/lts errors - recent Lua errors (Forever hides them)")
         ns.Print("/lts debug - which game data sources are working")
         ns.Print("/lts sheet - character sheet you can copy · /lts title - cycle earned titles")
+        ns.Print("/lts score - your Adventurer score and how it is made")
+        ns.Print("/lts csv - your play sessions as CSV for a spreadsheet")
     end
 end
 
