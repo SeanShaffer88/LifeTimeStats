@@ -1,4 +1,4 @@
-![LifeTimeStats](logo.png)
+![LifeTimeStats](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/logo.png)
 
 # LifeTimeStats
 
@@ -9,18 +9,18 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **License:** GPL-3.0-or-later (see `LICENSE`)
 - **Tracks:** 616 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
 <details>
 <summary><b>More screenshots</b></summary>
 
 | | |
 |---|---|
-| ![Top Lists](docs/screenshots/top-lists.png) Top Lists | ![What hurt you most](docs/screenshots/what-hurt-you.png) What hurt you most (damage meter) |
-| ![Achievements](docs/screenshots/achievements.png) Achievements | ![Records](docs/screenshots/records.png) Records |
-| ![Fastest and uniques](docs/screenshots/fastest-uniques.png) Fastest & Uniques | ![Wealth and loot](docs/screenshots/wealth.png) Wealth & Loot |
-| ![Social and silly](docs/screenshots/social.png) Social & Silly | ![Timeline](docs/screenshots/timeline.png) Timeline |
-| ![How it works](docs/screenshots/how-it-works.png) How it works | |
+| ![Top Lists](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/top-lists.png) Top Lists | ![What hurt you most](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/what-hurt-you.png) What hurt you most (damage meter) |
+| ![Achievements](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/achievements.png) Achievements | ![Records](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/records.png) Records |
+| ![Fastest and uniques](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/fastest-uniques.png) Fastest & Uniques | ![Wealth and loot](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/wealth.png) Wealth & Loot |
+| ![Social and silly](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/social.png) Social & Silly | ![Timeline](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/timeline.png) Timeline |
+| ![How it works](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/how-it-works.png) How it works | |
 
 The dashboard is from 1.10; the other captures are from versions 1.7 to 1.9 (Mage, level 5–6, class-colour accent). Later versions add the Legend card, Week/Month ranges, themes and the dungeon book.
 </details>
@@ -62,7 +62,7 @@ Search finds any statistic by name across all pages.
 
 ## Achievements
 
-99 achievements of LifeTimeStats' own, with up to 6 tiers each: **354 badges and 7,110 points**. Each one shows its tier pips, progress to the next tier and, on hover, every tier with the date you earned it.
+111 achievements of LifeTimeStats' own, with up to 6 tiers each: **396 badges and 7,890 points**. Each one shows its tier pips, progress to the next tier and, on hover, every tier with the date you earned it.
 
 | Category | Examples |
 |---|---|
@@ -163,25 +163,17 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 
 ```
 LifeTimeStats/
-  LifeTimeStats.toc  Core.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Achievements.lua  Share.lua  Backup.lua  UI.lua  Options.lua
+  LifeTimeStats.toc
+  Core.lua  Themes.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Life.lua  Story.lua
+  Meter.lua  Chronicle.lua  Dungeons.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
+  UI.lua  Options.lua
   Media/icon.tga  Media/dot.tga  Media/icons/*.tga  icon.png  logo.png
   README.md  CHANGELOG.md  DESCRIPTION.md  AUDIT.md  CREDITS.md  LICENSE
 ```
 
-## Screenshots to capture (in game)
-
-1. Dashboard, This character, Lifetime.
-2. Fastest & Uniques page after a dungeon run.
-3. Combat page showing the "Attacks on you" ring.
-4. Top Lists → Most killed creatures.
-5. Timeline page with the Gold chart selected.
-6. Search results for "fall".
-7. Same window on two different classes (class colour accents).
-8. Settings page.
-9. Achievements page with a few tiers earned, and a tooltip showing tier dates.
-10. An achievement toast (alerts set to Toast).
-11. Compare page with two characters.
-12. Share dialog with a preview.
+## Support
+Found a bug or have an idea? Open an issue: https://github.com/SeanShaffer88/LifeTimeStats/issues
+Include the output of `/lts debug` and `/lts errors` (both open in a copyable window).
 
 ## Development
 - `tests/run.py` runs every Lua file under Lua 5.1 with a stubbed WoW API (needs Python and `pip install lupa`): `python tests/run.py`.

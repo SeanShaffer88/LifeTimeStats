@@ -23,7 +23,7 @@ Different NPCs met, creatures killed, bosses, zones, subzones, quests, items, sp
 Most visited capital city, continent and zone. Time and distance per zone and continent. Kills and deaths per zone.
 
 ## Achievements
-99 achievements of its own with up to 6 tiers each: Walk It Off, Bunny Hopper, Gravity Always Wins, Marathon Ghost, Untouchable, Dragon's Hoard, Bawk Bawk, Not Enough Mana, Express Delivery and more. 354 badges and 7,110 points to chase. Alerts are optional.
+111 achievements of its own with up to 6 tiers each: Walk It Off, Bunny Hopper, Gravity Always Wins, Marathon Ghost, Untouchable, Dragon's Hoard, Bawk Bawk, Not Enough Mana, Express Delivery and more. 396 badges and 7,890 points to chase. Alerts are optional.
 
 ## Compare and share
 Put two characters side by side (or one against all of them) across every stat, and share a one-line summary to Say, Party, Raid, Guild or Instance chat when you choose to.

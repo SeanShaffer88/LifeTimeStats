@@ -1,6 +1,6 @@
 # Audit - LifeTimeStats 1.12.1-forever
 
-Date: 2026-11-07 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
+Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
 ## Evidence labels
 - **Verified (offline):** run under Lua 5.1 with a stubbed WoW API (`tests/run.py`, 245 assertions, all passing). Proves syntax, load order, tracker logic, data model upgrade, formatting, backup round-trip and that every page, scope and range renders without a Lua error against the stubs.
@@ -17,6 +17,7 @@ avoidance split (dodge/parry in and out) · crits and crushing blows taken · un
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
 
 ## 1.12.1
+- Release audit (2026-11-08): TOC, structure, globals (runtime diff: only SLASH_LIFETIMESTATS1/2 and the SavedVariables), API guards, secrets, ZIP layout and tests (269 assertions) pass. Fixed from it: achievement counts in README/DESCRIPTION (111 / 396 tiers / 7,890 points), README file list, internal screenshot to-do removed, Issues link added, README images use absolute URLs so they show inside the ZIP. Open: in-game taint check of the /played chat suppression (Trackers.lua replaces ChatFrame_DisplayTimePlayed), luacheck (not run here), git tags and releases.
 - In game (1.12.1): score 812, gear part 50 (best average item level 5 on a level 6), lines readable without padding.
 - In game (1.12.0): `/lts score` window opens; score 752 = level 600, quests 50, exploration 45, achievements 90, professions 42, deaths -75; gear 0 (item-level threshold too high for a level 6), wealth 0 (under 1 gold earned). 0 Lua errors seen.
 
