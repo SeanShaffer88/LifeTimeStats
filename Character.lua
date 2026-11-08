@@ -129,7 +129,7 @@ local function ScanStats()
         if okR then Max(key, N(total) or 0) end
     end
     local il, slots = AvgItemLevel()
-    if il and slots >= 8 then Max("max_ilvl", il) end
+    if il and slots >= 3 then Max("max_ilvl", il) end
 end
 local function Queue()
     if pending or not C_Timer then return end
@@ -238,6 +238,6 @@ end
 function ns.ScoreText(v)
     local total, parts = ns.Score(v)
     local out = { "Adventurer score: " .. ns.FormatInt(total), "" }
-    for _, p in ipairs(parts) do out[#out + 1] = string.format("%-13s %8s   (%s)", p[1], ns.FormatInt(p[2]), p[3]) end
+    for _, p in ipairs(parts) do out[#out + 1] = p[1] .. ": " .. ns.FormatInt(p[2]) .. "   · " .. p[3] end
     return table.concat(out, "\n")
 end

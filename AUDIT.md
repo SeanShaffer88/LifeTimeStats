@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.12.0-forever
+# Audit - LifeTimeStats 1.12.1-forever
 
 Date: 2026-11-07 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,9 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.12.1
+- In game (1.12.0): `/lts score` window opens; score 752 = level 600, quests 50, exploration 45, achievements 90, professions 42, deaths -75; gear 0 (item-level threshold too high for a level 6), wealth 0 (under 1 gold earned). 0 Lua errors seen.
 
 ## 1.12.0
 - In game (1.10.0 screenshot): Legend card, Week/Month ranges, 7-row Today box render; defects seen and fixed: gold-source legend value overlapping its label, fire death counted under Other.

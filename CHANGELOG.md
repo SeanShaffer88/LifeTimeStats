@@ -2,7 +2,15 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [1.12.0-forever] - 2026-11-08
+## [1.12.1-forever] - 2026-11-08
+
+From an in-game test of `/lts score` (score 752, every part shown).
+
+### Fixed
+- Gear part of the score stayed 0 on low-level characters: the best average item level now counts once 3 slots have an item level (was 8).
+- `/lts score` lines no longer rely on space padding (the game font is not fixed-width).
+
+ - 2026-11-08
 
 Ideas from TimePlayed+, PlayedTracker, PvP Stats Tracker, Classic Score, Siouxx Classic Stats, Extended Character Stats and CharacterStatsClassic (public descriptions only).
 
