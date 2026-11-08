@@ -12,17 +12,20 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 ![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
 <details>
-<summary><b>More screenshots</b></summary>
+<summary><b>More screenshots (every page)</b></summary>
 
 | | |
 |---|---|
-| ![Top Lists](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/top-lists.png) Top Lists | ![What hurt you most](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/what-hurt-you.png) What hurt you most (damage meter) |
-| ![Achievements](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/achievements.png) Achievements | ![Records](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/records.png) Records |
-| ![Fastest and uniques](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/fastest-uniques.png) Fastest & Uniques | ![Wealth and loot](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/wealth.png) Wealth & Loot |
-| ![Social and silly](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/social.png) Social & Silly | ![Timeline](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/timeline.png) Timeline |
-| ![How it works](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/how-it-works.png) How it works | |
+| ![Travel](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/travel.png)<br>Travel | ![Combat](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/combat.png)<br>Combat |
+| ![Deaths](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/deaths.png)<br>Deaths | ![Adventure](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/adventure.png)<br>Adventure |
+| ![Wealth & Loot](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/wealth.png)<br>Wealth & Loot | ![Social & Silly](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/social.png)<br>Social & Silly |
+| ![Adventurer's Life](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/adventurers-life.png)<br>Adventurer's Life | ![Records](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/records.png)<br>Records |
+| ![Fastest & Uniques](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/fastest-uniques.png)<br>Fastest & Uniques | ![Top Lists](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/top-lists.png)<br>Top Lists |
+| ![Timeline](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/timeline.png)<br>Timeline | ![Journal](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/journal.png)<br>Journal |
+| ![Achievements](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/achievements.png)<br>Achievements | ![Compare](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/compare.png)<br>Compare |
+| ![How it works](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/how-it-works.png)<br>How it works |  |
 
-The dashboard is from 1.10; the other captures are from versions 1.7 to 1.9 (Mage, level 5–6, class-colour accent). Later versions add the Legend card, Week/Month ranges, themes and the dungeon book.
+In-game captures from version 1.12.1 (Mage, level 6, class-colour accent).
 </details>
 
 ## Download
