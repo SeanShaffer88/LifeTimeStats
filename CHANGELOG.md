@@ -2,6 +2,16 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.12.2-forever] - 2026-11-08
+
+From a full set of in-game screenshots of 1.12.1.
+
+### Fixed
+- Most cast spells: internal spells such as LOGINEFFECT no longer appear; "Attack" (auto attack) is listed as Melee. Existing entries are repaired once at login.
+- Deaths: data written by versions before 1.5, when every death was blamed on Fatigue, is repaired once: those deaths move to Unknown cause (Killed most often by, first death, Deaths by cause, daily history).
+- Time per level and Life per level were empty until your next level-up: the level you are on now is shown as it grows, and the level you installed on is marked "(since install)" and not used for fastest or slowest level records.
+- How it works: the combat-log, damage and death-cause texts describe the damage meter and death recap instead of the old n/a behaviour.
+
 ## [1.12.1-forever] - 2026-11-08
 
 From an in-game test of `/lts score` (score 752, every part shown).

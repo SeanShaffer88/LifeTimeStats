@@ -105,7 +105,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-v1.12.1-forever.zip`.
+1. Download `LifeTimeStats-v1.12.2-forever.zip`.
 2. Unzip into `World of Warcraft\_classic_beta_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 

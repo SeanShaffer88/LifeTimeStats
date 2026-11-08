@@ -241,3 +241,57 @@ function ns.ScoreText(v)
     for _, p in ipairs(parts) do out[#out + 1] = p[1] .. ": " .. ns.FormatInt(p[2]) .. "   · " .. p[3] end
     return table.concat(out, "\n")
 end
+
+-- ------------------------------------------------------------ one-time data repairs
+-- 1.12.2: (a) all-caps internal spells (e.g. LOGINEFFECT) and "Attack" in the cast list;
+-- (b) deaths wrongly blamed on Fatigue by versions before 1.5 (mirror timer bug) move to Unknown;
+-- (c) the level you installed on gets a starting mark and snapshot so per-level tables show it.
+local function Repair()
+    local ch = ns.char
+    if not ch then return end
+    local m = ch.meta
+    m.repairs = m.repairs or {}
+    if not m.repairs.spells then
+        m.repairs.spells = true
+        local t = ch.t.spells
+        if t then
+            for k, v in pairs(t) do
+                if type(k) == "string" and k:match("^%u+$") then t[k] = nil; ch.c.casts = math.max(0, (ch.c.casts or 0) - v) end
+            end
+            for _, old in ipairs({ "Attack", "Auto Attack" }) do
+                if t[old] then t.Melee = (t.Melee or 0) + t[old]; t[old] = nil end
+            end
+        end
+    end
+    if not m.repairs.fatigue then
+        m.repairs.fatigue = true
+        local n = ch.c.deaths_fatigue or 0
+        local killers = ch.t.killers or {}
+        if n > 0 then
+            ch.c.deaths_fatigue = 0
+            ch.c.deaths_npc = (ch.c.deaths_npc or 0) + n
+            local f = killers.Fatigue or 0
+            if f > 0 then killers.Fatigue = nil; killers.Unknown = (killers.Unknown or 0) + f end
+            for _, d in pairs(ch.days or {}) do
+                if d.deaths_fatigue then d.deaths_npc = (d.deaths_npc or 0) + d.deaths_fatigue; d.deaths_fatigue = nil end
+            end
+        end
+        local fd = ch.first and ch.first.death
+        if fd == "Fatigue" then ch.first.death = "Unknown" end
+        if type(fd) == "table" and fd[1] == "Fatigue" then fd[1] = "Unknown" end
+        if type(fd) == "table" and fd.v == "Fatigue" then fd.v = "Unknown" end
+        for _, e in ipairs(ch.journal or {}) do
+            if type(e[2]) == "string" then e[2] = e[2]:gsub("^Died to Fatigue", "Died"):gsub(": Fatigue$", ": Unknown") end
+        end
+    end
+    local lvl = UnitLevel("player")
+    if lvl and lvl > 0 and not m.levelMark then
+        m.levelMark, m.levelMarkLevel, m.levelMarkPartial = ch.c.time_online or 0, lvl, true
+    end
+    ch.lvlsnap = ch.lvlsnap or {}
+    if lvl and not ch.lvlsnap[tostring(lvl)] and next(ch.lvlsnap) == nil and ns.LevelSnapshotQuiet then
+        ns.LevelSnapshotQuiet(lvl, true)
+    end
+end
+On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload) if isLogin or isReload then pcall(Repair) end end)
+ns.RepairData = Repair

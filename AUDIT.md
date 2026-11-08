@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.12.1-forever
+# Audit - LifeTimeStats 1.12.2-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,10 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.12.2
+- In game (1.12.1, 16 screenshots, every page): all pages render; defects seen and fixed here: LOGINEFFECT and Attack in Most cast spells, Fatigue blamed for a death (pre-1.5 data), empty per-level tables at the install level, outdated How it works texts.
+- Verified (offline): repairs run once (spells, fatigue deaths, first death, killer list), install level marked partial with a starting snapshot, Records and Journal pages render.
 
 ## 1.12.1
 - Release audit (2026-11-08): TOC, structure, globals (runtime diff: only SLASH_LIFETIMESTATS1/2 and the SavedVariables), API guards, secrets, ZIP layout and tests (269 assertions) pass. Fixed from it: achievement counts in README/DESCRIPTION (111 / 396 tiers / 7,890 points), README file list, internal screenshot to-do removed, Issues link added, README images use absolute URLs so they show inside the ZIP. Open: in-game taint check of the /played chat suppression (Trackers.lua replaces ChatFrame_DisplayTimePlayed), luacheck (not run here), git tags and releases.

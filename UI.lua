@@ -469,7 +469,16 @@ local function BuildCategories()
         { label = "Longest kill streak", icon = "skull", value = function(v) return v.r.max_streak or 0 end, sub = function() return "kills without dying" end },
         { label = "Biggest heal", icon = "heart", value = function(v) return v.r.max_heal or 0 end, sub = function(v) return v.r.max_heal_what or "" end },
     }, {
-        ListPanel("Time per level", "clock", 280, "leveltime", Time, 11, "Online time spent on each level (only levels started with the addon running)."),
+        { title = "Time per level", icon = "clock", h = 280, tip = "Online time spent on each level. The level you are on now is shown as it grows; the level you installed on is marked (since install).",
+          build = function(b, bw, bh) return W.BarList(b, bw, bh, 11) end,
+          update = function(o, v, base)
+              local list = ns.TopList(base, "leveltime", 10)
+              local m = ns.char and ns.char.meta
+              if base == ns.char and m and m.levelMark and m.levelMarkLevel == UnitLevel("player") then
+                  table.insert(list, 1, { "Level " .. m.levelMarkLevel .. (m.levelMarkPartial and " (since install)" or " (now)"), (ns.char.c.time_online or 0) - m.levelMark })
+              end
+              o:Set(list, Time)
+          end },
         ListPanel("Most cast spells", "star", nil, "spells", Int, 10),
     }, {
         title = "Records",
@@ -1068,12 +1077,19 @@ local function BuildJournal()
         for k in pairs(snaps) do levels[#levels + 1] = tonumber(k) end
         table.sort(levels)
         local lr = {}
+        -- current level so far (from the last snapshot)
+        local curLv = UnitLevel("player") or 0
+        local now = snaps[tostring(curLv)]
+        if now then
+            local function d(k) return (ns.char.c[k] or 0) - (now[k] or 0) end
+            lr[#lr + 1] = { curLv .. (now.partial and " (since install)" or " (now)"), Time(d("time_online")), Int(d("kills_npc") + d("kills_pvp")), Int(d("deaths")), Int(d("dist_foot") * ns.YARDS_TO_STEPS) }
+        end
         for i = #levels, 1, -1 do
             local lv = levels[i]
             local cur, prev = snaps[tostring(lv)], snaps[tostring(lv - 1)]
             if prev then
                 local function d(k) return (cur[k] or 0) - (prev[k] or 0) end
-                lr[#lr + 1] = { tostring(lv - 1), Time(d("time_online")), Int(d("kills_npc") + d("kills_pvp")), Int(d("deaths")), Int(d("dist_foot") * ns.YARDS_TO_STEPS) }
+                lr[#lr + 1] = { tostring(lv - 1) .. (prev.partial and " (partial)" or ""), Time(d("time_online")), Int(d("kills_npc") + d("kills_pvp")), Int(d("deaths")), Int(d("dist_foot") * ns.YARDS_TO_STEPS) }
             end
         end
         self.lvT:SetData(lr, true)
@@ -1091,10 +1107,10 @@ ns.HELP = {
     { "This character / All characters", "All characters adds up every character on this account that has logged in with LifeTimeStats. Records take the best, fastest times take the quickest, uniques are merged." },
     { "Steps and distance", "Distance comes from your movement speed, sampled four times a second. Steps are distance on foot divided by a 0.75 m stride. Mounted, swimming, flight path and ghost distance are separate and never count as steps. Travel and Cat form count as on foot." },
     { "Jumps and falls", "A jump only counts when you actually leave the ground (not while swimming or on a flight path). Airtime runs from leaving the ground to landing. Fall damage is the health you lost right as you landed; a fall is survived if you are still alive a second later." },
-    { "Forever and the combat log", "Forever does not give addons the combat log (it is reserved for Blizzard's own UI), so LifeTimeStats reads combat from what is still available: experience and honor messages, the units you fight, the combat text feed and your own health. A few statistics need the combat log itself (healing you do, interrupts, dispels, buffs, killing blows); they show n/a and fill in automatically if Forever ever allows it. /lts debug shows which sources are working." },
+    { "Forever and the combat log", "Forever does not give addons the combat log (it is reserved for Blizzard's own UI), so LifeTimeStats reads combat from what is still available: experience and honor messages, the units you fight, the combat text feed and your own health. After every fight it also reads Forever's built-in damage meter, which gives damage and healing you do (total and per spell), damage taken and who dealt it, avoidable damage, interrupts and dispels. A few statistics still need the combat log itself (overhealing, buffs, debuffs, killing blows you deal); they show n/a. /lts debug shows which sources are working." },
     { "Kills", "A kill counts when you get experience or honor for it, or when a hostile unit you were fighting (your target, mouseover, nameplates, boss frames) dies and was not tagged by someone else. The two are matched so one kill is never counted twice. Grey creatures that give no experience count only when you can see them die. Inside instances names are hidden from addons, so those kills are listed as Unknown (instance)." },
-    { "Your damage and avoidance", "Hits, crits and attacks that were dodged, parried, blocked or resisted come from the combat text feed on your target, and only while you fight alone, because in a group the feed cannot tell whose hit it was. Attacks on you (hits, crits, crushing blows, dodges, parries, blocks, misses, resists) are always counted. Forever hides how big each hit is, so damage done, DPS and biggest hit show n/a; damage taken and healing received are worked out from your own health instead (healing only while in combat, so regeneration does not count)." },
-    { "Deaths and corpse runs", "The cause is worked out at the moment you die: a fall that just hurt you, running out of breath while swimming, fatigue, or the hostile unit you were targeting. A corpse run lasts from releasing your spirit until you are alive again; its distance is how far your ghost moved." },
+    { "Your damage and avoidance", "Hits, crits and attacks that were dodged, parried, blocked or resisted come from the combat text feed on your target, and only while you fight alone, because in a group the feed cannot tell whose hit it was. Attacks on you (hits, crits, crushing blows, dodges, parries, blocks, misses, resists) are always counted. Forever hides how big each single hit is, so biggest hit comes only from death recaps; damage done, DPS and damage per spell come from the game's damage meter after each fight." },
+    { "Deaths and corpse runs", "The cause comes from the game's death recap (fire, lava, falling, drowning, fatigue, slime, or the attacker and spell); if there is none, from the damage meter's killing blow during a fight, else from a fall, running out of breath, or the hostile unit you were targeting. A corpse run lasts from releasing your spirit until you are alive again; its distance is how far your ghost moved." },
     { "Dungeons and raids", "Each separate instance is one run. A /reload, disconnect or leaving for under 30 minutes stays the same run; an instance reset starts a new one. Classic has no 'dungeon complete' event, so the addon counts runs with a boss kill. Fastest clear = entering to the last boss, and only runs that killed as many bosses as your best run there count. Raids also count a full clear when your lockout shows every boss dead." },
     { "Fastest times", "Lower is better. Level times use online time from one level-up to the next, so the level you were on when you installed is skipped. Quest times run from accepting to turning in (even across days)." },
     { "Uniques and firsts", "Uniques count different things you met, killed, visited or used; each list stops growing at 20,000 entries. Firsts are the first time something happened after install." },

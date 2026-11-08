@@ -1027,6 +1027,28 @@ do
   ns.ShowPage("records"); ns.ShowPage("lists"); ns.ShowPage("life"); ns.ShowPage("combat"); ns.ShowPage("achievements")
 end
 
+-- ===== v1.12.2 data repairs and per-level rows =====
+do
+  local ch = ns.char
+  ch.meta.repairs = nil
+  ch.t.spells = ch.t.spells or {}; ch.t.spells.LOGINEFFECT = 2; ch.t.spells.Attack = 4; ch.t.spells.Melee = 1
+  ch.c.deaths_fatigue = 1; ch.t.killers = ch.t.killers or {}; ch.t.killers.Fatigue = 1
+  local npc0, unk0 = ch.c.deaths_npc or 0, ch.t.killers.Unknown or 0
+  ch.first.death = "Fatigue"
+  ch.meta.levelMark = nil; ch.lvlsnap = {}
+  ns.RepairData()
+  eq(ch.t.spells.LOGINEFFECT, nil, "internal spell removed"); eq(ch.t.spells.Melee, 5, "Attack merged into Melee")
+  eq(ch.c.deaths_fatigue, 0, "fatigue deaths cleared"); eq(ch.c.deaths_npc, npc0 + 1, "moved to unknown cause")
+  eq(ch.t.killers.Fatigue, nil, "killer Fatigue removed"); eq(ch.t.killers.Unknown, unk0 + 1, "killer Unknown")
+  eq(ch.first.death, "Unknown", "first death fixed")
+  eq(ch.meta.levelMarkPartial, true, "install level marked partial")
+  eq(next(ch.lvlsnap) ~= nil, true, "install level snapshot")
+  ch.c.deaths_fatigue = 1; ns.RepairData()
+  eq(ch.c.deaths_fatigue, 1, "repair runs once (real fatigue deaths later are kept)")
+  ch.c.deaths_fatigue = 0
+  ns.ShowPage("records"); ns.ShowPage("life")
+end
+
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))
 print(fails == 0 and "ALL PASS" or (fails .. " FAILURES"))
 return fails

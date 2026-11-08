@@ -33,6 +33,15 @@ function ns.LevelSnapshot(level)
     ch.lvlsnap[tostring(level)] = s
     ns.Journal("Reached level " .. tostring(level) .. " in " .. Zone())
 end
+-- Starting point for the level you were on when LifeTimeStats was installed (partial level).
+function ns.LevelSnapshotQuiet(level, partial)
+    local ch = ns.char
+    if not ch then return end
+    ch.lvlsnap = ch.lvlsnap or {}
+    local s = { t = time(), partial = partial or nil }
+    for _, k in ipairs(SNAP_KEYS) do s[k] = ch.c[k] or 0 end
+    ch.lvlsnap[tostring(level)] = s
+end
 
 -- (damage meter reading lives in Meter.lua)
 

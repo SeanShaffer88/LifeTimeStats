@@ -516,7 +516,7 @@ local function LevelUp(level)
     ns.First("levelup", "Level " .. tostring(level))
     local m, online = ns.char.meta, ns.char.c.time_online or 0
     local dur
-    if m.levelMark and m.levelMarkLevel == (level - 1) then
+    if m.levelMark and m.levelMarkLevel == (level - 1) and not m.levelMarkPartial then
         dur = online - m.levelMark
         local label = (level - 1) .. " > " .. level
         ns.Min("level_fast", dur, label)
@@ -524,7 +524,7 @@ local function LevelUp(level)
         ns.char.t.leveltime = ns.char.t.leveltime or {}
         ns.char.t.leveltime["Level " .. label] = dur
     end
-    m.levelMark, m.levelMarkLevel = online, level
+    m.levelMark, m.levelMarkLevel, m.levelMarkPartial = online, level, nil
     if ns.LevelSnapshot then ns.LevelSnapshot(level) end
     if ns.OnLevelUp then ns.OnLevelUp(level, dur, online) end
 end
@@ -651,6 +651,7 @@ On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
     if unit ~= "player" then return end
     local name = SpellName(spellID)
     if not name or ns.IsSecret(name) or name:match("^%u+$") then return end
+    if name == "Attack" or name == "Auto Attack" then name = "Melee" end
     Add("casts")
     Tally("spells", name)
     if name == S.hearth then Add("hearths")
