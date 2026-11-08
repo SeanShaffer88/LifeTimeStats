@@ -10,7 +10,10 @@ From an in-game test of `/lts score` (score 752, every part shown).
 - Gear part of the score stayed 0 on low-level characters: the best average item level now counts once 3 slots have an item level (was 8).
 - `/lts score` lines no longer rely on space padding (the game font is not fixed-width).
 
- - 2026-11-08
+### Changed
+- Docs: README and DESCRIPTION achievement counts corrected (111 achievements, 396 tiers, 7,890 points); README file list updated; Support section with the Issues link; README images load from GitHub so they also show inside the ZIP.
+
+## [1.12.0-forever] - 2026-11-08
 
 Ideas from TimePlayed+, PlayedTracker, PvP Stats Tracker, Classic Score, Siouxx Classic Stats, Extended Character Stats and CharacterStatsClassic (public descriptions only).
 
@@ -26,7 +29,7 @@ Ideas from TimePlayed+, PlayedTracker, PvP Stats Tracker, Classic Score, Siouxx 
 - Dashboard: legend values no longer run into their labels (e.g. "Vendors4s 65c"); long labels are cut instead.
 - Deaths by cause has its own Fire / lava slice (fire deaths were under Other).
 
- - 2026-11-08
+## [1.11.0-forever] - 2026-11-08
 
 ### Added: dungeon book
 - All 35 Forever dungeons and 3 raids (Onyxia's Lair, Barrow Deeps, Hyjal Summit) with level range, zone and boss list, including the 9 new dungeons.
@@ -40,7 +43,7 @@ Ideas from TimePlayed+, PlayedTracker, PvP Stats Tracker, Classic Score, Siouxx 
 - Progress is stored in the standard sections, so backups and the account view include it.
 - DungeonJournal (Exehn): detected when installed and reported in `/lts debug`; its data is not read yet.
 
- - 2026-11-08
+## [1.10.2-forever] - 2026-11-08
 
 From an in-game test: fire death, `/lts debug` shows "from recap 1"; `/lts dm` shows the recap's amounts are readable.
 
@@ -49,7 +52,7 @@ From an in-game test: fire death, `/lts debug` shows "from recap 1"; `/lts dm` s
 - Biggest hit taken and biggest crit taken now fill from death recaps instead of showing n/a.
 - "Damage in your death recaps" list: damage per cause (Fire, or attacker · spell), replacing the tick count.
 
- - 2026-11-08
+## [1.10.1-forever] - 2026-11-08
 
 From an in-game test: died to fire out of combat, `/lts debug` and `/lts dm`.
 
