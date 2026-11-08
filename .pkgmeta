@@ -1,0 +1,5 @@
+package-as: LifeTimeStats
+ignore:
+  - tests
+  - docs
+  - .gitignore
