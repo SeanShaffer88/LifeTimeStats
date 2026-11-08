@@ -17,6 +17,7 @@ avoidance split (dodge/parry in and out) · crits and crushing blows taken · un
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
 
 ## 1.12.1
+- In game (1.12.1): score 812, gear part 50 (best average item level 5 on a level 6), lines readable without padding.
 - In game (1.12.0): `/lts score` window opens; score 752 = level 600, quests 50, exploration 45, achievements 90, professions 42, deaths -75; gear 0 (item-level threshold too high for a level 6), wealth 0 (under 1 gold earned). 0 Lua errors seen.
 
 ## 1.12.0
