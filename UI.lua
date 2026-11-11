@@ -1159,6 +1159,7 @@ end
 -- ============================================================ shell
 function ns.ShowPage(id)
     if not pages[id] then id = "dashboard" end
+    ns.activePage = id
     if id ~= "search" then Settings().lastCategory = id end
     if current and current ~= pages[id] then current:Hide() end
     current = pages[id]

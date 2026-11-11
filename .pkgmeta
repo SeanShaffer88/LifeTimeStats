@@ -2,4 +2,5 @@ package-as: LifeTimeStats
 ignore:
   - tests
   - docs
+  - scripts
   - .gitignore

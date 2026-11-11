@@ -19,6 +19,7 @@ function ns.Journal(text)
     local j = ch.journal
     j[#j + 1] = { time(), text, UnitLevel("player") or 0 }
     if #j > JOURNAL_CAP then table.remove(j, 1) end
+    if (ns.activePage == "journal" or ns.activePage == "lists") and ns.RefreshWindow then ns.RefreshWindow() end
 end
 
 -- ------------------------------------------------------------ level snapshots

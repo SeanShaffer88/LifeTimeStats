@@ -7,7 +7,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 616 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
+- **Tracks:** 839 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
 ![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
@@ -63,6 +63,19 @@ Steps, jumps, kills and deaths counters · kills vs deaths in your five deadlies
 
 Search finds any statistic by name across all pages.
 
+### New observation statistics (1.13.0)
+
+This release adds 222 statistics to the existing 616, plus Personal Best History, for 839 total dashboard entries:
+
+- **Movement context:** sampled time, distance and longest/farthest intervals moving or stationary, on foot, mounted, swimming, in combat, solo or grouped, AFK or active, resting, indoors/outdoors, in the open world, dungeon, raid, battleground or arena, while falling, casting, channeling, and below 25% or at full health. Contexts overlap; do not add them together.
+- **Corpse recovery:** actual ghost movement distance en route to your body, observed time moving and waiting, separate confirmed corpse retrievals and other resurrection methods, per-zone breakdowns, and fully observed run averages/records. Moving distance is not straight-line distance, and a retrieval button press alone does not count as success.
+- **Window visits:** time with the vendor, bank, mailbox, auction house, trade, trainer, flight map, NPC conversation, quest dialog or book open; visit counts, completed-visit averages and longest visits.
+- **Combat and pace:** sampled movement and fight records, known-outcome fight survival, and per-hour activity for kills, quests, gathering, crafting, loot, chats and more.
+- **Rates and proportions:** recorded XP and gold breakdowns, healing/damage shares, and averages such as repair cost or XP per completed quest.
+- **A living chronicle:** meaningful personal-best milestones can appear in your local Journal; the last-session recap can include its top new records. Both stay in-game and the journal option is configurable. The Top Lists page keeps a dated, bounded history of record changes.
+
+All additions use the client's available observations; hidden or missing data is skipped rather than guessed. These counters begin with 1.13.0 and are not backfilled from older saves. See the [measurement details](https://github.com/SeanShaffer88/LifeTimeStats/blob/v1.13.0-forever/docs/expanded-statistics.md) for definitions, unknown-data handling and test limits.
+
 ## Achievements
 
 111 achievements of LifeTimeStats' own, with up to 6 tiers each: **396 badges and 7,890 points**. Each one shows its tier pips, progress to the next tier and, on hover, every tier with the date you earned it.
@@ -105,7 +118,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-v1.12.2-forever.zip`.
+1. Download `LifeTimeStats-v1.13.0-forever.zip`.
 2. Unzip into `World of Warcraft\_classic_beta_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -158,6 +171,7 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Session** is since you logged in; a /reload keeps it. **Today** resets at local midnight. 40 days of daily history are kept for the charts.
 - **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. **Backup** gives a text copy; restoring never lowers a value.
 - The **How it works** page in the window explains every measurement.
+- The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
 - Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days.
 - Nothing is ever sent anywhere unless you press Send in the Share dialog or type `/lts share` with a channel. No chat spam unless you turn on milestones.
 - Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested).
@@ -169,7 +183,7 @@ LifeTimeStats/
   LifeTimeStats.toc
   Core.lua  Themes.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Life.lua  Story.lua
   Meter.lua  Chronicle.lua  Dungeons.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
-  UI.lua  Options.lua
+  UI.lua  Options.lua  Expanded.lua
   Media/icon.tga  Media/dot.tga  Media/icons/*.tga  icon.png  logo.png
   README.md  CHANGELOG.md  DESCRIPTION.md  AUDIT.md  CREDITS.md  LICENSE
 ```
@@ -180,4 +194,7 @@ Include the output of `/lts debug` and `/lts errors` (both open in a copyable wi
 
 ## Development
 - `tests/run.py` runs every Lua file under Lua 5.1 with a stubbed WoW API (needs Python and `pip install lupa`): `python tests/run.py`.
-- `docs/screenshots/` holds the README images; `tests/` and `docs/` are left out of release zips (`.pkgmeta`).
+- `tests/expanded.py` tests the new observation counters, hidden/missing APIs, edge cases and formatting under the same Lua 5.1 stub harness: `python tests/expanded.py`.
+- `tests/package_release.py` validates the versioned ZIP layout, manifest, required assets and SHA-256 sidecar.
+- New record history is saved locally, bounded to the 200 most recent breakthroughs per character/session, and included in text backups. Per-sample interval records need a meaningful gain before they create history or Journal entries.
+- These stubbed tests are not a live in-game compatibility test. `docs/screenshots/` holds the README images; `tests/`, `docs/` and `scripts/` are left out of release zips.

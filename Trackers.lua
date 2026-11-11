@@ -808,6 +808,7 @@ ticker:SetScript("OnUpdate", ns.Guard("ticker", function(_, elapsed)
     if swimming then Add("time_swim", dt) end
 
     local d, speed = MoveTick(dt)
+    if ns.TrackExpandedSample then ns.TrackExpandedSample(dt, d, speed) end
     if d and d > 0 then
         Add("dist_total", d)
         if taxi then Add("dist_taxi", d)
