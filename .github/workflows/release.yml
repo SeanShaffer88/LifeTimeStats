@@ -1,0 +1,47 @@
+name: LifeTimeStats checks and release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*-forever"
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install the Lua 5.1 test runtime
+        run: python -m pip install --disable-pip-version-check --prefer-binary lupa==2.8
+      - name: Run the existing regression suite
+        run: python tests/run.py
+      - name: Run the observation-statistics regression suite
+        run: python tests/expanded.py
+      - name: Verify release packaging
+        run: python tests/package_release.py
+      - name: Build versioned addon archive
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python scripts/package_release.py --tag "$GITHUB_REF_NAME" --output "$RUNNER_TEMP/lifetimestats-release"
+      - name: Publish ZIP, checksum and changelog as a GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/lifetimestats-release/LifeTimeStats-${GITHUB_REF_NAME#v}.zip" \
+            "$RUNNER_TEMP/lifetimestats-release/LifeTimeStats-${GITHUB_REF_NAME#v}.zip.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "LifeTimeStats $GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/lifetimestats-release/release-notes.md" \
+            --verify-tag \
+            --latest

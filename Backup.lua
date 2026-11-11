@@ -6,7 +6,7 @@
 local _, ns = ...
 
 local FLAT = { "c", "r", "f", "fw", "fd", "first", "firstd", "ach", "achr" }
-local NESTED = { "t", "u", "days" }
+local NESTED = { "t", "u", "days", "rh" }
 local IS_FLAT, IS_NESTED = {}, {}
 for _, k in ipairs(FLAT) do IS_FLAT[k] = true end
 for _, k in ipairs(NESTED) do IS_NESTED[k] = true end
@@ -95,6 +95,7 @@ function ns.Deserialize(str)
             out[a][Unesc(b)] = val
         elseif IS_NESTED[a] and c ~= "" then
             local g = Unesc(b)
+            if a == "rh" and g:match("^%d+$") then g = tonumber(g) end
             out[a][g] = out[a][g] or {}
             out[a][g][Unesc(c)] = val
         else
@@ -159,6 +160,22 @@ function ns.MergeMax(dst, src)
         dst.days[d] = dst.days[d] or {}
         for k, v in pairs(day) do
             if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v end
+        end
+    end
+    for _, entry in ipairs(src.rh or {}) do
+        if type(entry) == "table" and type(entry.k) == "string" and type(entry.v) == "number"
+            and type(entry.at) == "number" and (entry.d == "max" or entry.d == "min") then
+            local duplicate = false
+            for _, old in ipairs(dst.rh or {}) do
+                if old.k == entry.k and old.v == entry.v and old.at == entry.at and old.d == entry.d then
+                    duplicate = true; break
+                end
+            end
+            if not duplicate then
+                dst.rh[#dst.rh + 1] = { k = entry.k, v = entry.v, at = entry.at, d = entry.d, w = entry.w }
+                if #dst.rh > 200 then table.remove(dst.rh, 1) end
+                changed = changed + 1
+            end
         end
     end
     ns.EnsureRecord(dst) -- recount unique sets

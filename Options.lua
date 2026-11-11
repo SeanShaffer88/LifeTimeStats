@@ -219,7 +219,7 @@ function ns.CreateOptions()
         function() return S.shotAch end, function(v) S.shotAch = v end))
 
     -- CHAT & DISPLAY (right) ------------------------------------------
-    local cd = W.Card(c, "Chat and display", "social", R, y0, colW, 262)
+    local cd = W.Card(c, "Chat and display", "social", R, y0, colW, 298)
     b = cd.body
     Track(Toggle(b, 0, 0, cd.bw, "Session column", "Show how much each value grew this session.",
         function() return S.showSession end, function(v) S.showSession = v; ns.RefreshWindow() end))
@@ -231,14 +231,16 @@ function ns.CreateOptions()
         function() return S.tooltipKills end, function(v) S.tooltipKills = v end))
     Track(Toggle(b, 0, 136, cd.bw, "Milestones in chat", "A line when counters pass 100, 1,000, 10,000...",
         function() return S.milestones end, function(v) S.milestones = v end))
-    RowLabel(b, 0, 172, "Achievement alerts", nil)
+    Track(Toggle(b, 0, 170, cd.bw, "Record new highs in the journal", "Add meaningful new records to your local adventure chronicle; no live chat spam.",
+        function() return S.recordMoments end, function(v) S.recordMoments = v end))
+    RowLabel(b, 0, 205, "Achievement alerts", nil)
     local alerts = W.Segmented(b, {
         { id = "off", label = "Off", tip = "Only a 'new' count on the sidebar." },
         { id = "chat", label = "Chat", tip = "A chat line." },
         { id = "toast", label = "Toast", tip = "A small pop-up you can click to open the page." },
         { id = "both", label = "Both", tip = "Chat line and toast." },
     }, function(id) S.achAnnounce = id; alerts:Select(id) end)
-    alerts:SetPoint("TOPLEFT", 6, -192)
+    alerts:SetPoint("TOPLEFT", 6, -225)
     alerts:Select(S.achAnnounce or "off")
     alerts.Sync = function(self) self:Select(S.achAnnounce or "off") end
     Track(alerts)

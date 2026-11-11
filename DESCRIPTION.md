@@ -2,7 +2,9 @@
 
 **Every step, jump and kill, counted for life.**
 
-LifeTimeStats keeps a lifetime tally of your character in World of Warcraft: Forever: 616 statistics, top lists, fastest times, uniques and firsts, shown in a dashboard that takes on your class colour, or matches your UI addon: themes for ElvUI, Tukui, EllesmereUI and the default Blizzard look.
+LifeTimeStats keeps a lifetime tally of your character in World of Warcraft: Forever: 839 statistics, top lists, fastest times, uniques and firsts, shown in a dashboard that takes on your class colour, or matches your UI addon: themes for ElvUI, Tukui, EllesmereUI and the default Blizzard look.
+
+Version 1.13.0 adds 222 observation-based statistics: movement and combat contexts; measured ghost travel, confirmed corpse retrievals and other revivals; ten interface visit timers; combat survival and activity rates; and recorded XP, gold, healing and damage breakdowns. It also adds a bounded, backed-up personal-best timeline, optional local Journal milestones and new-record session recaps. Missing or hidden client data is skipped, and new counters are not reconstructed from pre-upgrade history.
 
 ## The useless ones
 Steps taken. Times jumped. Time spent in the air. Dances, hugs and chickens. Perfect /rolls. How often you sat down, opened your bags or toggled auto-run. Red error messages seen ("Not enough mana", we know). How many times you checked these stats.

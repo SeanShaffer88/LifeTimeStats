@@ -31,6 +31,7 @@ local DEFAULTS = {
     achAnnounce  = "off", -- off | chat | toast | both
     countPet     = true,
     milestones   = false,
+    recordMoments = true,
     lastCategory = "dashboard",
     scope        = "char",
     range        = "lifetime",
@@ -148,13 +149,13 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
     for _, k in ipairs(SECTIONS) do rec[k] = {} end
     -- c counters · r records (max) · t tallies · u unique sets · un unique counts
-    -- f fastest (min) · fw/fd label/date · first/firstd firsts · days daily counters · qa quest accept times
+    -- f fastest (min) · fw/fd label/date · first/firstd firsts · days daily counters · qa quest accept times · rh record history
     return rec
 end
 ns.NewCharRecord = NewCharRecord
@@ -180,7 +181,7 @@ end
 ns.EnsureRecord = Ensure
 
 local function NewSession()
-    return { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, start = GetTime() }
+    return { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, rh = {}, start = GetTime() }
 end
 ns.session = NewSession()
 
@@ -261,12 +262,16 @@ ns.RecapText = RecapText
 function ns.Save()
     if not ns.char then return end
     if type(LifeTimeStatsCharDB) == "table" then
-        LifeTimeStatsCharDB.lastSession = { c = ns.session.c, elapsed = GetTime() - ns.session.start, at = time(), top = SessionTopSpell() }
+        local s = ns.session
+        local highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(s.rh, 3) or {}
+        LifeTimeStatsCharDB.lastSession = {
+            c = s.c, elapsed = GetTime() - s.start, at = time(), top = SessionTopSpell(), highlights = highlights,
+        }
     end
     if type(LifeTimeStatsCharDB) == "table" then
         local s = ns.session
         LifeTimeStatsCharDB.session = { c = s.c, r = s.r, t = s.t, u = s.u, un = s.un, f = s.f, fw = s.fw, fd = s.fd,
-            first = s.first, firstd = s.firstd, elapsed = GetTime() - s.start, savedAt = time() }
+            first = s.first, firstd = s.firstd, rh = s.rh, elapsed = GetTime() - s.start, savedAt = time() }
     end
     ns.char.meta.rev = (ns.char.meta.rev or 0) + 1
     ns.char.meta.saved = time()
@@ -310,6 +315,51 @@ local HUGE = math.huge
 local function Bad(n) return type(n) ~= "number" or n ~= n or n == HUGE or n == -HUGE end
 ns.BadNumber = Bad
 
+-- Keep only recent, validated record breakthroughs. The history is local to
+-- the character/session and never contains arbitrary API objects or secret data.
+local HISTORY_CAP = 200
+local baseEnsureRecord = ns.EnsureRecord
+function ns.EnsureRecord(rec)
+    baseEnsureRecord(rec)
+    local clean = {}
+    for i = math.max(1, #(rec.rh or {}) - HISTORY_CAP + 1), #(rec.rh or {}) do
+        local e = rec.rh[i]
+        if type(e) == "table" and not ns.IsSecret(e) and type(e.k) == "string" and e.k ~= ""
+            and type(e.v) == "number" and not Bad(e.v)
+            and type(e.at) == "number" and not Bad(e.at)
+            and (e.d == "max" or e.d == "min") then
+            clean[#clean + 1] = {
+                k = e.k, v = e.v, at = e.at, d = e.d,
+                w = type(e.w) == "string" and e.w:sub(1, 100) or nil,
+            }
+        end
+    end
+    rec.rh = clean
+    return rec
+end
+
+function ns.AddRecordHistory(rec, key, value, label, direction, previous)
+    if not rec or type(key) ~= "string" or ns.IsSecret(value) or Bad(value)
+        or (direction ~= "max" and direction ~= "min") then return end
+    -- Movement interval records can change every 0.25-second sample. Log
+    -- useful milestones, not each tick.
+    if previous and direction == "max" then
+        local minStep
+        if key:match("^ex_longest_") then minStep = 10
+        elseif key:match("^ex_farthest_") then minStep = 50 end
+        if minStep and value - previous < math.max(minStep, math.abs(previous) * 0.05) then return end
+    end
+    if type(rec.rh) ~= "table" then rec.rh = {} end
+    local at = time()
+    if ns.IsSecret(at) or Bad(at) then return end
+    local event = { k = key, v = value, at = at, d = direction }
+    if not ns.IsSecret(label) and type(label) == "string" and label ~= "" then event.w = label:sub(1, 100) end
+    local log = rec.rh
+    log[#log + 1] = event
+    while #log > HISTORY_CAP do table.remove(log, 1) end
+    return event
+end
+
 function ns.Add(key, n)
     n = n or 1
     local ch = ns.char
@@ -338,13 +388,18 @@ function ns.Max(key, v, label)
     if ns.IsSecret(label) then label = nil end
     local r = ns.char.r
     if v > (r[key] or 0) then
+        local previous = r[key] or 0
         r[key] = v
         if label then r[key .. "_what"] = tostring(label) end
+        local event = ns.AddRecordHistory(ns.char, key, v, label, "max", previous)
+        if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
     end
     local s = ns.session.r
     if v > (s[key] or 0) then
+        local previous = s[key] or 0
         s[key] = v
         if label then s[key .. "_what"] = tostring(label) end
+        ns.AddRecordHistory(ns.session, key, v, label, "max", previous)
     end
 end
 
@@ -352,13 +407,21 @@ end
 function ns.Min(key, v, label)
     if not ns.char or ns.IsSecret(v) or Bad(v) or v <= 0 then return end
     if ns.IsSecret(label) then label = nil end
-    for _, rec in ipairs({ ns.char, ns.session }) do
-        local cur = rec.f[key]
-        if not cur or v < cur then
-            rec.f[key] = v
-            rec.fw[key] = label and tostring(label) or nil
-            rec.fd[key] = time()
-        end
+    local lifetime, session = ns.char, ns.session
+    local cur = lifetime.f[key]
+    if not cur or v < cur then
+        lifetime.f[key] = v
+        lifetime.fw[key] = label and tostring(label) or nil
+        lifetime.fd[key] = time()
+        local event = ns.AddRecordHistory(lifetime, key, v, label, "min", cur)
+        if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
+    end
+    cur = session.f[key]
+    if not cur or v < cur then
+        session.f[key] = v
+        session.fw[key] = label and tostring(label) or nil
+        session.fd[key] = time()
+        ns.AddRecordHistory(session, key, v, label, "min", cur)
     end
 end
 
@@ -433,7 +496,7 @@ end
 local EMPTY = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {} }
 
 local function MergeAccount()
-    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, ach = {}, achr = {}, meta = {} }
+    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, ach = {}, achr = {}, meta = {}, rh = {} }
     for _, rec in pairs(ns.db.chars) do
         if Valid(rec) then
             Ensure(rec)
@@ -476,8 +539,18 @@ local function MergeAccount()
                 v.days[d] = dst
                 for k, n in pairs(day) do dst[k] = (dst[k] or 0) + n end
             end
+            for _, entry in ipairs(rec.rh or {}) do
+                if type(entry) == "table" then
+                    v.rh[#v.rh + 1] = {
+                        k = entry.k, v = entry.v, at = entry.at, d = entry.d, w = entry.w,
+                        character = type(rec.meta.name) == "string" and rec.meta.name or nil,
+                    }
+                end
+            end
         end
     end
+    table.sort(v.rh, function(a, b) return (a.at or 0) > (b.at or 0) end)
+    while #v.rh > HISTORY_CAP do table.remove(v.rh) end
     return v
 end
 
@@ -497,7 +570,7 @@ function ns.GetView(scope, range)
     end
     if range == "today" then
         local day = base.days[ns.Today()] or {}
-        return { c = day, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, today = true }
+        return { c = day, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, rh = base.rh, today = true }
     end
     if range == "week" or range == "month" then
         -- sum of the daily buckets: last 7 or 30 days including today
@@ -507,7 +580,7 @@ function ns.GetView(scope, range)
             local day = base.days[date("%Y%m%d", now - i * 86400)]
             if day then for k, v in pairs(day) do sum[k] = (sum[k] or 0) + v end end
         end
-        return { c = sum, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, today = true, span = n }
+        return { c = sum, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, rh = base.rh, today = true, span = n }
     end
     return base
 end
@@ -545,7 +618,9 @@ ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin)
     if not isLogin then return end
     local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
     if ns.settings.recap and type(last) == "table" and type(last.c) == "table" and (last.elapsed or 0) > 60 then
-        ns.Print("Last session: " .. RecapText(last.c, last.elapsed, last.top))
+        local highlights = type(last.highlights) == "table" and #last.highlights > 0
+            and (" · new records: " .. table.concat(last.highlights, "; ")) or ""
+        ns.Print("Last session: " .. RecapText(last.c, last.elapsed, last.top) .. highlights)
     end
     ns.ResetSession()
 end)

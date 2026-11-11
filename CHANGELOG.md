@@ -2,6 +2,22 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.13.0-forever] - 2026-11-11
+
+### Added
+- 222 observation-based statistics, a personal-best history list (839 total entries): movement context/time/distance records, verified corpse-recovery outcomes and zone lists, ten sampled interface-visit timers, fight observations and records, activity rates, and XP, money, healing and damage ratios.
+- A movement-observation coverage stat; hidden or missing client values are not counted as zero movement.
+- Persisted, reload-safe recovery measurements. Only observed ghost time counts; the method is identified only after a recent user action and confirmed revival. New counters are not backfilled.
+- Bounded, timestamped record improvements, with a local Journal toggle and top-three record highlights in the existing last-session recap.
+- Versioned release ZIP/ SHA-256 generation and Lua 5.1 regression/package checks.
+
+### Changed
+- Documented data sources, overlap, missing observations, record-history retention, and limitations of the stubbed tests.
+
+### Fixed
+- Survival-rate denominator now excludes fight endings where alive/dead status was unavailable.
+- Moving-speed average now uses distance and movement time observed by the same version.
+
 ## [1.12.2-forever] - 2026-11-08
 
 From a full set of in-game screenshots of 1.12.1.

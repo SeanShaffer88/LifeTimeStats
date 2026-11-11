@@ -2,7 +2,7 @@
 ## Title: |cffffb238LifeTime|r|cffefe6d2Stats|r
 ## Notes: Lifetime cumulative statistics for your character: steps, jumps, kills, deaths, gold, quests, dungeons and lots more.
 ## Author: Malikor
-## Version: 1.12.2
+## Version: 1.13.0
 ## IconTexture: Interface\AddOns\LifeTimeStats\Media\icon
 ## OptionalDeps: ElvUI, Tukui, EllesmereUI
 ## SavedVariables: LifeTimeStatsDB
@@ -29,3 +29,4 @@ Share.lua
 Backup.lua
 UI.lua
 Options.lua
+Expanded.lua
