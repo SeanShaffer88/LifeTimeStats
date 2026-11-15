@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.15.0-forever
+# Audit - LifeTimeStats 1.16.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,16 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.16.0
+- Research instead of in-game checks (2026-11-15):
+  - **Forever API surface:** Thunderz96/forever-addon-kit publishes `data/forever_api.json`, captured from the live beta client (build 1.60.1.69893: 6,045 global functions and 269 namespaces). `scripts/api_scan.py` compares every LifeTimeStats call against it. Unguarded removed calls found and fixed: `GetNumFactions`/`GetFactionInfo` (reputation never read), `GetSpellInfo` for form names and `GetItemInfo` for toy names. Every remaining hit is a guarded fallback behind a `C_` call or is our own function.
+  - **Present in that dump:** `ChatFrame_DisplayTimePlayed`, `RequestTimePlayed`, `UnitCreatureType`, `UnitClassification`, `GetNumGroupMembers`, `IsInRaid`, `UnitPosition`, `GetUnitSpeed`, `C_Item.GetDetailedItemLevelInfo`/`GetItemQualityByID`/`GetItemNameByID`, `C_Spell.GetSpellName`, `C_Reputation.*`, `C_DamageMeter.*`, `C_DeathRecap.*`, `C_ChatInfo.SendChatMessage`, `C_Secrets.*`. Missing: `GetBattlefieldStatInfo` (already optional).
+  - **Same kit, measured in game:** `UNIT_COMBAT` amounts are plain while health is secret in combat. That matches 1.10's health-based fallbacks. Registering an unknown event throws, and LifeTimeStats already wraps registration in pcall. `EncounterJournalDisabled=1` on the beta.
+  - The kit also reported a beta bug where saved variables were never read back. Guides for moving beta settings to live, and the in-game data kept between 1.12 sessions, indicate it does not affect live.
+  - **DBM-Dungeons** ships `DBM-Party-Forever` with 57 encounter scaffolds (`SetEncounterID`, `SetZone`, English names) for the nine Forever dungeons. DBM registering these encounters means ENCOUNTER_START/END fire for them on Forever. Names and IDs were used for the rosters and `ns.FOREVER_ENCOUNTERS`. No DBM code is included.
+- Verified (offline): new `tests/compendium.py` (913 assertions) covers month records, the Timeline Months view for every metric, CSV columns, sums and quoting, `/lts export`, the compartment functions, and a globals check after loading and opening every page. Only the slash command, saved variables, two named frames and the three compartment functions are global. The existing suites pass, with roster tests updated to the DBM rosters and an encounter-ID mapping check.
+- Unverified (in client): whether optional status of the four provisional rosters matches the game; addon compartment presence on Forever; CSV size in the copy window for large accounts.
 
 ## 1.15.0
 - Verified (offline, Python 3.14 + lupa 2.8): new `tests/guide.py` (159 assertions) covers a full dungeon run with members, a wipe, a death in the fight, a kill with fastest time and first-kill group, boss loot inside and outside the 3-minute window, world bosses, bestiary type, classification and level, zone atlas, suggestions, chapters, every section and every dungeon and boss page in character and account scope, the page refresh, and the LTS3 round trip of run history and bestiary. The existing suites pass with the catalog at 888 entries. No new globals.

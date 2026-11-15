@@ -168,6 +168,9 @@ function W.Segmented(parent, options, onPick)
 end
 
 -- ------------------------------------------------------------ card
+-- Card titles are upper case, except in the Forever Journal skin.
+function ns.CardTitle(s) return ns.themeId == "forever" and s or tostring(s):upper() end
+
 function W.Card(parent, title, icon, x, y, w, h, tip)
     local f = W.Panel(parent, T.tile)
     f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)

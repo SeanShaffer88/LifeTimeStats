@@ -67,9 +67,9 @@ function B.book(view)
         local clears = (t.dungeonclears or {})[d.name] or 0
         local tag = (d.raid and "raid " or "") .. d.min .. (d.max ~= d.min and ("-" .. d.max) or "")
         rows[#rows + 1] = { tostring(i), d.name .. "  " .. DIM .. tag .. "|r", total > 0 and found / total or 0,
-            d.learn and (found .. " known") or (found .. " / " .. total),
+            found .. " / " .. total .. (d.learn and "*" or ""),
             Plural(seen, "boss") .. " seen · " .. Plural(runs, "run") .. (clears > 0 and (" · " .. Plural(clears, "clear")) or ""),
-            dkey = d.key, tip = d.zone .. (d.learn and "\nRoster still being discovered: bosses are added as you meet them." or "") }
+            dkey = d.key, tip = d.zone .. (d.learn and "\n* Which bosses are optional is not known yet, so full clears are not counted here. Bosses not on the list are added as you meet them." or "") }
     end
     return rows
 end
@@ -356,7 +356,7 @@ function ns.BuildGuidePage(env)
         if key == lastKey and scope == lastScope and GetTime() - lastAt < 5 then return end
         lastScope, lastAt = scope, GetTime()
         self.nav:SetData(ns.GuideChapterRows(v, state), true)
-        self.title:SetText(ns.GuideTitle(state):upper())
+        self.title:SetText(ns.CardTitle(ns.GuideTitle(state)))
         self.list:SetData(ns.GuideRows(v, state), key == lastKey)
         lastKey = key
     end

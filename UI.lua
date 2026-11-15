@@ -38,7 +38,7 @@ local function DateLabel(t) return t and date("%b %d %H:%M", t) or "" end
 local function Settings() return ns.settings end
 local function RangeName()
     local r = Settings().range
-    return ({ today = "TODAY", session = "SESSION", week = "LAST 7 DAYS", month = "LAST 30 DAYS" })[r] or "LIFETIME"
+    return ({ today = "TODAY", session = "SESSION", week = "LAST 7 DAYS", month = "Last 30 days" })[r] or "LIFETIME"
 end
 
 local function Views()
@@ -117,6 +117,9 @@ local function StatRows(cat, view, sess)
     end
     return rows
 end
+
+-- A built page by id (used by the offline tests and other modules).
+function ns.Page(id) return pages[id] end
 
 -- ------------------------------------------------------------ page factory
 local function NewPage(id)
@@ -773,7 +776,20 @@ local function BuildTimeline()
     p.chartSingle = W.Columns(cc.body, cc.bw, cc.bh, 30, "single")
     p.chartHolder = CreateFrame("Frame", nil, cc.body); p.chartHolder:SetAllPoints()
     p.chartSigned = W.Columns(p.chartHolder, cc.bw, cc.bh, 30, "signed")
+    -- 12-month view: days older than 40 are kept as monthly totals, so this reaches back a year.
+    p.monthHolder = CreateFrame("Frame", nil, cc.body); p.monthHolder:SetAllPoints()
+    p.monthSingle = W.Columns(p.monthHolder, cc.bw, cc.bh, 12, "single")
+    p.monthSignedHolder = CreateFrame("Frame", nil, p.monthHolder); p.monthSignedHolder:SetAllPoints()
+    p.monthSigned = W.Columns(p.monthSignedHolder, cc.bw, cc.bh, 12, "signed")
+    p.chartTitle = cc.title
     local tc = Panel(p, "Day by day", "lists", 0, BODY_Y + 230, CW, BODY_H - 230)
+    p.tableTitle = tc.title
+    p.period = "days"
+    p.periodSeg = W.Segmented(tc, {
+        { id = "days", label = "Days", tip = "The last 30 days, one row and one column each." },
+        { id = "months", label = "Months", tip = "The last 12 months. Older days are kept as monthly totals." },
+    }, function(id) p.period = id; ns.RefreshWindow() end)
+    p.periodSeg:SetPoint("TOPRIGHT", -8, -2)
     p.dayT = W.Table(tc.body, tc.bw, tc.bh, {
         { "DATE", 120, kind = "text" }, { "STEPS", 100, kind = "num" }, { "JUMPS", 80, kind = "num" }, { "KILLS", 80, kind = "num" },
         { "DEATHS", 70, kind = "num" }, { "QUESTS", 70, kind = "num" }, { "XP", 90, kind = "num" }, { "GOLD (NET)", 150, kind = "num" }, { "ONLINE", 0, kind = "dim" },
@@ -800,11 +816,44 @@ local function BuildTimeline()
             for i, e in ipairs(series) do vals[i] = { m.fn(e.v or {}) }; labels[i] = DayLabel(e.d) end
             axis = { labels[1], labels[15], "Today" }
         end
-        local chart = m.signed and self.chartSigned or self.chartSingle
-        self.chartHolder:SetShown(m.signed and true or false)
-        chart:Set(vals, { m.signed and C.amber or C.cream2 }, labels, axis, m.fmt, { m.label }, not m.signed)
-        if m.signed then self.chartSingle:Set({}, { C.amber }, {}, { "", "", "" }) end
+        local months = self.period == "months" and not m.levels
+        self.periodSeg:Select(self.period)
+        if self.chartTitle then self.chartTitle:SetText(ns.CardTitle(months and "Last 12 months" or (m.levels and "Last 30 levels" or "Last 30 days"))) end
+        if self.tableTitle then self.tableTitle:SetText(ns.CardTitle(self.period == "months" and "Month by month" or "Day by day")) end
+        self.monthHolder:SetShown(months)
+        local mseries = (self.period == "months") and ns.MonthRecords(base, 12) or nil
+        if months then
+            local mv, ml = {}, {}
+            for i, e in ipairs(mseries) do
+                mv[i] = { m.fn(e.v) }
+                ml[i] = date("%b %Y", time({ year = tonumber(e.m:sub(1, 4)), month = tonumber(e.m:sub(5, 6)), day = 1, hour = 12 }))
+            end
+            local mchart = m.signed and self.monthSigned or self.monthSingle
+            self.monthSignedHolder:SetShown(m.signed and true or false)
+            mchart:Set(mv, { m.signed and C.amber or C.cream2 }, ml, { ml[1], ml[6], "This month" }, m.fmt, { m.label }, not m.signed)
+            if m.signed then self.monthSingle:Set({}, { C.amber }, {}, { "", "", "" }) end
+            self.chartSingle:Set({}, { C.amber }, {}, { "", "", "" })
+            self.chartSigned:Set({}, { C.amber }, {}, { "", "", "" })
+            self.chartHolder:SetShown(false)
+        else
+            local chart = m.signed and self.chartSigned or self.chartSingle
+            self.chartHolder:SetShown(m.signed and true or false)
+            chart:Set(vals, { m.signed and C.amber or C.cream2 }, labels, axis, m.fmt, { m.label }, not m.signed)
+            if m.signed then self.chartSingle:Set({}, { C.amber }, {}, { "", "", "" }) end
+        end
         local rows = {}
+        if mseries then
+            for i = #mseries, 1, -1 do
+                local e, d = mseries[i], mseries[i].v
+                if next(d) then
+                    rows[#rows + 1] = { date("%B %Y", time({ year = tonumber(e.m:sub(1, 4)), month = tonumber(e.m:sub(5, 6)), day = 1, hour = 12 })) .. (i == #mseries and " (so far)" or ""),
+                        Int((d.dist_foot or 0) * ns.YARDS_TO_STEPS), Int(d.jumps or 0), Int((d.kills_npc or 0) + (d.kills_pvp or 0)), Int(d.deaths or 0),
+                        Int(d.quests_done or 0), Int(d.xp or 0), Money((d.money_in or 0) - (d.money_out or 0)), Time(d.time_online or 0) }
+                end
+            end
+            self.dayT:SetData(rows, true)
+            return
+        end
         for i = #series, 1, -1 do
             local e = series[i]
             local d = e.v
@@ -1994,6 +2043,20 @@ function ns.OpenPage(id)
     if not win then CreateWindow() end
     if not win:IsShown() then Settings().lastCategory = id; win:Show() else ns.ShowPage(id) end
 end
+
+-- Addon compartment (the addon list button by the minimap on clients that have it).
+-- These three names are referenced from the TOC, so they must be globals.
+function LifeTimeStats_OnAddonCompartmentClick(_, button)
+    if button == "RightButton" then ns.OpenOptions() else ns.ToggleWindow() end
+end
+function LifeTimeStats_OnAddonCompartmentEnter(_, frame)
+    if not GameTooltip or not frame then return end
+    GameTooltip:SetOwner(frame, "ANCHOR_LEFT")
+    GameTooltip:AddLine("LifeTimeStats")
+    GameTooltip:AddLine("Click to open · Right-click for settings", 1, 1, 1)
+    GameTooltip:Show()
+end
+function LifeTimeStats_OnAddonCompartmentLeave() if GameTooltip then GameTooltip:Hide() end end
 
 function ns.ToggleWindow()
     if not win then CreateWindow() end

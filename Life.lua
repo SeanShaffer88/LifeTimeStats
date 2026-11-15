@@ -104,7 +104,7 @@ function ns.ScanHearthstones()
             for i = 1, n do
                 local okI, id = pcall(C_ToyBox.GetToyFromIndex, i)
                 if okI and type(id) == "number" and not S(id) and PlayerHasToy(id) then
-                    local nm = GetItemInfo and GetItemInfo(id)
+                    local nm = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)) or (GetItemInfo and GetItemInfo(id))
                     SeeHearth(id, nm)
                 end
             end

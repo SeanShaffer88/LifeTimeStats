@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.15.0 prerelease archive, `LifeTimeStats-1.15.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.16.0 prerelease archive, `LifeTimeStats-1.16.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -117,7 +117,15 @@ A Dungeon Journal-style compendium of everything your characters have seen. In *
 - **Group memories**: who you ran instances with, killed bosses with and who was there for your first kills.
 - **Boss loot**: your own loot within 3 minutes of each boss kill. It is what you got, not a full loot table.
 
+Boss rosters for the nine Forever dungeons and the Forever encounter IDs come from DBM-Dungeons' Forever encounter scaffolds (names and IDs only). In Krol'Dok Stronghold, Alcaz Island Prison, Blackmaw Hold and Shaper's Terrace it is not yet known which bosses are optional, so they are marked * and full clears are not counted there.
+
 Everything here is also counted as statistics and top lists (boss wipes, kills by group size, boss loot by quality, kills by creature type and classification, deaths by hour and by level, and more). Tracking starts with 1.15.0, so nothing earlier is backfilled.
+
+## Export everything
+
+`/lts export` opens every statistic, fastest time, unique count, first and top list for every character, plus the account total, as CSV. Values are raw numbers: times in seconds, money in copper, distances in yards, firsts as Unix time. The Timeline page has a **Days / Months** switch; Months shows the last 12 months from the monthly totals.
+
+On clients with the addon compartment (the addon list button by the minimap), LifeTimeStats is listed there: click to open, right-click for settings.
 
 ## Titles and character sheet
 
@@ -137,7 +145,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.15.0-forever.zip`.
+1. Download `LifeTimeStats-1.16.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 

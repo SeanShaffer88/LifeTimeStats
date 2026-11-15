@@ -981,21 +981,23 @@ do
   eq(ns.char.f["clear:krol"], nil, "incomplete roster has no fastest clear")
   fire("ENCOUNTER_END", 3, "Some New Boss", 1, 5, 1)
   local f2, t2 = ns.DungeonProgress(ns.DUNGEON_BY_KEY.krol)
-  eq(f2 .. "/" .. t2, "2/2", "learned boss adds to total")
+  eq(f2 .. "/" .. t2, "2/7", "learned boss adds to the DBM roster of 6")
   ns.char.run = nil
   GetInstanceInfo = function() return "Alcaz Island Prison", "party", 1, "Normal", 5, 0, false, 9002 end
   fire("PLAYER_ENTERING_WORLD", false, false)
   fire("ENCOUNTER_END", 4, "Blazeroar", 1, 5, 1)
   fire("ENCOUNTER_END", 5, "Another New Boss", 1, 5, 1)
   local f3, t3 = ns.DungeonProgress(ns.DUNGEON_BY_KEY.alcaz)
-  eq(f3 .. "/" .. t3, "2/2", "Alcaz discoveries include optional and learned encounters")
+  eq(f3 .. "/" .. t3, "2/6", "Alcaz discoveries include optional and learned encounters")
   eq(ns.char.c.dj_full_clears, f0 + 1, "Alcaz partial roster never credits a clear")
   eq(ns.char.un.dj_books or 0, beforeBooks, "Alcaz partial roster never completes the book")
   -- list rows render
   local def; for _, l in ipairs(ns.LISTS) do if l.id == "dungeonbook" then def = l end end
   local rows = def.rows(ns.char, ns.session)
   local krolRow = rows[ns.DUNGEON_BY_KEY.krol.order]
-  eq(krolRow[4], "2 known", "partial Dungeon Book progress is labeled by known discoveries")
+  eq(krolRow[4], "2 / 7*", "provisional Dungeon Book progress is marked")
+  eq(ns.EncounterName(3451, "whatever"), "Overseer Mugg", "encounter ID gives the listed name")
+  eq(ns.EncounterName(99999, "Other"), "Other", "unknown encounter keeps the client name")
   eq(#rows, #ns.DUNGEONS, "book has every instance"); eq(#ns.DUNGEONS, 38, "35 dungeons + 3 raids")
   eq(ns.NEW_DUNGEON_COUNT, 9, "9 new dungeons")
   -- backup carries progress

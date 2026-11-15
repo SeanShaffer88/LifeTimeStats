@@ -74,6 +74,65 @@ function ns.SessionCSV()
     return table.concat(lines, "\n")
 end
 
+-- Every statistic, fastest time, unique count and first for every character and the account,
+-- one row each, as raw numbers a spreadsheet can sort (times in seconds, money in copper,
+-- distances in yards, firsts as Unix time).
+local function CSVField(v)
+    v = tostring(v == nil and "" or v)
+    if v:find('[,"\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
+    return v
+end
+local function CSVNumber(v)
+    if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then return "" end
+    if v == math.floor(v) then return string.format("%.0f", v) end
+    return string.format("%.3f", v)
+end
+function ns.CompendiumCSV()
+    local cols, names = {}, {}
+    for key, rec in pairs(ns.db.chars or {}) do
+        if ns.ValidRecord(rec) then cols[#cols + 1] = { key = key, rec = rec } end
+    end
+    table.sort(cols, function(a, b) return a.key < b.key end)
+    local header = { "section", "statistic", "unit" }
+    for _, c in ipairs(cols) do header[#header + 1] = CSVField(c.key) end
+    header[#header + 1] = "account"
+    local account = ns.GetView("account", "lifetime")
+    local views = {}
+    for i, c in ipairs(cols) do views[i] = c.rec end
+    views[#views + 1] = account
+    local lines = { table.concat(header, ",") }
+    local function Row(section, label, unit, fn)
+        local parts = { CSVField(section), CSVField(label), CSVField(unit or "") }
+        for _, v in ipairs(views) do
+            local ok, value = pcall(fn, v)
+            parts[#parts + 1] = ok and CSVNumber(value) or ""
+        end
+        lines[#lines + 1] = table.concat(parts, ",")
+    end
+    for _, cat in ipairs(ns.CATEGORIES) do
+        for _, st in ipairs(ns.STATS[cat.id] or {}) do
+            Row(cat.name, st.label, st.fmt, function(v) return (ns.StatValue(st, v)) end)
+        end
+    end
+    for _, f in ipairs(ns.FASTEST or {}) do
+        Row("Fastest", f.label, "time", function(v) local x = v.f[f.key] return type(x) == "table" and x.v or x end)
+    end
+    for _, u in ipairs(ns.UNIQUES or {}) do
+        Row("Uniques", u.label, "int", function(v) return (v.un and v.un[u.set]) or 0 end)
+    end
+    for _, f in ipairs(ns.FIRSTS or {}) do
+        Row("Firsts", f.label, "unix time", function(v) return v.firstd[f.key] end)
+    end
+    for _, l in ipairs(ns.LISTS or {}) do
+        Row("Top lists", l.name .. " (entries)", "int", function(v)
+            if l.count then return l.count(v) end
+            local n = 0 for _ in pairs((v.t or {})[l.id] or {}) do n = n + 1 end return n
+        end)
+    end
+    if ns.Score then Row("Score", "Adventurer score", "int", function(v) return (ns.Score(v)) end) end
+    return table.concat(lines, "\n")
+end
+
 -- ------------------------------------------------------------ peak character stats
 local STAT_KEYS = { "max_str", "max_agi", "max_sta", "max_int", "max_spi" }
 local RES = { [2] = "max_res_fire", [3] = "max_res_nature", [4] = "max_res_frost", [5] = "max_res_shadow", [6] = "max_res_arcane" }
@@ -140,16 +199,34 @@ end
 ns.ScanCharacterStats = ScanStats
 
 -- ------------------------------------------------------------ reputation standings
+-- Forever runs the Retail client: GetNumFactions/GetFactionInfo are gone, C_Reputation has them.
+local function FactionStanding(i)
+    if C_Reputation and C_Reputation.GetFactionDataByIndex then
+        local ok, data = pcall(C_Reputation.GetFactionDataByIndex, i)
+        if ok and type(data) == "table" and not S(data) then
+            return N(data.reaction), data.isHeader and not data.isHeaderWithRep
+        end
+        return nil
+    end
+    if GetFactionInfo then
+        local ok, _, _, standing, _, _, _, _, _, isHeader, _, hasRep = pcall(GetFactionInfo, i)
+        if ok then return N(standing), isHeader and not hasRep end
+    end
+end
 local function ScanReputation()
-    if not ns.char or not GetNumFactions or not GetFactionInfo then return end
+    if not ns.char then return end
+    local numFn = (C_Reputation and C_Reputation.GetNumFactions) or GetNumFactions
+    if not numFn then return end
+    local okN, total = pcall(numFn)
+    if not okN or type(total) ~= "number" or S(total) then return end
     local counts = { [5] = 0, [6] = 0, [7] = 0, [8] = 0 }
-    for i = 1, GetNumFactions() do
-        local ok, name, _, standing, _, _, _, _, _, isHeader, _, hasRep = pcall(GetFactionInfo, i)
-        standing = ok and N(standing)
-        if standing and (not isHeader or hasRep) then
+    for i = 1, total do
+        local standing, headerOnly = FactionStanding(i)
+        if standing and not headerOnly then
             for s = 5, 8 do if standing >= s then counts[s] = counts[s] + 1 end end
         end
     end
+    ns.src.reputation = total
     Max("max_friendly", counts[5]); Max("max_honored", counts[6]); Max("max_revered", counts[7]); Max("max_exalted", counts[8])
 end
 On("UPDATE_FACTION", function() if C_Timer then C_Timer.After(1, function() pcall(ScanReputation) end) end end)

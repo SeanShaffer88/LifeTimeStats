@@ -123,8 +123,17 @@ local function Label(run, name)
     return label or Str(name) or "?", d
 end
 
-On("ENCOUNTER_START", function(_, _, name)
+-- The encounter ID gives the boss its listed name even if the client words it differently.
+function ns.EncounterName(id, name)
+    if type(id) == "number" and not S(id) and ns.FOREVER_ENCOUNTERS and ns.FOREVER_ENCOUNTERS[id] then
+        return ns.FOREVER_ENCOUNTERS[id]
+    end
+    return name
+end
+
+On("ENCOUNTER_START", function(_, id, name)
     if not ns.char then return end
+    name = ns.EncounterName(id, name)
     local run = CurrentRun()
     local label, d = Label(run, name)
     engage = { label = label, t = GetTime(), wall = time(), dkey = d and d.key }
@@ -137,8 +146,9 @@ On("ENCOUNTER_START", function(_, _, name)
     end
 end)
 
-On("ENCOUNTER_END", function(_, _, name, _, _, success)
+On("ENCOUNTER_END", function(_, id, name, _, _, success)
     if not ns.char then return end
+    name = ns.EncounterName(id, name)
     local e = engage
     engage = nil
     local run = CurrentRun()

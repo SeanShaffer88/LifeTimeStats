@@ -33,6 +33,8 @@ jobs:
         run: python tests/journal.py
       - name: Verify the Adventure Guide
         run: python tests/guide.py
+      - name: Verify trends, export, compartment and globals
+        run: python tests/compendium.py
       - name: Verify release packaging
         run: python tests/package_release.py
 

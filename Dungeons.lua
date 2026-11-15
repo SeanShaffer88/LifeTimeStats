@@ -1,7 +1,10 @@
 -- LifeTimeStats - dungeon book: every Forever dungeon and raid with its level range and bosses.
 -- Counts bosses found per dungeon, full clears, fastest clear, and runs under / in / over level.
--- Boss lists: Warcraft Tavern Forever guides (2026-11). Where a guide was incomplete
--- (marked learn = true) bosses you kill there are added as you meet them.
+-- Boss lists: Warcraft Tavern Forever guides (2026-11). The nine Forever dungeons were checked
+-- against DBM-Dungeons' Forever encounter scaffolds (build 1.60.1.70840; names and encounter IDs
+-- only, no code). Older guide names DBM does not list are kept as optional so earlier kills count.
+-- learn = true: which bosses are optional is still unknown, so full clears are not counted there
+-- and bosses you kill that are not listed are added as you meet them.
 -- If DungeonJournal (Exehn) is installed, Dungeons.lua can read its data too (see DJ section).
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local _, ns = ...
@@ -11,36 +14,36 @@ local S = ns.IsSecret
 -- key, name, min, max, zone, instance (GetInstanceInfo name when it differs), bosses (* = optional / rare), flags
 local D = {
     { "rfc",   "Ragefire Chasm", 13, 18, "Orgrimmar", nil, "Oggleflint, Taragaman the Hungerer, Jergosh the Invoker, Bazzalan" },
-    { "thanes","Hall of Thanes", 13, 20, "Ironforge", nil, "Faldrim Anvilmar, Magmatus, Plunder, Durgen Dirgehammer", new = true },
-    { "rol",   "Ruins of Lordaeron", 15, 22, "Tirisfal Glades", nil, "Witherfang, The Baron, Viktor the Vile*, The Abandoned*, Bjork, Rath'mael, Lordaeron Captain*", new = true },
+    { "thanes","Hall of Thanes", 13, 20, "Ironforge", nil, "Faldrim Anvilmar, Plunder, Infurnus, Durgen Dirgehammer, Magmatus*", new = true },
+    { "rol",   "Ruins of Lordaeron", 15, 22, "Tirisfal Glades", nil, "Witherfang, The Butcher, Viktor the Vile*, The Abandoned*, Bjork, Rath'mael, Lordaeron Captain*, The Baron*", new = true },
     { "wc",    "Wailing Caverns", 15, 24, "The Barrens", nil, "Kresh, Lady Anacondra, Lord Cobran, Deviate Faerie Dragon*, Lord Pythas, Skum, Lord Serpentis, Verdan the Everliving, Mutanus the Devourer" },
     { "dm",    "The Deadmines", 17, 26, "Westfall", nil, "Rhahk'zor, Miner Johnson*, Sneed's Shredder, Gilnid, Mr. Smite, Captain Greenskin, Edwin VanCleef, Cookie*" },
     { "sfk",   "Shadowfang Keep", 20, 30, "Silverpine Forest", nil, "Rethilgore, Razorclaw the Butcher, Baron Silverlaine, Commander Springvale, Odo the Blindwatcher, Deathsworn Captain*, Fenrus the Devourer, Wolf Master Nandos, Archmage Arugal" },
     { "bfd",   "Blackfathom Deeps", 24, 32, "Ashenvale", nil, "Ghamoo-ra, Lady Sarevess, Gelihast*, Lorgus Jett, Baron Aquanis, Twilight Lord Kelris, Old Serra'kis*, Aku'mai" },
     { "stocks","The Stockade", 25, 29, "Stormwind City", nil, "Targorr the Dread, Kam Deepfury, Hamhock, Bazil Thredd, Bruegal Ironknuckle*, Dextren Ward" },
     { "exc",   "Excavation Site: Wetlands", 26, 33, "Wetlands", nil, "Saltspine, Shadetooth, Highland Horror*, Relic Guardian", new = true },
-    { "dal",   "City of Dalaran", 28, 35, "Alterac Mountains", nil, "Atrexis the Grave Knight, Lyn the Ignored*, Mana Devourer, Arcane Anomaly, Fel Ancient, Arcanic Enigma, Unstable Sentry, Shade of the Archmage", new = true },
+    { "dal",   "City of Dalaran", 28, 35, "Alterac Mountains", nil, "Atrexis the Grave Knight, Lyn the Ignored*, Mana Devourer, Mana Elemental, Mana Wraith, Arcane Anomaly, Fel Ancient, Unstable Sentinel, Shade of the Archmage, Arcanic Enigma*, Unstable Sentry*", new = true },
     { "rfk",   "Razorfen Kraul", 29, 38, "The Barrens", nil, "Roogug, Aggem Thorncurse, Death Speaker Jargba, Overlord Ramtusk, Earthcaller Halmgar*, Agathelos the Raging, Blind Hunter*, Charlga Razorflank" },
     { "gnomer","Gnomeregan", 29, 38, "Dun Morogh", nil, "Grubbis, Viscous Fallout, Electrocutioner 6000, Crowd Pummeler 9-60, Dark Iron Ambassador*, Mekgineer Thermaplugg" },
     { "smgy",  "Scarlet Monastery Graveyard", 30, 38, "Tirisfal Glades", "Scarlet Monastery", "Interrogator Vishas, Ironspire*, Fallen Champion*, Azshir the Sleepless*, Bloodmage Thalnos" },
     { "smlib", "Scarlet Monastery Library", 33, 41, "Tirisfal Glades", "Scarlet Monastery", "Houndmaster Loksey, Arcanist Doan" },
-    { "drown", "The Drowned City", 35, 42, "Stranglethorn Vale", nil, "Zul'Alai, Zin'aka, Var'Taka, Captain Dreadrise", new = true },
+    { "drown", "The Drowned City", 35, 42, "Stranglethorn Vale", nil, "Zul'Alai, Var'Taka, Deathless Guardians, Min'loth the Serpent, Primeval Elemental, Captain Dreadrise, Zin'aka*", new = true },
     { "smarm", "Scarlet Monastery Armory", 36, 44, "Tirisfal Glades", "Scarlet Monastery", "Herod" },
     { "rfd",   "Razorfen Downs", 37, 46, "The Barrens", nil, "Tuten'kash, Plaguemaw the Rotting*, Mordresh Fire Eye, Ragglesnout*, Glutton, Amnennar the Coldbringer" },
     { "smcath","Scarlet Monastery Cathedral", 38, 46, "Tirisfal Glades", "Scarlet Monastery", "High Inquisitor Fairbanks, Scarlet Commander Mograine, High Inquisitor Whitemane" },
-    { "krol",  "Krol'Dok Stronghold", 40, 47, "Riverglades", nil, "Overlord Mugg", new = true, learn = true },
+    { "krol",  "Krol'Dok Stronghold", 40, 47, "Riverglades", nil, "Nar'gurk, Slavecrusher Grox, Overseer Mugg, Twilight Commander Zarmok, Handler Ashka, Overlord Mugg*", new = true, learn = true },
     { "ulda",  "Uldaman", 41, 51, "Badlands", nil, "The Lost Dwarves*, Revelosh, Ironaya, Obsidian Sentinel, Ancient Stone Keeper, Galgann Firehammer, Grimlok, Archaedas" },
     { "zf",    "Zul'Farrak", 44, 54, "Tanaris", nil, "Zerillis*, Antu'sul, Theka the Martyr, Witch Doctor Zum'rah, Dustwraith*, Shadowpriest Sezz'ziz, Sergeant Bly, Chief Ukorz Sandscalp, Hydromancer Velratha, Gahz'rilla, Sandarr Dunereaver*" },
     { "mara",  "Maraudon", 46, 55, "Desolace", nil, "Tinkerer Gizlock, Lord Vyletongue, Noxxion, Razorlash, Celebras the Cursed, Meshlok the Harvester*, Landslide, Rotgrip, Princess Theradras" },
-    { "alcaz", "Alcaz Island Prison", 48, 55, "Dustwallow Marsh", nil, "Blazeroar*", new = true, learn = true },
+    { "alcaz", "Alcaz Island Prison", 48, 55, "Dustwallow Marsh", nil, "Overseer Wrex, Tidemistress Ca'zass, The Questioner, Katerina the Cleaner, Blazeroar*", new = true, learn = true },
     { "st",    "Sunken Temple", 50, 60, "Swamp of Sorrows", "The Temple of Atal'Hakkar", "Atal'alarion, Spawn of Hakkar, Jammal'an the Prophet, Weaver, Dreamscythe, Hazzas, Morphaz, Shade of Eranikus, Avatar of Hakkar" },
     { "brd",   "Blackrock Depths", 52, 60, "Blackrock Mountain", nil, "High Interrogator Gerstahn, Lord Roccor, Houndmaster Grebmar, Hedrum the Creeper, Gorosh the Dervish, Anub'shiah, Ok'thor the Breaker, Grizzle, Eviscerator, Theldren, Pyromancer Loregrain, Warder Stilgiss, Watchman Doomgrip, Fineous Darkvire, Lord Incendius, Bael'gar, General Angerforge, Golem Lord Argelmach, Ribbly Screwspigot*, Hurley Blackbreath*, Plugger Spazzring*, Phalanx, Ambassador Flamelash, Panzor the Invincible*, The Seven, Magmus, Emperor Dagran Thaurissan" },
     { "dme",   "Dire Maul (East)", 54, 60, "Feralas", "Dire Maul", "Pusillin, Lethtendris, Hydrospawn, Zevrin Thornhoof, Alzzin the Wildshaper, Isalien*" },
     { "lbrs",  "Lower Blackrock Spire", 55, 60, "Blackrock Mountain", "Blackrock Spire", "Burning Felguard*, Spirestone Butcher*, Spirestone Battle Lord*, Spirestone Lord Magus*, Highlord Omokk, Shadow Hunter Vosh'gajin, War Master Voone, Mor Grayhoof*, Bannok Grimaxe*, Mother Smolderweb, Crystal Fang*, Urok Doomhowl, Quartermaster Zigris, Halycon, Gizrul the Slavener, Ghok Bashguud*, Overlord Wyrmthalak" },
-    { "black", "Blackmaw Hold", 55, 60, "Azshara", nil, "Varrox Bleakhoof", new = true, learn = true },
+    { "black", "Blackmaw Hold", 55, 60, "Azshara", nil, "Withermaw, Impaan the Imprisoner, Bonesnout the Unbroken, Blackmaw Behemoth, Elder Shaman Bloodmane, Varrox Bleakhoof, Unbound Spirit", new = true, learn = true },
     { "dmw",   "Dire Maul (West)", 56, 60, "Feralas", "Dire Maul", "Tendris Warpwood, Magister Kalendris, Tsu'zee*, Illyanna Ravenoak, Immol'thar, Prince Tortheldrin, Lord Hel'nurath*" },
     { "dmn",   "Dire Maul (North)", 56, 60, "Feralas", "Dire Maul", "Guard Mol'dar*, Stomper Kreeg*, Guard Fengus*, Guard Slip'kik*, Captain Kromcrush*, King Gordok" },
-    { "shaper","Shaper's Terrace", 58, 60, "Un'Goro Crater", nil, "Bolt, Cinder, Snowtalon, Nanaya", new = true, learn = true },
+    { "shaper","Shaper's Terrace", 58, 60, "Un'Goro Crater", nil, "Titanosaur, Ravasaur Hunters, Thunderhoof, Venomridge, Nanaya, Cinder, King Op, Bolt, Direhorn Matriarch, Snowtalon, Vitrix", new = true, learn = true },
     { "stratl","Stratholme (Main Gate)", 58, 60, "Eastern Plaguelands", "Stratholme", "Skul*, The Unforgiven, Hearthsinger Forresten*, Postmaster Malown*, Timmy the Cruel, Crimson Hammersmith, Cannon Master Willey, Archivist Galford, Balnazzar, Jarien and Sothos*" },
     { "stratu","Stratholme (Service Gate)", 58, 60, "Eastern Plaguelands", "Stratholme", "Nerub'enkan, Stonespire*, Black Guard Swordsmith, Baroness Anastari, Maleki the Pallid, Magistrate Barthilas, Ramstein the Gorger, Baron Rivendare" },
     { "scholo","Scholomance", 58, 60, "Western Plaguelands", nil, "Kirtonos the Herald*, Jandice Barov*, Rattlegore, Death Knight Darkreaver*, Marduk Blackpool, Vectus, Ras Frostwhisper, Kormok*, Lady Illucia Barov, Lord Alexei Barov, The Ravenian, Lorekeeper Polkelt, Doctor Theolen Krastinov, Instructor Malicia, Darkmaster Gandling" },
@@ -49,6 +52,19 @@ local D = {
     { "ony",   "Onyxia's Lair", 60, 60, "Dustwallow Marsh", nil, "Onyxia", raid = true },
     { "barrow","Barrow Deeps", 60, 60, "Mount Hyjal", nil, "Deepscar Matriarch, Khalith the Dreadspinner, Amethrax, Ravus and Darlissa, Elder Tangleclaw, Well of Sorrow, Del'lynar Songwood, Sonya Darkhallow", raid = true, new = true },
     { "hyjal", "Hyjal Summit", 60, 60, "Mount Hyjal", nil, "Bandalar, Time-Lost Battalion, Old Gloomlurker, Kathris the Haunted, Elder Minderei, Council of Thorns, The Wild King, Ancient of Decay, Sylvestris Dusksong, Gharalis the Abyssal, Anara Chillwind, Tracker Stillwind, Nythus the Dreadbound", raid = true, new = true },
+}
+
+-- Encounter IDs of the Forever dungeon bosses (from DBM-Dungeons' Forever scaffolds).
+ns.FOREVER_ENCOUNTERS = {
+    [3493] = "Faldrim Anvilmar", [3494] = "Plunder", [3495] = "Infurnus", [3496] = "Durgen Dirgehammer",
+    [3353] = "Witherfang", [3354] = "Rath'mael", [3355] = "The Butcher", [3357] = "The Abandoned", [3408] = "Lordaeron Captain", [3411] = "Viktor the Vile", [3412] = "Bjork",
+    [3480] = "Saltspine", [3481] = "Shadetooth", [3482] = "Relic Guardian", [3644] = "Highland Horror",
+    [3298] = "Arcane Anomaly", [3299] = "Fel Ancient", [3300] = "Mana Devourer", [3301] = "Mana Elemental", [3302] = "Unstable Sentinel", [3303] = "Shade of the Archmage", [3310] = "Lyn the Ignored", [3311] = "Atrexis the Grave Knight", [3312] = "Mana Wraith",
+    [3474] = "Zul'Alai", [3475] = "Var'Taka", [3476] = "Captain Dreadrise", [3478] = "Deathless Guardians", [3479] = "Min'loth the Serpent", [3511] = "Primeval Elemental",
+    [3449] = "Nar'gurk", [3450] = "Slavecrusher Grox", [3451] = "Overseer Mugg", [3452] = "Twilight Commander Zarmok", [3453] = "Handler Ashka",
+    [3403] = "Overseer Wrex", [3409] = "Blazeroar", [3410] = "Tidemistress Ca'zass", [3415] = "The Questioner", [3418] = "Katerina the Cleaner",
+    [3315] = "Withermaw", [3316] = "Impaan the Imprisoner", [3322] = "Bonesnout the Unbroken", [3323] = "Blackmaw Behemoth", [3327] = "Elder Shaman Bloodmane", [3334] = "Varrox Bleakhoof", [3336] = "Unbound Spirit",
+    [3498] = "Titanosaur", [3499] = "Ravasaur Hunters", [3500] = "Thunderhoof", [3501] = "Venomridge", [3502] = "Nanaya", [3503] = "Cinder", [3504] = "King Op", [3505] = "Bolt", [3507] = "Direhorn Matriarch", [3597] = "Snowtalon", [3600] = "Vitrix",
 }
 
 -- Normalise names for matching: lower case, no "the ", no punctuation.

@@ -10,6 +10,8 @@ Version 1.14.0 adds Journal filters by entry type and zone, private notes on Jou
 
 Version 1.15.0 adds the Adventure Guide (key G), a Dungeon Journal-style compendium of all your characters: boss pages, a dungeon progress book, run history, a death codex, a bestiary, a zone atlas, Chronicle chapters, group memories, boss loot and suggestions for what to do next, plus 49 new statistics and top lists.
 
+Version 1.16.0 adds `/lts export` (every statistic for every character as CSV), a 12-month Timeline view, an addon compartment entry, full DBM-checked boss rosters for the nine Forever dungeons, and reputation standings, form names and toy names on the Forever client.
+
 ## The useless ones
 Steps taken. Times jumped. Time spent in the air. Dances, hugs and chickens. Perfect /rolls. How often you sat down, opened your bags or toggled auto-run. Red error messages seen ("Not enough mana", we know). How many times you checked these stats.
 
@@ -54,6 +56,6 @@ LifeTimeStats stores data locally in account and character SavedVariables. Stats
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip `LifeTimeStats-1.15.0-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
+Unzip `LifeTimeStats-1.16.0-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.
