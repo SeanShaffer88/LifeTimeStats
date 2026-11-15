@@ -1,0 +1,104 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Notebook characters</title><link rel="stylesheet" href="notebook.css">
+<style>
+.card { display: flex; gap: 10px; align-items: center; border: 1.5px solid var(--ink-faint); border-radius: 6px; padding: 7px 10px; margin-bottom: 8px; background: rgba(255,255,255,.15); }
+.card.on { border-color: var(--ink); border-width: 2px; background: rgba(255,255,255,.35); }
+.crest { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; }
+.card b { font-weight: normal; font-size: 15px; display: block; }
+.card small { font-size: 11px; color: var(--ink-soft); display: block; }
+.portrait { height: 250px; display: flex; align-items: flex-end; justify-content: center; border: 1.5px solid var(--ink); border-radius: 6px;
+  background: radial-gradient(ellipse at 50% 85%, rgba(58,46,34,.25), transparent 60%), rgba(255,255,255,.12); }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.prof { display: grid; grid-template-columns: 90px 1fr 60px; align-items: center; gap: 8px; font-size: 12.5px; line-height: 1.9; }
+.prof .bar { height: 8px; border: 1.5px solid var(--ink); border-radius: 4px; }
+.prof .bar div { height: 100%; background: repeating-linear-gradient(135deg, var(--accent) 0 3px, transparent 3px 6px); }
+.prof .n { text-align: right; color: var(--accent); }
+</style></head>
+<body><div class="window">
+  <div class="header">
+    <span class="title">LifeTimeStats</span>
+    <div class="seg"><span class="on">Character</span><span>Account</span></div>
+    <div class="seg"><span class="on">Lifetime</span><span>Session</span><span>Today</span><span>Week</span><span>Month</span></div>
+    <span class="grow"></span>
+    <div class="who"><b>Moo</b><small>Level 10 · 2,118 pts</small></div>
+    <div class="x">✕</div>
+  </div>
+  <div class="tabs">
+    <div class="tab on"><span>Character</span></div>
+    <div class="tab"><span>Stats</span></div>
+    <div class="tab"><span>Quest Log</span></div>
+    <div class="tab"><span>Places</span></div>
+    <div class="tab"><span>Records</span></div>
+    <div class="tab"><span>Journal</span></div>
+    <div class="tab"><span>Notes</span></div>
+  </div>
+  <div class="book">
+    <div class="page left">
+      <div class="pagehead">Character 1</div>
+      <div class="subtabs"><span class="tag">Dashboard</span><span class="tag on">Characters</span><span class="tag">Compare</span></div>
+      <div class="grid" style="grid-template-columns: 210px 1fr;">
+        <div class="portrait">
+          <svg width="150" height="230" viewBox="0 0 150 230" fill="none" stroke="#3a2e22" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M52 40 q-18 -14 -26 -2 q10 2 18 12"/><path d="M98 40 q18 -14 26 -2 q-10 2 -18 12"/>
+            <ellipse cx="75" cy="52" rx="24" ry="26"/><path d="M64 66 q11 8 22 0"/><circle cx="66" cy="50" r="2" fill="#3a2e22"/><circle cx="84" cy="50" r="2" fill="#3a2e22"/>
+            <path d="M48 84 q27 -12 54 0 l10 60 q-37 12 -74 0 z"/><path d="M48 84 l-18 50 l10 4 l16 -40"/><path d="M102 84 l18 50 l-10 4 l-16 -40"/>
+            <path d="M58 144 l-4 66 h18 l3 -50 l3 50 h18 l-4 -66"/><path d="M60 110 h30 M62 124 h26"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-size: 26px; color: var(--druid);">Moo</div>
+          <div style="font-size: 14px;">Level 10 Tauren Druid</div>
+          <div style="font-size: 11.5px; color: var(--ink-soft); font-style: italic; margin-bottom: 8px;">Last seen in Mulgore, Stonebull Lake · just now</div>
+          <div class="facts">
+            <div class="row"><span class="k">Gold</span><span class="dots"></span><span class="v">14s 77c</span></div>
+            <div class="row"><span class="k">Played</span><span class="dots"></span><span class="v">5h 31m</span></div>
+            <div class="row"><span class="k">Rested</span><span class="dots"></span><span class="v">1,382</span></div>
+            <div class="row"><span class="k">Next level</span><span class="dots"></span><span class="v">12%</span></div>
+            <div class="row"><span class="k">Item level</span><span class="dots"></span><span class="v">5.9</span></div>
+            <div class="row"><span class="k">Bags</span><span class="dots"></span><span class="v">2 / 38</span></div>
+            <div class="row"><span class="k">Hearth</span><span class="dots"></span><span class="v">Bloodhoof</span></div>
+            <div class="row"><span class="k">Score</span><span class="dots"></span><span class="v">2,118</span></div>
+          </div>
+          <div class="row" style="margin-top:2px;"><span class="k">Reputation</span><span class="dots"></span><span class="v">Friendly · Darkspear Trolls</span></div>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: 10px;">
+        <div class="box">
+          <h4>Professions</h4>
+          <div class="prof"><span>Skinning</span><div class="bar"><div style="width:62%"></div></div><span class="n">93 / 150</span></div>
+          <div class="prof"><span>Mining</span><div class="bar"><div style="width:19%"></div></div><span class="n">14 / 75</span></div>
+          <div class="prof"><span>Fishing</span><div class="bar"><div style="width:2%"></div></div><span class="n">1 / 75</span></div>
+          <div class="prof"><span>Cooking</span><div class="bar"><div style="width:2%"></div></div><span class="n">1 / 75</span></div>
+        </div>
+        <div class="box ledger">
+          <h4>Lifetime</h4>
+          <div class="row"><span class="k">Steps</span><span class="dots"></span><span class="v">50,474</span></div>
+          <div class="row"><span class="k">Enemies slain</span><span class="dots"></span><span class="v">220</span></div>
+          <div class="row"><span class="k">Quests</span><span class="dots"></span><span class="v">34</span></div>
+          <div class="row"><span class="k">Gold earned</span><span class="dots"></span><span class="v">36s 13c</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="spiral">
+      <i style="top:14px"></i><i style="top:44px"></i><i style="top:74px"></i><i style="top:104px"></i><i style="top:134px"></i><i style="top:164px"></i><i style="top:194px"></i><i style="top:224px"></i><i style="top:254px"></i><i style="top:284px"></i><i style="top:314px"></i><i style="top:344px"></i><i style="top:374px"></i><i style="top:404px"></i><i style="top:434px"></i><i style="top:464px"></i><i style="top:494px"></i><i style="top:524px"></i><i style="top:554px"></i><i style="top:584px"></i><i style="top:614px"></i>
+    </div>
+    <div class="page right">
+      <div class="pagehead">Your Characters</div>
+      <div class="card on"><div class="crest" style="background: var(--druid);">❦</div><div><b style="color: var(--druid);">Moo</b><small>Level 10 Druid · Mulgore · just now</small></div></div>
+      <div class="card"><div class="crest" style="background: var(--lock);">✶</div><div><b style="color: var(--lock);">Hex</b><small>Level 7 Warlock · Durotar · 16 min ago</small></div></div>
+      <div class="card"><div class="crest" style="background: var(--mage);">✧</div><div><b style="color: var(--mage);">Abraca</b><small>Level 7 Mage · Orgrimmar · 20 min ago</small></div></div>
+      <div class="box ledger" style="margin-top: 6px;">
+        <h4>Account</h4>
+        <div class="row"><span class="k">Characters</span><span class="dots"></span><span class="v">3</span></div>
+        <div class="row"><span class="k">Gold</span><span class="dots"></span><span class="v">28s 63c</span></div>
+        <div class="row"><span class="k">Played</span><span class="dots"></span><span class="v">11h 26m</span></div>
+      </div>
+      <div class="subtabs" style="flex-wrap: wrap; margin-top: 12px;">
+        <span class="tag">People</span><span class="tag">Farming</span><span class="tag">Reputation</span><span class="tag">Currencies</span>
+        <span class="tag">Item log</span><span class="tag">Gathering</span><span class="tag">Mail</span><span class="tag">Goals</span>
+        <span class="tag">Trends</span><span class="tag">Quests</span><span class="tag">Levels</span><span class="tag">Habits</span>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Counting since Nov 10, 2026 · 943 statistics · 3 characters</span><span class="grow"></span><span>v1.21.0</span><span class="btn">Sheet</span><span class="btn">Share</span><span class="btn">Backup</span></div>
+</div></body></html>
