@@ -232,6 +232,31 @@ eq(count("ex_fights_incomplete"), 1, "partial fight explicitly tracked")
 eq(count("ex_fights_observed"), 1, "partial not recorded as complete")
 
 -- Every new getter is finite at zero and formats in every existing category.
+-- A continuous interval improves the in-memory maximum every sample. History
+-- publishes only meaningful differences from the last published value.
+state.combat = false
+fire("PLAYER_LEAVING_WORLD")
+ns.char.r.ex_longest_moving, ns.char.r.ex_farthest_moving = nil, nil
+ns.settings.recordMoments = false
+for _ = 1, 240 do ns.TrackExpandedSample(0.25, 1.75, 7) end
+near(ns.char.r.ex_longest_moving, 60, "continuous interval retains 60 second record")
+near(ns.char.r.ex_farthest_moving, 420, "continuous interval retains 420 yards")
+local movementRecords = {}
+for _, entry in ipairs(ns.char.rh) do
+    if entry.k == "ex_longest_moving" or entry.k == "ex_farthest_moving" then
+        local records = movementRecords[entry.k] or {}
+        movementRecords[entry.k] = records
+        records[#records + 1] = entry.v
+    end
+end
+local lengths = movementRecords.ex_longest_moving or {}
+local distances = movementRecords.ex_farthest_moving or {}
+eq(#lengths, 6, "six elapsed-time milestones instead of one per sample")
+near(lengths[1], 10, "first elapsed-time milestone")
+near(lengths[#lengths], 60, "latest elapsed-time milestone")
+eq(#distances, 8, "eight distance milestones instead of one per sample")
+eq(distances[1] >= 50 and distances[1] < 52, true, "first distance milestone")
+
 -- Personal records are dated, bounded, saveable and visible in the chronicle.
 local priorJournal = #(ns.char.journal or {})
 ns.settings.recordMoments = false

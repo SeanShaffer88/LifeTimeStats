@@ -8,11 +8,11 @@ L.execute((pathlib.Path(__file__).parent / "harness.lua").read_text())
 
 toc = (ROOT / "LifeTimeStats.toc").read_text().splitlines()
 files = [l.strip() for l in toc if l.strip().endswith(".lua")]
-L.execute("ns = {}")
+L.execute("ns = {}; addonChunks = {}")
 for f in files:
     src = (ROOT / f).read_text()
     chunk = L.eval("function(src, name) local f, e = loadstring(src, name); if not f then error(e) end; return f end")(src, f)
-    L.eval("function(f) f('LifeTimeStats', ns) end")(chunk)
+    L.eval("function(f) addonChunks[#addonChunks + 1] = f; f('LifeTimeStats', ns) end")(chunk)
 
 test = r'''
 local fails = 0
@@ -723,6 +723,7 @@ Enum = { DamageMeterType = { DamageDone = 0, HealingDone = 2 }, DamageMeterSessi
 C_DamageMeter = { GetCombatSessionFromType = function(st, mt) return { combatSources = { { isLocalPlayer = true, totalAmount = mt == 0 and 500 or 120 } } } end }
 ns.src.amountReadable = nil
 local dd8 = ns.char.c.dmg_done or 0
+fire("PLAYER_REGEN_DISABLED")
 fire("PLAYER_REGEN_ENABLED"); NOW = NOW + 1; RunTimers()
 eq(ns.char.c.dmg_done, dd8 + 500, "damage from damage meter"); eq(ns.src.dmReadable, true, "dm readable")
 C_DamageMeter = nil; Enum = nil
@@ -745,6 +746,7 @@ fire("PLAYER_ENTERING_WORLD", true, false); NOW = NOW + 6; RunTimers()
 eq(ns.char.r.mounts_owned, 2, "mounts owned")
 C_DamageMeter = { GetCombatSessionSourceFromType = function() return { totalAmount = 77 } end }
 local d9 = ns.char.c.dmg_done or 0; ns.src.amountReadable = nil
+fire("PLAYER_REGEN_DISABLED")
 fire("PLAYER_REGEN_ENABLED"); NOW = NOW + 1; RunTimers()
 eq(ns.char.c.dmg_done, d9 + 77, "dm source by guid")
 C_DamageMeter = nil
@@ -802,7 +804,7 @@ eq(li ~= nil and li < 8, true, "spell lists near top")
 
 -- ===== v1.10 damage meter: catch-up, avoidable, enemy, pet, group, boss, killer =====
 local sessList = { { sessionID = 200, name = "Old", durationSeconds = 5 } }
-local srcData = {}
+local srcData = { [200] = { [0] = { totalAmount = 0 } } }
 C_DamageMeter = {
   GetAvailableCombatSessions = function() return sessList end,
   GetCombatSessionSourceFromID = function(id, t, guid) if guid and srcData[id] then return srcData[id][t] end end,
@@ -844,6 +846,7 @@ eq(ns.char.t.bossdamage.Hogger, 300, "boss damage"); eq(ns.char.r.best_boss_dps,
 IsInGroup = function() return false end
 -- meter restarted numbering (relog): no fights lost, no crash
 sessList = { { sessionID = 3, name = "New", durationSeconds = 4 } }
+srcData[3] = { [0] = { totalAmount = 0 } }
 fire("PLAYER_REGEN_ENABLED"); NOW = NOW + 1; RunTimers()
 eq(ns.char.meta.dmLastID, 3, "numbering restart handled")
 -- death cause from the meter
@@ -969,12 +972,28 @@ do
   ns.char.run = nil
   GetInstanceInfo = function() return "Krol'Dok Stronghold", "party", 1, "Normal", 5, 0, false, 9001 end
   fire("PLAYER_ENTERING_WORLD", false, false)
+  local beforeBooks = ns.char.un.dj_books or 0
+  fire("ENCOUNTER_END", 3, "Overlord Mugg", 1, 5, 1)
+  eq(ns.char.c.dj_full_clears, f0 + 1, "Krol'Dok known encounter does not award a full clear")
+  eq(ns.char.un.dj_books or 0, beforeBooks, "partial book does not award completed discovery")
+  eq(ns.char.f["clear:krol"], nil, "incomplete roster has no fastest clear")
   fire("ENCOUNTER_END", 3, "Some New Boss", 1, 5, 1)
   local f2, t2 = ns.DungeonProgress(ns.DUNGEON_BY_KEY.krol)
-  eq(f2 .. "/" .. t2, "1/2", "learned boss adds to total")
+  eq(f2 .. "/" .. t2, "2/2", "learned boss adds to total")
+  ns.char.run = nil
+  GetInstanceInfo = function() return "Alcaz Island Prison", "party", 1, "Normal", 5, 0, false, 9002 end
+  fire("PLAYER_ENTERING_WORLD", false, false)
+  fire("ENCOUNTER_END", 4, "Blazeroar", 1, 5, 1)
+  fire("ENCOUNTER_END", 5, "Another New Boss", 1, 5, 1)
+  local f3, t3 = ns.DungeonProgress(ns.DUNGEON_BY_KEY.alcaz)
+  eq(f3 .. "/" .. t3, "2/2", "Alcaz discoveries include optional and learned encounters")
+  eq(ns.char.c.dj_full_clears, f0 + 1, "Alcaz partial roster never credits a clear")
+  eq(ns.char.un.dj_books or 0, beforeBooks, "Alcaz partial roster never completes the book")
   -- list rows render
   local def; for _, l in ipairs(ns.LISTS) do if l.id == "dungeonbook" then def = l end end
   local rows = def.rows(ns.char, ns.session)
+  local krolRow = rows[ns.DUNGEON_BY_KEY.krol.order]
+  eq(krolRow[4], "2 known", "partial Dungeon Book progress is labeled by known discoveries")
   eq(#rows, #ns.DUNGEONS, "book has every instance"); eq(#ns.DUNGEONS, 38, "35 dungeons + 3 raids")
   eq(ns.NEW_DUNGEON_COUNT, 9, "9 new dungeons")
   -- backup carries progress
@@ -1047,6 +1066,238 @@ do
   eq(ch.c.deaths_fatigue, 1, "repair runs once (real fatigue deaths later are kept)")
   ch.c.deaths_fatigue = 0
   ns.ShowPage("records"); ns.ShowPage("life")
+end
+
+-- Mixed combat sources must agree per direction and per completed fight.
+do
+  ns.cleuSeen = nil
+  ns.settings.amountsSecret = true
+  local sessions, totals = {}, {}
+  C_DamageMeter = {
+    GetAvailableCombatSessions = function() return sessions end,
+    GetCombatSessionSourceFromID = function(id, kind)
+      return totals[id] and { totalAmount = totals[id][kind] or 0 }
+    end,
+  }
+  local function start(group)
+    state.combat, state.group = true, group
+    fire("PLAYER_REGEN_DISABLED")
+  end
+  local function finish(id, damage, taken)
+    if id then
+      sessions[#sessions + 1] = { sessionID = id, durationSeconds = 5 }
+      totals[id] = { [0] = damage, [7] = taken }
+    end
+    state.combat = false
+    fire("PLAYER_REGEN_ENABLED")
+  end
+  local function drain() NOW = NOW + 1; RunTimers() end
+  ns.char.meta.dmLastID = nil
+  fire("PLAYER_ENTERING_WORLD", false, true)
+  local done0, taken0 = ns.char.c.dmg_done or 0, ns.char.c.dmg_taken or 0
+
+  start(2)
+  fire("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+  finish(401, 321, 40)
+  drain()
+  eq(ns.char.c.dmg_done, done0 + 321, "incoming visibility does not suppress outgoing meter")
+  eq(ns.char.c.dmg_taken, taken0 + 40, "sticky secret flag does not duplicate readable incoming hit")
+
+  units.target = { guid = "Creature-0-1-1-1-5-5", name = "Test Tiger", hostile = true }
+  start(0)
+  fire("UNIT_COMBAT", "target", "WOUND", "", 25, 1)
+  finish(402, 40, 0)
+  start(2) -- The previous timer has not run.
+  finish(403, 60, 35)
+  drain()
+  eq(ns.char.c.dmg_done, done0 + 421, "back-to-back fights keep their own outgoing source credits")
+  eq(ns.char.c.dmg_taken, taken0 + 75, "later meter-only fight counts taken damage")
+
+  -- A cleared meter exposes two tracked results before its first delayed wake.
+  sessions, totals, ns.char.meta.dmLastID = {}, {}, nil
+  fire("PLAYER_ENTERING_WORLD", false, true)
+  start(2)
+  finish(1, 50, 0)
+  start(2)
+  finish(2, 75, 0)
+  drain()
+  done0 = done0 + 125
+  eq(ns.char.c.dmg_done, done0 + 421, "fresh meter reads both completed numbered fights")
+
+  start(2)
+  sessions[#sessions + 1] = { sessionID = 3, durationSeconds = 5 }
+  finish()
+  drain()
+  eq(ns.char.meta.dmLastID, 2, "meter cursor waits for totals to become readable")
+  totals[3] = { [0] = 30 }
+  fire("DAMAGE_METER_COMBAT_SESSION_UPDATED", 0, 3)
+  drain()
+  done0 = done0 + 30
+  eq(ns.char.c.dmg_done, done0 + 421, "late readable totals are recovered once")
+  eq(ns.char.meta.dmLastID, 3, "meter cursor advances after totals are read")
+
+  -- Correct argument order does not mistake session 7's damage for 0's taken.
+  local source = C_DamageMeter.GetCombatSessionSourceFromID
+  C_DamageMeter.GetCombatSessionSourceFromID = function(id, kind)
+    if id == 4 and kind == 7 then return nil end
+    if id == 7 and kind == 4 then return { totalAmount = 9999 } end
+    return source(id, kind)
+  end
+  start(2)
+  finish(4, 12, 0)
+  drain()
+  eq(ns.char.meta.dmLastID, 3, "partially visible tracked row waits for incoming total")
+  C_DamageMeter.GetCombatSessionSourceFromID = source
+  totals[4][7] = 16
+  fire("DAMAGE_METER_COMBAT_SESSION_UPDATED", 7, 4)
+  drain()
+  done0 = done0 + 12
+  taken0 = taken0 + 16
+  eq(ns.char.c.dmg_done, done0 + 421, "readable outgoing result is credited once when incoming row arrives")
+  eq(ns.char.c.dmg_taken, taken0 + 75, "meter reads late incoming damage using correct session and metric order")
+
+  start(0)
+  fire("UNIT_COMBAT", "target", "WOUND", "", 20, 1)
+  finish()
+  drain()
+  eq(ns.char.c.dmg_done, done0 + 441, "unreadable meter preserves direct count")
+
+  C_DamageMeter = { GetCombatSessionSourceFromType = function(_, kind)
+    return { totalAmount = kind == 0 and 17 or 0 }
+  end }
+  start(2)
+  finish()
+  drain()
+  eq(ns.char.c.dmg_done, done0 + 458, "unnumbered current fight is read on completion")
+  fire("PLAYER_REGEN_ENABLED")
+  fire("DAMAGE_METER_CURRENT_SESSION_UPDATED")
+  drain()
+  eq(ns.char.c.dmg_done, done0 + 458, "repeated events cannot count unnumbered current twice")
+
+  C_DamageMeter = nil
+  state.hp = 1000
+  fire("UNIT_MAXHEALTH", "player")
+  start(0)
+  fire("UNIT_COMBAT", "player", "WOUND", "", 25, 1)
+  state.hp = 960
+  fire("UNIT_HEALTH", "player")
+  eq(ns.char.c.dmg_taken, taken0 + 100, "readable UNIT_COMBAT credit remains immediate")
+  fire("PLAYER_LOGOUT")
+  eq(LifeTimeStatsCharDB.data.c.dmg_taken, taken0 + 115, "logout saves only health loss beyond direct incoming damage")
+  finish()
+  units.target = nil
+end
+
+-- Existing numeric keys and old text backup keys name the same discoveries.
+do
+  local live = ns.char
+  local source = ns.NewCharRecord()
+  source.u.quests = { [46217] = true }
+  local decoded = assert(ns.Deserialize(ns.Serialize(source)))
+  eq(ns.MergeMax(source, decoded), 0, "restoring own backup changes no discoveries")
+  eq(source.un.quests, 1, "own backup leaves one quest")
+  local fresh = ns.NewCharRecord()
+  ns.MergeMax(fresh, decoded)
+  ns.char = fresh
+  eq(ns.Unique("quests", 46217), false, "discovery restored on fresh character is already known")
+  eq(fresh.un.quests, 1, "fresh backup leaves one quest")
+  eq(ns.MergeMax(fresh, decoded), 0, "repeat restore changes nothing")
+  source.c.dmg_done = 5000000000
+  local large = assert(ns.Deserialize(ns.Serialize(source)))
+  eq(large.c.dmg_done, 5000000000, "backup keeps a lifetime total above signed 32-bit")
+  ns.char = live
+  local old = ns.NewCharRecord()
+  old.u.quests = { [46217] = true, ["46217"] = true, ["046217"] = true }
+  ns.EnsureRecord(old)
+  eq(old.un.quests, 2, "legacy numeric and string IDs deduplicate without changing other keys")
+end
+
+-- Restore keeps the most recent records irrespective of input insertion order.
+do
+  local newest, older = ns.NewCharRecord(), ns.NewCharRecord()
+  for i = 1, 200 do newest.rh[i] = { k = "jumps", v = i, at = 1000 + i, d = "max" } end
+  older.rh[1] = { k = "jumps", v = 0, at = 500, d = "max" }
+  local decoded = assert(ns.Deserialize(ns.Serialize(older)))
+  eq(ns.MergeMax(newest, decoded), 0, "restore discards history older than capacity")
+  eq(#newest.rh, 200, "history cap after merging older backup")
+  eq(newest.rh[1].at, 1001, "history retains oldest of the 200 newest entries")
+  eq(newest.rh[200].at, 1200, "history retains newest entry")
+  older.rh[1] = { k = "jumps", v = 201, at = 1200, d = "max" }
+  eq(ns.MergeMax(newest, older), 1, "new distinct record with matching timestamp is retained")
+  eq(newest.rh[199].v, 200, "equal timestamp retains destination first")
+  eq(newest.rh[200].v, 201, "equal timestamp retains source second")
+  eq(ns.MergeMax(newest, older), 0, "repeat history restore changes nothing")
+end
+
+-- Real logins distinguish short sessions. An actual addon reload restores
+-- the active row, its exact wall start and elapsed monotonic time.
+do
+  local realTime, wall = time, time() + 120
+  time = function() return wall end
+  ns.char.sessionlog = {}
+  fire("PLAYER_ENTERING_WORLD", true, false)
+  ns.Add("kills_npc", 10)
+  NOW, wall = NOW + 60, wall + 60
+  fire("PLAYER_LOGOUT")
+  local firstRow = ns.char.sessionlog[1]
+  local firstStart = firstRow.s
+  NOW, wall = NOW + 50, wall + 50
+  fire("PLAYER_ENTERING_WORLD", true, false)
+  ns.Add("kills_npc", 2)
+  local meterRows = { { sessionID = 80, durationSeconds = 4 } }
+  local meterReady = false
+  local takenBefore = ns.char.c.dmg_taken or 0
+  C_DamageMeter = {
+    GetAvailableCombatSessions = function() return meterRows end,
+    GetCombatSessionSourceFromID = function(id, kind)
+      if id == 81 and meterReady then return { totalAmount = kind == 7 and 100 or 0 } end
+    end,
+  }
+  ns.char.meta.dmLastID = 80
+  state.combat = true
+  fire("PLAYER_REGEN_DISABLED")
+  fire("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+  state.combat = false
+  meterRows[#meterRows + 1] = { sessionID = 81, durationSeconds = 5 }
+  fire("PLAYER_REGEN_ENABLED")
+  NOW, wall = NOW + 10, wall + 10
+  fire("PLAYER_LOGOUT")
+  eq(ns.char.c.dmg_taken, takenBefore + 40, "logout preserves direct hit while meter row is unreadable")
+  local log = ns.char.sessionlog
+  eq(#log, 2, "quick relog keeps two sessions")
+  eq(log[1].k, 10, "quick relog preserves original totals")
+  eq(log[1].s, firstStart, "first session wall start preserved")
+
+  NOW, wall = NOW + 25, wall + 25
+  timers = {} -- Reload discards timers from the previous UI.
+  local reloaded = {}
+  for _, chunk in ipairs(addonChunks) do chunk("LifeTimeStats", reloaded) end
+  local newFrame = reloaded.frame
+  newFrame.scripts.OnEvent(newFrame, "ADDON_LOADED", "LifeTimeStats")
+  newFrame.scripts.OnEvent(newFrame, "PLAYER_ENTERING_WORLD", false, true)
+  meterReady = true
+  newFrame.scripts.OnEvent(newFrame, "DAMAGE_METER_COMBAT_SESSION_UPDATED", 7, 81)
+  local journalBefore = #(reloaded.char.journal or {})
+  reloaded.settings.recordMoments = true
+  reloaded.Max("reload_grace_test", 1)
+  eq(#(reloaded.char.journal or {}), journalBefore, "reload retains startup grace")
+  NOW, wall = NOW + 6, wall + 6
+  RunTimers()
+  eq(reloaded.char.c.dmg_taken, takenBefore + 100, "reload reconciles late meter total against saved direct credit")
+  journalBefore = #(reloaded.char.journal or {})
+  reloaded.Max("reload_milestone_test", 1)
+  eq(#(reloaded.char.journal or {}), journalBefore + 1, "new record adds Journal entry after reload")
+  reloaded.Add("kills_npc", 3)
+  reloaded.LogSession()
+  eq(#log, 2, "reload updates same session row")
+  if log[2] then
+    eq(log[2].s, firstStart + 110, "reload preserves exact session start")
+    eq(log[2].d, 16, "reload preserves elapsed but excludes loading time")
+    eq(log[2].k, 5, "reload preserves session counters")
+  end
+  eq(#reloaded.errors, 0, "reload handlers have no errors")
+  C_DamageMeter = nil
+  time = realTime
 end
 
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))

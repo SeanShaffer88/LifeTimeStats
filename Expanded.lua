@@ -537,8 +537,8 @@ table.insert(ns.LISTS, {
     rows = RecordRows,
 })
 local recordsReadyAt = nil
-On("PLAYER_ENTERING_WORLD", function(_, isLogin)
-    if isLogin then recordsReadyAt = GetTime() + 5 end
+On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
+    if isLogin or isReload then recordsReadyAt = GetTime() + 5 end
 end)
 function ns.RecordMoment(entry)
     if not recordsReadyAt or GetTime() < recordsReadyAt

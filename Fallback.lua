@@ -264,12 +264,14 @@ On("UNIT_COMBAT", function(_, unit, action, flag, amount, school)
     elseif type(amount) == "number" and amount > 0 then
         ns.src.amountReadable = true
     end
+    if ns.BadNumber(amount) then amount = nil end
     if S(school) then school = nil end
     if unit == "player" then
         Src("ucPlayer")
         if action == "WOUND" then
             if amount and amount > 0 then
                 Add("dmg_taken", amount)
+                ns.TrackFightDamage("taken", amount)
                 incomingHits[#incomingHits + 1] = { GetTime(), amount }
                 if #incomingHits > 8 then table.remove(incomingHits, 1) end
             end
@@ -294,7 +296,11 @@ On("UNIT_COMBAT", function(_, unit, action, flag, amount, school)
         Engage("target")
         local what = (GetTime() - lastSpellT < 3) and lastSpell or "Melee"
         if action == "WOUND" then
-            if amount and amount > 0 then Add("dmg_done", amount); Max("max_hit", amount, what) end
+            if amount and amount > 0 then
+                Add("dmg_done", amount)
+                ns.TrackFightDamage("done", amount)
+                Max("max_hit", amount, what)
+            end
             Add("hits")
             if school == 1 then Add("melee_hits") elseif school then Add("spell_hits") end
             if flag == "CRITICAL" then
@@ -324,14 +330,17 @@ local function HealthDelta()
     end
     ns.src.hpReadable = true
     if ns.settings.healthSecret then ns.settings.healthSecret = nil end
-    if lastHp and ns.settings.amountsSecret and not ns.src.amountReadable and not CleuActive() then
+    if lastHp and ns.settings.amountsSecret and not CleuActive() then
         local d = hp - lastHp
         if d < 0 then
             local dmg = -d
-            Add("dmg_taken", dmg)
-            local src = Hostile("target") and Safe(UnitName("target")) or nil
-            Max("max_hit_taken", dmg, src)
-        elseif d > 0 and B(UnitAffectingCombat("player")) and not B(UnitIsDeadOrGhost("player")) then
+            local staged = ns.TrackFightDamage("health", dmg)
+            if staged or not ns.src.amountReadable then
+                if not staged then Add("dmg_taken", dmg) end
+                local src = Hostile("target") and Safe(UnitName("target")) or nil
+                Max("max_hit_taken", dmg, src)
+            end
+        elseif d > 0 and not ns.src.amountReadable and B(UnitAffectingCombat("player")) and not B(UnitIsDeadOrGhost("player")) then
             Add("heal_taken", d)
             Max("max_heal_taken", d)
         end

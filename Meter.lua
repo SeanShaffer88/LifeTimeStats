@@ -12,11 +12,16 @@ local GetTime = GetTime
 local DT = { damage = 0, heal = 2, interrupts = 5, dispels = 6, taken = 7, avoidable = 8, deaths = 9, enemy = 10 }
 ns.DM_TYPES = DT
 local MAX_PER_PASS = 20
+local secretReads = 0
 
 local function Zone() local z = ns.GetZone and ns.GetZone() return (z and z ~= "") and z or "?" end
 local function Num(v)
-    if S(v) then ns.src.dmSecret = true return nil end
-    if type(v) == "number" and v == v then return v end
+    if S(v) then
+        ns.src.dmSecret = true
+        secretReads = secretReads + 1
+        return nil
+    end
+    if not ns.BadNumber(v) then return v end
 end
 local function Name(v) if type(v) == "string" and not S(v) and v ~= "" then return v end end
 local function Persist() ns.src.dmReadable = true; if ns.settings then ns.settings.dmReadable = true end end
@@ -40,7 +45,7 @@ ns.DMSpellName = SpellName
 -- Iterate combatSpells rows with a readable amount above zero.
 local function Spells(src)
     local list = type(src) == "table" and src.combatSpells
-    if type(list) ~= "table" then return function() end end
+    if type(list) ~= "table" or S(list) then return function() end end
     local i = 0
     return function()
         while true do
@@ -61,7 +66,7 @@ local function Total(t)
 end
 local function Sources(sess)
     local list = type(sess) == "table" and (sess.combatSources or sess.sources)
-    return type(list) == "table" and list or nil
+    return type(list) == "table" and not S(list) and list or nil
 end
 local function IsMe(src, me, myAmt)
     local isMe = src.isLocalPlayer
@@ -88,21 +93,16 @@ end
 local function MySource(id, kind)
     local t, me = DT[kind], Me()
     if me then
-        for _, args in ipairs({ { id, t }, { t, id } }) do
-            local res = Call("GetCombatSessionSourceFromID", args[1], args[2], me)
-            local v = Total(res)
-            if v then ns.src.dmCall = "GetCombatSessionSourceFromID" return v, res end
-        end
+        local res = Call("GetCombatSessionSourceFromID", id, t, me)
+        local v = Total(res)
+        if v then ns.src.dmCall = "GetCombatSessionSourceFromID" return v, res end
     end
-    for _, args in ipairs({ { id, t }, { t, id } }) do
-        local sess = Call("GetCombatSessionFromID", args[1], args[2])
-        local list = Sources(sess)
-        if list then
-            for _, src in pairs(list) do
-                if type(src) == "table" and IsMe(src, me) then
-                    local v = Total(src)
-                    if v then ns.src.dmCall = "GetCombatSessionFromID" return v, src end
-                end
+    local list = Sources(Call("GetCombatSessionFromID", id, t))
+    if list then
+        for _, src in pairs(list) do
+            if type(src) == "table" and IsMe(src, me) then
+                local v = Total(src)
+                if v then ns.src.dmCall = "GetCombatSessionFromID" return v, src end
             end
         end
     end
@@ -112,30 +112,29 @@ end
 local function Local(kind)
     local t, me = DT[kind], Me()
     if me then
-        for _, args in ipairs({ { 1, t }, { t, 1 } }) do
-            local res = Call("GetCombatSessionSourceFromType", args[1], args[2], me)
-            local v = Total(res)
-            if v then return v, res end
-        end
+        local res = Call("GetCombatSessionSourceFromType", 1, t, me)
+        local v = Total(res)
+        if v then return v, res end
     end
-    for _, args in ipairs({ { 1, t }, { t, 1 } }) do
-        local list = Sources(Call("GetCombatSessionFromType", args[1], args[2]))
-        if list then
-            for _, src in pairs(list) do
-                if type(src) == "table" and IsMe(src, me) then
-                    local v = Total(src)
-                    if v then return v, src end
-                end
+    local list = Sources(Call("GetCombatSessionFromType", 1, t))
+    if list then
+        for _, src in pairs(list) do
+            if type(src) == "table" and IsMe(src, me) then
+                local v = Total(src)
+                if v then return v, src end
             end
         end
     end
 end
 ns.DMLocal = Local
 
+local function HasSessionList()
+    return type(C_DamageMeter) == "table" and type(C_DamageMeter.GetAvailableCombatSessions) == "function"
+end
 local function SessionList()
-    if type(C_DamageMeter) ~= "table" or type(C_DamageMeter.GetAvailableCombatSessions) ~= "function" then return nil end
+    if not HasSessionList() then return nil end
     local ok, list = pcall(C_DamageMeter.GetAvailableCombatSessions)
-    if not ok or type(list) ~= "table" then return nil end
+    if not ok or type(list) ~= "table" or S(list) then return nil end
     local out = {}
     for _, s in pairs(list) do
         if type(s) == "table" and Num(s.sessionID) then out[#out + 1] = s end
@@ -150,7 +149,7 @@ ns.DMSessionList = SessionList
 -- taken as the biggest hit (only if it is not more than the spell's total).
 local function ProbeDetails(sp, nm, amt)
     local det = sp.combatSpellDetails
-    if type(det) ~= "table" then return end
+    if type(det) ~= "table" or S(det) then return end
     local best, bestCrit
     local function Walk(t, depth)
         for k, v in pairs(t) do
@@ -182,29 +181,37 @@ local function B_InGroup()
 end
 
 -- ------------------------------------------------------------ one fight
-local function ReadFight(sess)
+local function ReadFight(sess, credited, allowMissing, accept)
     local id = sess and sess.sessionID
     local name = Name(sess and sess.name)
     local dur = sess and Num(sess.durationSeconds)
     local solo = not B_InGroup()
+    local function Read(kind)
+        if id then return MySource(id, kind) end
+        return Local(kind)
+    end
+    local before = secretReads
+    local d, dsrc = Read("damage")
+    local h, hsrc = Read("heal")
+    local tk, tsrc = Read("taken")
+    local av, asrc = Read("avoidable")
+    local it, dp = Read("interrupts"), Read("dispels")
+    -- A numbered row can arrive before its totals become readable. No counters
+    -- or cursor movement until the row settles or the bounded retry expires.
+    if not allowMissing and (secretReads > before or not (d or h or tk or av or it or dp)
+        or (credited and (d == nil or tk == nil))) then return false end
+    -- Mark the row read before applying its effects, so a detail field error
+    -- cannot make a later wake apply the same totals again.
+    accept()
     ns.src.dmSessions = (ns.src.dmSessions or 0) + 1
     if name then Tally("foughtenemies", name) end
     if dur then Add("dm_fight_time", dur); Max("max_dm_fight", dur, name) end
-    local countTotals = not ns.src.amountReadable  -- UNIT_COMBAT already counts if amounts are open
-    local function Read(kind)
-        if id then
-            local v, src = MySource(id, kind)
-            if v then return v, src end
-        end
-        if not id then return Local(kind) end
-    end
 
     -- damage done
-    local d, dsrc = Read("damage")
     if d and d > 0 then
         Persist()
         ns.src.dmCounted = (ns.src.dmCounted or 0) + d
-        if countTotals then Add("dmg_done", d) end
+        if not (credited and credited.skipDone) then Add("dmg_done", math.max(0, d - (credited and credited.done or 0))) end
         Max("max_fight_damage", d, name or Zone())
         Add("dm_fights_dmg", 1)
         Tally("dmglevel", LevelKey(), d)
@@ -214,8 +221,9 @@ local function ReadFight(sess)
         local top, topAmt = nil, 0
         for sp, amt in Spells(dsrc) do
             local nm = SpellName(sp.spellID)
-            local det = type(sp.combatSpellDetails) == "table" and sp.combatSpellDetails or {}
-            local pet = (det.isPet == true and (Name(det.unitName) or "Pet")) or Name(sp.creatureName)
+            local det = sp.combatSpellDetails
+            if type(det) ~= "table" or S(det) then det = {} end
+            local pet = (ns.Bool(det.isPet) and (Name(det.unitName) or "Pet")) or Name(sp.creatureName)
             if pet then
                 Add("dmg_pet", amt); Tally("petdamage", pet, amt)
             elseif nm then
@@ -258,29 +266,27 @@ local function ReadFight(sess)
     end
 
     -- healing done
-    local h, hsrc = Read("heal")
     if h and h > 0 then
         Persist(); Add("heal_done", h); Max("max_fight_heal", h, name or Zone())
         for sp, amt in Spells(hsrc) do local nm = SpellName(sp.spellID); if nm then Tally("spellheal", nm, amt) end end
     end
 
     -- damage taken
-    local tk, tsrc = Read("taken")
     if tk and tk > 0 then
         Persist()
-        if ns.settings.amountsSecret then Add("dmg_taken", tk) end
+        if not (credited and credited.skipTaken) then Add("dmg_taken", math.max(0, tk - (credited and credited.taken or 0))) end
         Max("max_fight_taken", tk, name or Zone())
         for sp, amt in Spells(tsrc) do
-            local det = type(sp.combatSpellDetails) == "table" and sp.combatSpellDetails or {}
+            local det = sp.combatSpellDetails
+            if type(det) ~= "table" or S(det) then det = {} end
             local who = Name(det.unitName) or Name(sp.creatureName) or name
             if who then Tally("hurtby", who, amt) end
             local nm = SpellName(sp.spellID); if nm then Tally("hurtbyspell", nm, amt) end
-            if sp.isDeadly == true then Add("deadly_hits", 1) end
+            if ns.Bool(sp.isDeadly) then Add("deadly_hits", 1) end
         end
     end
 
     -- avoidable damage taken ("standing in the fire")
-    local av, asrc = Read("avoidable")
     if av and av > 0 then
         Persist(); Add("dmg_avoidable", av); Add("fights_in_fire")
         Max("max_fight_avoidable", av, name or Zone())
@@ -313,40 +319,204 @@ local function ReadFight(sess)
         end
     end
 
-    local it = Read("interrupts"); if it and it > 0 then Persist(); Add("interrupts", it) end
-    local dp = Read("dispels"); if dp and dp > 0 then Persist(); Add("dispels", dp) end
+    if it and it > 0 then Persist(); Add("interrupts", it) end
+    if dp and dp > 0 then Persist(); Add("dispels", dp) end
+    return true
+end
+
+-- Fallback damage is credited immediately. Match it to numbered meter results
+-- so the meter fills only the missing amount in each direction.
+local activeFight, currentFight, lastSeenID, firstFightBaseline
+local pendingFights, creditsByID = {}, {}
+local readGeneration, readPending, retries = 0, false, 0
+local MAX_RETRIES = 2
+
+function ns.TrackFightDamage(kind, amount)
+    if not activeFight then return false end
+    activeFight[kind] = (activeFight[kind] or 0) + amount
+    return true
+end
+
+local function NewestID(list)
+    return list and (#list > 0 and list[#list].sessionID or 0)
+end
+
+local function MatchCredits(list)
+    local newest = NewestID(list)
+    if newest == nil then return end
+    if lastSeenID and newest < lastSeenID then creditsByID = {} end
+    lastSeenID = newest
+    local oldest = list[1] and list[1].sessionID
+    if oldest then
+        for id in pairs(creditsByID) do
+            if id < oldest then creditsByID[id] = nil end
+        end
+    end
+    if #pendingFights == 0 or newest == 0 then return end
+
+    -- More than one fight can finish before the list updates. Claim a result
+    -- only when the observed IDs identify a unique match. Where coverage
+    -- overlaps, keep direct totals and omit only the affected meter direction.
+    local matches, waiting = {}, {}
+    for _, fight in ipairs(pendingFights) do
+        local floor = fight.baseline or 0
+        if newest < floor then floor = 0 end
+        local ids = {}
+        for _, session in ipairs(list) do
+            local id = session.sessionID
+            if id > floor and not creditsByID[id] then ids[#ids + 1] = id end
+        end
+        if #ids == 0 then waiting[#waiting + 1] = fight end
+        for _, id in ipairs(ids) do
+            local match = matches[id]
+            if not match then
+                match = { done = 0, taken = 0, ambiguous = false }
+                matches[id] = match
+            else
+                match.ambiguous = true
+            end
+            match.ambiguous = match.ambiguous or fight.ambiguous or #ids > 1
+            match.done = math.max(match.done, fight.done or 0)
+            match.taken = math.max(match.taken, fight.taken or 0)
+        end
+    end
+    pendingFights = waiting
+    for id, match in pairs(matches) do
+        if match.ambiguous then
+            match.skipDone = match.done > 0
+            match.skipTaken = match.taken > 0
+        end
+        creditsByID[id] = match
+    end
 end
 
 -- ------------------------------------------------------------ after combat: all unread fights
-function ns.DMCatchUp()
-    if not ns.char or ns.cleuSeen then return end
+function ns.DMCatchUp(allowMissing)
+    if not ns.char or ns.cleuSeen or activeFight then return end
     local m = ns.char.meta
     local list = SessionList()
     if not list then
-        -- no fight list on this client: read the current fight once
-        ReadFight(nil)
+        if currentFight and type(C_DamageMeter) == "table" and not HasSessionList() then
+            if not ReadFight(nil, currentFight, allowMissing, function() currentFight = nil end) then return true end
+        end
         return
     end
+    currentFight = nil
+    MatchCredits(list)
     if #list == 0 then return end
     local newest = list[#list].sessionID
     if not m.dmLastID or newest < m.dmLastID then
-        -- first read ever, or the meter restarted its numbering: only the newest fight
-        m.dmLastID = newest - 1
+        local baseline = firstFightBaseline
+        -- With no observed start, avoid backfilling older meter history.
+        m.dmLastID = baseline and baseline <= newest and baseline or newest - 1
     end
+    firstFightBaseline = nil
     local done = 0
     for _, sess in ipairs(list) do
         if sess.sessionID > m.dmLastID then
-            m.dmLastID = sess.sessionID
-            ReadFight(sess)
+            if not ReadFight(sess, creditsByID[sess.sessionID], allowMissing, function()
+                m.dmLastID = sess.sessionID
+                creditsByID[sess.sessionID] = nil
+            end) then return true end
             done = done + 1
             if done >= MAX_PER_PASS then break end
         end
     end
+    for id in pairs(creditsByID) do
+        if id <= m.dmLastID then creditsByID[id] = nil end
+    end
 end
 
-On("PLAYER_REGEN_ENABLED", function()
-    C_Timer.After(0.8, function() ns.DMCatchUp() end)
+local function InvalidateRead()
+    readGeneration = readGeneration + 1
+    readPending, retries = false, 0
+end
+
+local function QueueRead(delay)
+    if readPending or activeFight then return end
+    local generation = readGeneration
+    readPending = true
+    C_Timer.After(delay, ns.Guard("damage meter read", function()
+        if generation ~= readGeneration then return end
+        readPending = false
+        local waiting = ns.DMCatchUp(retries >= MAX_RETRIES)
+        if waiting and retries < MAX_RETRIES then
+            retries = retries + 1
+            QueueRead(0.5)
+        elseif not waiting then
+            retries = 0
+        end
+    end))
+end
+
+local function SettleHealth(fight)
+    if fight.health and fight.health > (fight.taken or 0) then
+        Add("dmg_taken", fight.health - (fight.taken or 0))
+        fight.taken = fight.health
+    end
+end
+
+local function AddPending(fight)
+    pendingFights[#pendingFights + 1] = fight
+    -- Keep observations bounded if the meter is disabled or publishes late.
+    if #pendingFights > MAX_PER_PASS then
+        local oldest = table.remove(pendingFights, 1)
+        local nextFight = pendingFights[1]
+        nextFight.baseline = math.min(oldest.baseline or 0, nextFight.baseline or 0)
+        nextFight.done = math.max(oldest.done or 0, nextFight.done or 0)
+        nextFight.taken = math.max(oldest.taken or 0, nextFight.taken or 0)
+        nextFight.ambiguous = true
+    end
+end
+
+On("PLAYER_REGEN_DISABLED", function()
+    if activeFight then return end
+    if currentFight and not HasSessionList() and ns.Bool(UnitAffectingCombat("player")) == false then
+        ns.DMCatchUp()
+    end
+    InvalidateRead()
+    local list = SessionList()
+    MatchCredits(list)
+    local baseline, cursor = NewestID(list), ns.char.meta.dmLastID
+    if firstFightBaseline == nil and (not cursor or (baseline and baseline < cursor)) then
+        firstFightBaseline = baseline or false
+    end
+    activeFight = { baseline = baseline or cursor }
+    currentFight = nil
 end)
+
+On("PLAYER_REGEN_ENABLED", function()
+    local fight = activeFight
+    activeFight = nil
+    if fight then
+        SettleHealth(fight)
+        currentFight = fight
+        if HasSessionList() then
+            AddPending(fight)
+            MatchCredits(SessionList())
+        end
+    end
+    QueueRead(0.8)
+end)
+
+On("DAMAGE_METER_COMBAT_SESSION_UPDATED", function(_, _, id)
+    if Num(id) and id > (ns.char.meta.dmLastID or 0) and not activeFight then QueueRead(0) end
+end)
+On("DAMAGE_METER_CURRENT_SESSION_UPDATED", function()
+    if currentFight and not HasSessionList() then QueueRead(0) end
+end)
+
+ns.FlushCombatDamage = ns.Guard("save combat totals", function()
+    if activeFight then SettleHealth(activeFight)
+    elseif HasSessionList() then ns.DMCatchUp() end
+end)
+
+function ns.SaveFightCorrelation()
+    if HasSessionList() and (activeFight or #pendingFights > 0 or next(creditsByID)) then
+        return { pending = pendingFights, byID = creditsByID, active = activeFight,
+            seen = lastSeenID, baseline = firstFightBaseline }
+    end
+end
 
 -- Login / reload: fights from before are not counted again. Also note the meter's own
 -- overall total so /lts debug can compare it with what was counted this session.
@@ -356,14 +526,30 @@ local function OverallMine()
 end
 On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
     if not (isLogin or isReload) or not ns.char then return end
+    activeFight, currentFight, lastSeenID, firstFightBaseline = nil, nil, nil, nil
+    pendingFights, creditsByID = {}, {}
+    InvalidateRead()
+    local saved = ns.savedFightCorrelation
+    ns.savedFightCorrelation = nil
+    local restored = isReload and not isLogin and type(saved) == "table"
+    if restored then
+        pendingFights = type(saved.pending) == "table" and saved.pending or {}
+        creditsByID = type(saved.byID) == "table" and saved.byID or {}
+        lastSeenID, firstFightBaseline = saved.seen, saved.baseline
+        if type(saved.active) == "table" then
+            if ns.Bool(UnitAffectingCombat("player")) then activeFight = saved.active
+            else AddPending(saved.active) end
+        end
+    end
     local list = SessionList()
-    if list and #list > 0 then
+    if not restored and list and #list > 0 then
         local newest = list[#list].sessionID
         local m = ns.char.meta
         if not m.dmLastID or newest < m.dmLastID then m.dmLastID = newest end
     end
     ns.src.dmOverall0 = OverallMine() or 0
     ns.src.dmCounted = 0
+    if restored then QueueRead(0.8) end
 end)
 
 -- "Missed fights" check for /lts debug: meter overall since login vs what was counted.
@@ -380,7 +566,7 @@ function ns.DMKiller()
     if type(src) ~= "table" then return nil end
     local deadly, biggest, bigAmt
     for sp, amt in Spells(src) do
-        if sp.isDeadly == true then deadly = sp end
+        if ns.Bool(sp.isDeadly) then deadly = sp end
         if not bigAmt or amt > bigAmt then biggest, bigAmt = sp, amt end
     end
     local sp = deadly or biggest
