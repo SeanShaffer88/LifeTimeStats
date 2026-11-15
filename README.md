@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.17.1 prerelease archive, `LifeTimeStats-1.17.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.18.0 prerelease archive, `LifeTimeStats-1.18.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -123,7 +123,7 @@ Everything here is also counted as statistics and top lists (boss wipes, kills b
 
 ## Characters (key R)
 
-Every character on this account in one place, kept on this computer only.
+Every character on this account in one place, kept on this computer only, laid out like the character select screen: a card for each character on the right (class crest, name in class colour, level, class and where you logged out), and the chosen character on the left, with your own 3D model (alts show their class crest, because the game does not give addons other characters' appearance), the key facts, and a table of professions, saved instances and lifetime highlights. **People** and **Farming** buttons under the cards switch the left side to those lists.
 
 - **All characters**: level, class, gold, /played, item level and when you last played, with account totals.
 - **One page per character**: race and class, title, guild and rank, gold, /played, rested XP, where you logged out, hearthstone, item level, bag space, best reputation, Adventurer score, professions with skill levels, and saved instances with time to reset. The page is refreshed every minute while you play that character.
@@ -156,7 +156,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.17.1-forever.zip`.
+1. Download `LifeTimeStats-1.18.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
