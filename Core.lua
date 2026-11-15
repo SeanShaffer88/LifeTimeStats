@@ -488,7 +488,7 @@ function ns.Min(key, v, label)
     end
 end
 
-function ns.First(key, label)
+function ns.First(key, label, eventZone)
     if not ns.char then return end
     if ns.IsSecret(label) then label = nil end
     local ch = ns.char
@@ -497,7 +497,7 @@ function ns.First(key, label)
     ch.firstd[key] = time()
     if ns.Journal and ns.FIRST_LABEL then
         local lbl = ns.FIRST_LABEL[key]
-        if lbl then ns.Journal(lbl .. ((label and label ~= "yes") and (": " .. tostring(label)) or "")) end
+        if lbl then ns.Journal(lbl .. ((label and label ~= "yes") and (": " .. tostring(label)) or ""), "first", eventZone) end
     end
 end
 

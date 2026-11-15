@@ -544,7 +544,7 @@ function ns.RecordMoment(entry)
     if not recordsReadyAt or GetTime() < recordsReadyAt
         or not ns.settings or not ns.settings.recordMoments or not ns.loggedIn or not ns.Journal then return end
     ns.Journal("New personal record: " .. RecordTitle(entry) .. " — " .. RecordValue(entry)
-        .. (type(entry.w) == "string" and entry.w ~= "" and (" in " .. entry.w) or ""))
+        .. (type(entry.w) == "string" and entry.w ~= "" and (" in " .. entry.w) or ""), "personalBest")
 end
 ns.EXPANDED_STAT_COUNT = added
 local previousIsNA = ns.IsNA

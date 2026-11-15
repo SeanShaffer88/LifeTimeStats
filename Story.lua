@@ -12,14 +12,111 @@ local function SafeStr(v) if S(v) or type(v) ~= "string" or v == "" then return 
 
 -- ------------------------------------------------------------ journal
 local JOURNAL_CAP = 600
-function ns.Journal(text)
+ns.JOURNAL_NOTE_LIMIT = 500
+local JOURNAL_KINDS = { first = true, boss = true, death = true, personalBest = true }
+local firstLabels = {}
+for key, label in pairs(ns.FIRST_LABEL) do firstLabels[label] = key end
+
+local function ReadableZone(value)
+    local name = SafeStr(value)
+    if name and name ~= "?" and name:find("%S") then return name end
+end
+
+-- The tracker cache is a fallback only when the zone API is unavailable.
+-- An unreadable API result can indicate a transition out of the cached zone.
+function ns.GetJournalZone()
+    if GetRealZoneText then
+        local ok, value = pcall(GetRealZoneText)
+        if ok then return ReadableZone(value) end
+        return
+    end
+    if ns.GetZone then return ReadableZone(ns.GetZone()) end
+end
+
+-- Existing rows have only timestamp, text and level. Interpret the wording of
+-- the old writers at read time, so opening the Journal never changes the save.
+function ns.JournalEntryInfo(entry)
+    if type(entry) ~= "table" or S(entry) then return end
+    local kind = SafeStr(entry.kind)
+    if entry.kind ~= nil or entry.zone ~= nil then
+        if not JOURNAL_KINDS[kind] then kind = nil end
+        return kind, ReadableZone(entry.zone)
+    end
+    local text = SafeStr(entry[2])
+    if not text then return end
+    local firstKey = firstLabels[text:match("^([^:]+): .+$") or text]
+    if firstKey then return "first", nil, firstKey == "boss" and "boss" or nil end
+
+    local zone = text:match("^Arrived in (.+) %(level %d+%)$")
+    if zone then return "first", ReadableZone(zone) end
+    if text:match("^Rested at .+ for the first time$") or text:match("^First ride on .+$") then return "first" end
+    if text:match("^New personal record: .+$") then return "personalBest" end
+    zone = text:match("^Reached level %d+ in (.+)$")
+    if zone then return nil, ReadableZone(zone) end
+    zone = text:match("^Died in (.+)$")
+    if zone then return "death", ReadableZone(zone) end
+    -- With multiple separators, a legacy killer name and a zone name cannot
+    -- reliably be distinguished. Preserve the category and leave the zone blank.
+    zone = text:match("^Died to .- in (.+)$")
+    if zone then
+        if not zone:find(" in ", 1, true) then return "death", ReadableZone(zone) end
+        return "death"
+    end
+end
+
+-- An explicit false location means the original event location was unreadable.
+function ns.Journal(text, kind, eventZone)
     local ch = ns.char
-    if not ch or not text then return end
+    if not ch or not SafeStr(text) then return end
+    local zone = eventZone
+    if zone == nil then zone = ns.GetJournalZone() end
+    local level = UnitLevel("player")
+    if S(level) or type(level) ~= "number" then level = 0 end
     ch.journal = ch.journal or {}
     local j = ch.journal
-    j[#j + 1] = { time(), text, UnitLevel("player") or 0 }
+    j[#j + 1] = { time(), text, level, kind = kind, zone = ReadableZone(zone) }
     if #j > JOURNAL_CAP then table.remove(j, 1) end
     if (ns.activePage == "journal" or ns.activePage == "lists") and ns.RefreshWindow then ns.RefreshWindow() end
+end
+
+function ns.JournalNote(entry)
+    if type(entry) == "table" and not S(entry) then return SafeStr(entry.note) end
+end
+
+function ns.SetJournalNote(entry, text)
+    local journal = ns.char and ns.char.journal
+    if type(journal) ~= "table" or type(entry) ~= "table" or S(entry) then
+        return false, "This Journal entry is no longer available."
+    end
+    -- Entries can be evicted while the editor is open. Timestamps and text
+    -- can match another entry, so require the same row object.
+    local found = false
+    for _, row in ipairs(journal) do
+        if rawequal(row, entry) then
+            found = true
+            break
+        end
+    end
+    if not found then return false, "This Journal entry is no longer available." end
+
+    if text == nil then
+        entry.note = nil
+        return true
+    end
+    if S(text) or type(text) ~= "string" then return false, "The note must be readable text." end
+    text = text:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("\t", " ")
+    if text:find("[%z\1-\8\11-\31\127]") then return false, "The note contains unsupported control characters." end
+    text = text:match("^%s*(.-)%s*$")
+    if text == "" then return false, "Enter a note, or use Remove note." end
+
+    local tooLong = "Keep the note to " .. ns.JOURNAL_NOTE_LIMIT .. " characters or fewer."
+    if #text > ns.JOURNAL_NOTE_LIMIT * 4 then return false, tooLong end
+    -- WoW edit boxes provide UTF-8. Each code point has one byte outside the
+    -- continuation range, regardless of how many bytes it occupies.
+    local _, characters = text:gsub("[^\128-\191]", "")
+    if characters > ns.JOURNAL_NOTE_LIMIT then return false, tooLong end
+    entry.note = text
+    return true
 end
 
 -- ------------------------------------------------------------ level snapshots
@@ -32,7 +129,8 @@ function ns.LevelSnapshot(level)
     local s = { t = time() }
     for _, k in ipairs(SNAP_KEYS) do s[k] = ch.c[k] or 0 end
     ch.lvlsnap[tostring(level)] = s
-    ns.Journal("Reached level " .. tostring(level) .. " in " .. Zone())
+    local zone = ns.GetJournalZone()
+    ns.Journal("Reached level " .. tostring(level) .. " in " .. (zone or "?"), nil, zone or false)
 end
 -- Starting point for the level you were on when LifeTimeStats was installed (partial level).
 function ns.LevelSnapshotQuiet(level, partial)
@@ -66,14 +164,17 @@ local function InnName()
     if not z then return nil end
     local w = ns.Where and ns.Where()
     if w and w.city then return nil end -- capital cities are not inns
-    return sub and (sub .. ", " .. z) or z
+    return sub and (sub .. ", " .. z) or z, z
 end
 On("PLAYER_UPDATE_RESTING", function()
     if B(IsResting()) then
-        local inn = InnName()
+        local inn, zone = InnName()
         if inn then
             Add("inn_visits")
-            if Unique("inns", inn) then First("inn", inn); ns.Journal("Rested at " .. inn .. " for the first time") end
+            if Unique("inns", inn) then
+                First("inn", inn, zone)
+                ns.Journal("Rested at " .. inn .. " for the first time", "first", zone)
+            end
             Tally("innvisits", inn)
         end
     end
@@ -101,7 +202,7 @@ On("ZONE_CHANGED_NEW_AREA", function()
     ns.char.zonelog = ns.char.zonelog or {}
     if not ns.char.zonelog[z] then
         ns.char.zonelog[z] = { time(), UnitLevel("player") or 0 }
-        ns.Journal("Arrived in " .. z .. " (level " .. (UnitLevel("player") or 0) .. ")")
+        ns.Journal("Arrived in " .. z .. " (level " .. (UnitLevel("player") or 0) .. ")", "first", z)
     end
 end)
 
@@ -164,7 +265,10 @@ f:SetScript("OnUpdate", ns.Guard("story", function(_, el)
     local m = B(IsMounted())
     if m and not wasMounted and lastCast and GetTime() - lastCastT < 4 then
         Tally("mounts", lastCast)
-        if Unique("mounts", lastCast) then First("mountname", lastCast); ns.Journal("First ride on " .. lastCast) end
+        if Unique("mounts", lastCast) then
+            First("mountname", lastCast)
+            ns.Journal("First ride on " .. lastCast, "first")
+        end
     end
     wasMounted = m
     -- food and drink (out of combat only: auras can be hidden in combat)
@@ -200,7 +304,7 @@ On("PLAYER_ENTERING_WORLD", function(_, isLogin)
 end)
 
 -- ------------------------------------------------------------ humiliating deaths
-function ns.OnStoryDeath(cause)
+function ns.OnStoryDeath(cause, eventZone)
     if B(UnitExists("target")) and B(UnitCanAttack("player", "target")) and not B(UnitIsPlayer("target")) then
         local lvl, my = UnitLevel("target"), UnitLevel("player")
         if type(lvl) == "number" and type(my) == "number" and not S(lvl) and not S(my) and lvl > 0 and lvl <= my - 5 then
@@ -208,7 +312,9 @@ function ns.OnStoryDeath(cause)
             Tally("lowbiekillers", SafeStr(UnitName("target")) or "?")
         end
     end
-    ns.Journal("Died" .. (cause and cause ~= "Unknown" and (" to " .. cause) or "") .. " in " .. Zone())
+    local zone = ReadableZone(eventZone)
+    ns.Journal("Died" .. (cause and cause ~= "Unknown" and (" to " .. cause) or "") .. " in " .. (zone or "?"),
+        "death", zone or false)
 end
 
 -- ------------------------------------------------------------ titles

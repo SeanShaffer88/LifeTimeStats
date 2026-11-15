@@ -171,8 +171,9 @@ function ns.FinalizeRun(run)
     ns.Min(key, run.lastBoss - run.start, run.bosses .. (run.bosses == 1 and " boss" or " bosses"))
 end
 
-local function BossKilled(name)
-    name = name or "?"
+local function BossKilled(name, eventZone)
+    if ns.IsSecret(name) or type(name) ~= "string" or name == "" then name = "?" end
+    if eventZone == nil then eventZone = ns.GetJournalZone() or false end
     local run = ns.char.run
     local kind = run and not run.left and run.type or "world"
     if kind ~= "party" and kind ~= "raid" then kind = "world" end
@@ -181,7 +182,7 @@ local function BossKilled(name)
     Tally("bosses", name)
     Tally("bosses_" .. kind, name)
     ns.Unique("bosses_" .. kind, name)
-    ns.First("boss", name)
+    ns.First("boss", name, eventZone)
     ns.lastBossKill = { name = name, t = GetTime(), kind = kind }
     if ns.OnBossKill then ns.OnBossKill(name, kind) end
     if ns.DungeonBossKill then pcall(ns.DungeonBossKill, name, kind) end
@@ -194,6 +195,7 @@ local function BossKilled(name)
             C_Timer.After(3, RequestRaidInfo)
         end
     end
+    if ns.Journal then ns.Journal("Boss killed: " .. name, "boss", eventZone) end
 end
 
 On("ENCOUNTER_END", function(_, _, name, _, _, success)
@@ -291,8 +293,9 @@ local function HandleCLEU()
         if bossGUIDs[dGUID] then
             bossGUIDs[dGUID] = nil
             local n = dName
+            local eventZone = ns.GetJournalZone() or false
             C_Timer.After(5, function()
-                if GetTime() - lastEncounterEnd > 10 then BossKilled(n) end
+                if GetTime() - lastEncounterEnd > 10 then BossKilled(n, eventZone) end
             end)
         end
         if damaged[dGUID] and GetTime() - damaged[dGUID] < 180 then
@@ -409,6 +412,7 @@ On("COMBAT_LOG_EVENT_UNFILTERED", HandleCLEU)
 On("PLAYER_DEAD", function()
     if isDead then return end
     isDead = true
+    local eventZone = ns.GetJournalZone() or false
     Add("deaths")
     streak = 0
     if curType == "party" then Add("deaths_party") elseif curType == "raid" then Add("deaths_raid")
@@ -423,15 +427,16 @@ On("PLAYER_DEAD", function()
         local r = ns.RecapCause and ns.RecapCause()
         if r then h = r end
         if h then h.t = GetTime() end
-        ns.ClassifyDeath(h)
+        ns.ClassifyDeath(h, eventZone)
     end)
 end)
 
-function ns.ClassifyDeath(h)
+function ns.ClassifyDeath(h, eventZone)
+    if eventZone == nil then eventZone = ns.GetJournalZone() or false end
     local cause = "Unknown"
     if h then cause = h.env and (h.env:sub(1, 1) .. h.env:sub(2):lower()) or h.name or cause end
-    ns.First("death", cause)
-    if ns.OnPlayerDeath then ns.OnPlayerDeath(cause) end
+    ns.First("death", cause, eventZone)
+    if ns.OnPlayerDeath then ns.OnPlayerDeath(cause, eventZone) end
     if h then
         if h.env then
             if h.env == "FALLING" then

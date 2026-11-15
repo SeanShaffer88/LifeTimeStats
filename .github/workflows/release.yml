@@ -7,6 +7,8 @@ on:
       - main
     tags:
       - "v*-forever"
+      # This prerelease is published manually with CI skipped by request.
+      - '!v1.14.0-forever'
 
 permissions:
   contents: read

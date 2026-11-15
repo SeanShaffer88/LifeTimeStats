@@ -200,3 +200,491 @@ function ns.MergeMax(dst, src)
     ns.EnsureRecord(dst) -- recount unique sets
     return changed
 end
+
+-- LTS3 full snapshots use an ASCII-only, length-prefixed tree of maps, text,
+-- numbers and booleans. The checksum detects accidental changes to the text.
+-- Only the durable character fields below can cross the restore boundary.
+local FULL_HEADER = "LTS3|"
+local MAX_FULL_BYTES = 8 * 1024 * 1024
+local MAX_FULL_INPUT = MAX_FULL_BYTES + 64 * 1024
+local MAX_FULL_NODES = 700000
+local MAX_FULL_DEPTH = 6
+local MAX_TEXT_BYTES = 4096
+local MAX_ID = 9007199254740990
+local MAX_IMPORTED_SESSION_ID = MAX_ID - 65536
+local MAX_TIMESTAMP = 4102444800 -- 2100-01-01
+local IsSecret = ns.IsSecret
+
+local function Require(condition, message)
+    if not condition then error(message, 0) end
+end
+
+local function Attempt(operation)
+    local ok, result = pcall(operation)
+    if not ok then return nil, result end
+    return result
+end
+
+local function PlainTable(value)
+    return type(value) == "table" and not IsSecret(value) and getmetatable(value) == nil
+end
+
+local function Number(value)
+    return not IsSecret(value) and not ns.BadNumber(value)
+end
+
+local function Integer(value, minimum, maximum)
+    return Number(value) and value >= minimum and value <= maximum and value % 1 == 0
+end
+
+local function Timestamp(value) return Integer(value, 0, MAX_TIMESTAMP) end
+local function Nonnegative(value) return Number(value) and value >= 0 end
+local function Duration(value) return Number(value) and value > 0 and value <= MAX_TIMESTAMP end
+local function Level(value) return Integer(value, 0, 1000) end
+local function ID(value) return Integer(value, 1, MAX_ID) end
+local function Boolean(value) return type(value) == "boolean" and not IsSecret(value) end
+local function Text(value)
+    return type(value) == "string" and not IsSecret(value) and #value <= MAX_TEXT_BYTES
+        and not value:find("[%z\1-\8\11\12\14-\31\127]")
+end
+
+local function Key(value)
+    return Text(value) and value ~= "" and not value:find("[\n\r\t]")
+end
+
+local function Note(value)
+    if not Text(value) or not value:find("%S") or value:find("[\r\t]") then return false end
+    local limit = ns.JOURNAL_NOTE_LIMIT or 500
+    if #value > limit * 4 then return false end
+    local index, count = 1, 0
+    while index <= #value do
+        local lead = value:byte(index)
+        local width
+        if lead < 128 then width = 1
+        elseif lead >= 194 and lead <= 223 then width = 2
+        elseif lead >= 224 and lead <= 239 then width = 3
+        elseif lead >= 240 and lead <= 244 then width = 4
+        else return false end
+        if width > 1 then
+            local second = value:byte(index + 1) or 0
+            if (lead == 224 and second < 160) or (lead == 237 and second > 159)
+                or (lead == 240 and second < 144) or (lead == 244 and second > 143) then return false end
+            for offset = 1, width - 1 do
+                local byte = value:byte(index + offset) or 0
+                if byte < 128 or byte > 191 then return false end
+            end
+        end
+        index, count = index + width, count + 1
+        if count > limit then return false end
+    end
+    return true
+end
+
+local function DayKey(value)
+    if type(value) ~= "string" or IsSecret(value) then return false end
+    local year, month, day = value:match("^(%d%d%d%d)(%d%d)(%d%d)$")
+    year, month, day = tonumber(year), tonumber(month), tonumber(day)
+    if not year or year < 1970 or year > 2100 or month < 1 or month > 12 or day < 1 then return false end
+    local days = ({ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 })[month]
+    if month == 2 and year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0) then days = 29 end
+    return day <= days
+end
+
+local FULL_META = {
+    created = Timestamp, achInit = Boolean, achUnseen = Nonnegative, levelMark = Nonnegative,
+    levelMarkLevel = Level, levelMarkPartial = Boolean, bgStreak = Nonnegative, repairs = true,
+}
+local FULL_FIELDS = {
+    "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "ach", "achr",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "meta",
+}
+local FULL_FIELD_SET = {}
+for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
+
+local JOURNAL_KINDS = { first = true, boss = true, death = true, personalBest = true }
+local JOURNAL_ROW = {
+    [1] = Timestamp, [2] = function(value) return Text(value) and value ~= "" end,
+    [3] = Level, zone = Key, note = Note,
+    kind = function(value) return Key(value) and JOURNAL_KINDS[value] end,
+}
+local RECORD_ROW = {
+    k = Key, v = Number, at = Timestamp, w = Text,
+    d = function(value) return not IsSecret(value) and (value == "min" or value == "max") end,
+}
+local LEVEL_ROW = {
+    t = Timestamp, partial = Boolean, dist_foot = Nonnegative, jumps = Nonnegative, kills_npc = Nonnegative,
+    kills_pvp = Nonnegative, deaths = Nonnegative, quests_done = Nonnegative, money_in = Nonnegative,
+    time_online = Nonnegative, critter_kills = Nonnegative, times_drunk = Nonnegative,
+}
+local ZONE_ROW = { [1] = Timestamp, [2] = Level }
+local SESSION_ROW = {
+    id = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
+    s = Timestamp, d = Timestamp, afk = Timestamp, l = Level, steps = Nonnegative,
+    k = Nonnegative, de = Nonnegative, q = Nonnegative, xp = Nonnegative, dmg = Nonnegative, z = Text,
+}
+
+local function StageFullSnapshot(snapshot, exportLegacy)
+    Require(PlainTable(snapshot) and Key(snapshot.character) and Timestamp(snapshot.savedAt)
+        and PlainTable(snapshot.record), "The full backup has an invalid header.")
+    for key in pairs(snapshot) do
+        Require(key == "character" or key == "savedAt" or key == "record" or key == "noteCount",
+            "The full backup has unexpected header fields.")
+    end
+    local source = snapshot.record
+    local record, fields, noteCount = {}, 0, 0
+    for key in pairs(source) do
+        Require(FULL_FIELD_SET[key], "The full backup has unknown character fields.")
+    end
+
+    local section
+    local function Check(value)
+        if not value then error("The full backup has invalid " .. section .. " data.", 0) end
+    end
+    local function CountField()
+        fields = fields + 1
+        Require(fields <= MAX_FULL_NODES, "The full backup contains too many entries.")
+    end
+    local function Map(input, validKey, convertValue)
+        Check(PlainTable(input))
+        local result = {}
+        for key, value in pairs(input) do
+            CountField()
+            Check(validKey(key))
+            result[key] = convertValue(value, key)
+        end
+        return result
+    end
+    local function Scalar(rule)
+        return function(value)
+            Check(rule(value))
+            return value
+        end
+    end
+    local function Row(input, rules, required)
+        local result = Map(input, function(key) return not IsSecret(key) and rules[key] ~= nil end, function(value, key)
+            Check(rules[key](value))
+            return value
+        end)
+        for _, key in ipairs(required) do Check(result[key] ~= nil) end
+        return result
+    end
+    local function Sequence(input, limit, convertRow)
+        Check(PlainTable(input))
+        local count = 0
+        for key in pairs(input) do
+            Check(Integer(key, 1, limit))
+            count = count + 1
+        end
+        local result = {}
+        for index = 1, count do
+            CountField()
+            result[index] = convertRow(input[index], index)
+        end
+        return result
+    end
+    local function StringOrID(value) return Key(value) or ID(value) end
+
+    section = "counters"; record.c = Map(source.c, Key, Scalar(Number))
+    section = "records"; record.r = Map(source.r, Key, function(value, key)
+        if key:sub(-5) == "_what" then Check(Text(value)) else Check(Number(value)) end
+        return value
+    end)
+    section = "tallies"; record.t = Map(source.t, Key, function(tally) return Map(tally, StringOrID, Scalar(Number)) end)
+    section = "unique discoveries"; record.u = Map(source.u, Key, function(set)
+        Check(PlainTable(set))
+        local result = {}
+        for key, value in pairs(set) do
+            CountField()
+            Check(StringOrID(key) and not IsSecret(value) and (value == true or value == 1))
+            result[ns.UniqueKey(key)] = true
+        end
+        return result
+    end)
+    section = "fastest times"; record.f = Map(source.f, Key, Scalar(Duration))
+    section = "fastest time labels"; record.fw = Map(source.fw, Key, Scalar(Text))
+    section = "fastest time dates"; record.fd = Map(source.fd, Key, Scalar(Timestamp))
+    local legacyDeathDate
+    section = "first milestones"; record.first = Map(source.first, Key, function(value, key)
+        if not exportLegacy or key ~= "death" or not PlainTable(value) then
+            Check(Text(value))
+            return value
+        end
+        -- Older saves can carry the first-death label in a tuple or a v
+        -- field. Export it in the current shape without editing the save.
+        local label
+        for field, fieldValue in pairs(value) do
+            CountField()
+            if field == 1 or field == "v" then
+                Check(Text(fieldValue) and (label == nil or label == fieldValue))
+                label = fieldValue
+            else
+                Check((field == 2 or field == "at" or field == "t") and Timestamp(fieldValue)
+                    and (legacyDeathDate == nil or legacyDeathDate == fieldValue))
+                legacyDeathDate = fieldValue
+            end
+        end
+        Check(label ~= nil)
+        return label
+    end)
+    section = "first milestone dates"; record.firstd = Map(source.firstd, Key, Scalar(Timestamp))
+    if legacyDeathDate then
+        Check(record.firstd.death == nil or record.firstd.death == legacyDeathDate)
+        record.firstd.death = legacyDeathDate
+    end
+    section = "daily history"; record.days = Map(source.days, DayKey, function(day) return Map(day, Key, Scalar(Number)) end)
+    section = "achievement dates"; record.ach = Map(source.ach, Key, Scalar(Timestamp))
+    section = "retroactive achievements"; record.achr = Map(source.achr, Key, Scalar(Boolean))
+    section = "personal-best history"; record.rh = Sequence(source.rh, ns.RECORD_HISTORY_CAP or 200, function(row)
+        return Row(row, RECORD_ROW, { "k", "v", "at", "d" })
+    end)
+    section = "Journal"; record.journal = Sequence(source.journal, 600, function(row)
+        local result = Row(row, JOURNAL_ROW, { 1, 2, 3 })
+        if result.note then noteCount = noteCount + 1 end
+        return result
+    end)
+    section = "level history"; record.lvlsnap = Map(source.lvlsnap, function(key)
+        return Key(key) and key:match("^%d+$") and Level(tonumber(key))
+    end, function(row) return Row(row, LEVEL_ROW, { "t" }) end)
+    section = "travel log"; record.zonelog = Map(source.zonelog, Key, function(row) return Row(row, ZONE_ROW, { 1, 2 }) end)
+    local sessionIDs = {}
+    section = "session history"; record.sessionlog = Sequence(source.sessionlog, 300, function(row)
+        local result = Row(row, SESSION_ROW, { "s", "d" })
+        if result.id then
+            Check(not sessionIDs[result.id])
+            sessionIDs[result.id] = true
+        end
+        return result
+    end)
+    section = "character history settings"; record.meta = Map(source.meta, function(key)
+        return Key(key) and FULL_META[key] ~= nil
+    end, function(value, key)
+        if key == "repairs" then return Map(value, Key, Scalar(Boolean)) end
+        return Scalar(FULL_META[key])(value)
+    end)
+    return { character = snapshot.character, savedAt = snapshot.savedAt, record = record, noteCount = noteCount }
+end
+
+local function FullChecksum(body)
+    local a, b = 1, 0
+    for i = 1, #body do
+        a = (a + body:byte(i)) % 65521
+        b = (b + a) % 65521
+    end
+    -- Format two safe 16-bit values so the result is independent of C int size.
+    return string.format("%04x%04x", b, a)
+end
+
+local function FullEscape(value)
+    return (value:gsub("[|%z\1-\32\127-\255%%]", function(byte)
+        return string.format("%%%02X", byte:byte())
+    end))
+end
+
+local DECIMAL_POINT = string.format("%.1f", 0.5):match("^0(.+)5$") or "."
+local function FullNumber(value)
+    local text = string.format("%.17g", value)
+    if DECIMAL_POINT ~= "." then
+        local separator = text:find(DECIMAL_POINT, 1, true)
+        if separator then
+            text = text:sub(1, separator - 1) .. "." .. text:sub(separator + #DECIMAL_POINT)
+        end
+    end
+    return text
+end
+
+local function FullKeyLess(a, b)
+    if type(a) ~= type(b) then return type(a) == "number" end
+    if type(a) == "number" then return a < b end
+    -- Compare text keys byte-for-byte for the same output in every locale.
+    for index = 1, math.min(#a, #b) do
+        local left, right = a:byte(index), b:byte(index)
+        if left ~= right then return left < right end
+    end
+    return #a < #b
+end
+
+local function EncodeFull(root)
+    local parts, active, size, nodes = {}, {}, 0, 0
+    local function Emit(part)
+        size = size + #part
+        Require(size <= MAX_FULL_BYTES, "This character is too large for a full text backup.")
+        parts[#parts + 1] = part
+    end
+    local function Value(value, depth)
+        nodes = nodes + 1
+        Require(nodes <= MAX_FULL_NODES and depth <= MAX_FULL_DEPTH, "The full backup contains too many entries.")
+        local kind = type(value)
+        if kind == "table" then
+            Require(PlainTable(value) and not active[value], "The full backup contains invalid data.")
+            active[value] = true
+            local keys = {}
+            for key in pairs(value) do
+                Require(Key(key) or ID(key), "The full backup contains an invalid key.")
+                keys[#keys + 1] = key
+            end
+            table.sort(keys, FullKeyLess)
+            Emit("m" .. #keys .. ":")
+            for _, key in ipairs(keys) do
+                Value(key, depth + 1)
+                Value(value[key], depth + 1)
+            end
+            active[value] = nil
+        elseif kind == "string" then
+            Require(Text(value), "The full backup contains invalid text.")
+            local ascii = FullEscape(value)
+            Emit("s" .. #ascii .. ":" .. ascii)
+        elseif kind == "number" then
+            Require(Number(value), "The full backup contains an invalid number.")
+            Emit("n" .. FullNumber(value) .. ";")
+        else
+            Require(Boolean(value), "The full backup has an invalid value.")
+            Emit(value and "t" or "f")
+        end
+    end
+    Value(root, 1)
+    return table.concat(parts)
+end
+
+local function DecodeFull(body)
+    local position, nodes = 1, 0
+    local malformed = "The full backup text is malformed."
+    local function Size(limit)
+        local separator = body:find(":", position, true)
+        Require(separator and separator > position and separator - position <= 8, malformed)
+        local digits = body:sub(position, separator - 1)
+        Require(digits:match("^%d+$"), malformed)
+        local size = tonumber(digits)
+        Require(size <= limit, "The full backup contains too many entries.")
+        position = separator + 1
+        return size
+    end
+    local function Value(depth)
+        nodes = nodes + 1
+        Require(nodes <= MAX_FULL_NODES and depth <= MAX_FULL_DEPTH, "The full backup contains too many entries.")
+        local tag = body:sub(position, position)
+        position = position + 1
+        if tag == "m" then
+            local count = Size(math.floor((MAX_FULL_NODES - nodes) / 2))
+            local result = {}
+            for _ = 1, count do
+                local key = Value(depth + 1)
+                Require((Key(key) or ID(key)) and result[key] == nil, "The full backup contains an invalid or duplicate key.")
+                result[key] = Value(depth + 1)
+            end
+            return result
+        end
+        if tag == "s" then
+            local size = Size(MAX_TEXT_BYTES * 3)
+            Require(position + size - 1 <= #body, malformed)
+            local ascii = body:sub(position, position + size - 1)
+            position = position + size
+            Require(not ascii:gsub("%%(%x%x)", ""):find("%%"), malformed)
+            local value = Unesc(ascii)
+            Require(Text(value), "The full backup contains invalid text.")
+            return value
+        end
+        if tag == "n" then
+            local separator = body:find(";", position, true)
+            Require(separator and separator > position and separator - position <= 32, malformed)
+            local text = body:sub(position, separator - 1)
+            position = separator + 1
+            Require(text:match("^%-?%d+%.?%d*$") or text:match("^%-?%d+%.?%d*[eE][+%-]?%d+$"), malformed)
+            if DECIMAL_POINT ~= "." then text = text:gsub("%.", function() return DECIMAL_POINT end, 1) end
+            local value = tonumber(text)
+            Require(Number(value), "The full backup contains an invalid number.")
+            return value
+        end
+        if tag == "t" then return true end
+        if tag == "f" then return false end
+        error(malformed, 0)
+    end
+    local result = Value(1)
+    Require(position == #body + 1, "The full backup has unexpected trailing text.")
+    return result
+end
+
+function ns.IsFullBackup(text)
+    return type(text) == "string" and not IsSecret(text) and text:match("^%s*LTS3|") ~= nil
+end
+
+function ns.SerializeFullBackup()
+    return Attempt(function()
+        Require(ns.ValidRecord(ns.char) and Key(ns.charKey), "The active character is unavailable.")
+        local record = { meta = {} }
+        for _, field in ipairs(FULL_FIELDS) do
+            if field ~= "meta" then
+                local value = ns.char[field]
+                record[field] = value == nil and {} or value
+            end
+        end
+        for field in pairs(FULL_META) do record.meta[field] = ns.char.meta[field] end
+        local snapshot = StageFullSnapshot({ character = ns.charKey, savedAt = time(), record = record }, true)
+        snapshot.noteCount = nil -- Derived during preview, never trusted from a pasted backup.
+        local body = EncodeFull(snapshot)
+        return FULL_HEADER .. FullChecksum(body) .. "|" .. body
+    end)
+end
+
+function ns.DeserializeFullBackup(text)
+    return Attempt(function()
+        Require(type(text) == "string" and not IsSecret(text) and #text <= MAX_FULL_INPUT, "The full backup is missing or too large.")
+        local checksum, body = text:gsub("%s", ""):match("^LTS3|(%x%x%x%x%x%x%x%x)|(.+)$")
+        Require(checksum and #body <= MAX_FULL_BYTES and not body:find("[^!-~]")
+            and not body:find("|", 1, true), "The full backup text is malformed.")
+        Require(FullChecksum(body) == checksum:lower(), "The full backup checksum does not match.")
+        local decoded = DecodeFull(body)
+        Require(PlainTable(decoded) and decoded.noteCount == nil, "The full backup has unexpected header fields.")
+        local snapshot = StageFullSnapshot(decoded)
+        Require(snapshot.character == ns.charKey, "This full backup belongs to a different character.")
+        return snapshot
+    end)
+end
+
+function ns.RestoreFullBackup(snapshot)
+    local destination, character = ns.char, ns.charKey
+    local staged, reason = Attempt(function()
+        Require(ns.ValidRecord(destination) and Key(character) and type(ns.db) == "table"
+            and type(ns.db.chars) == "table" and type(LifeTimeStatsCharDB) == "table", "The active character is unavailable.")
+        Require(PlainTable(snapshot) and snapshot.character == character, "This full backup belongs to a different character.")
+        return StageFullSnapshot(snapshot).record
+    end)
+    if not staged then return false, reason end
+
+    local uniqueCounts = {}
+    for set, values in pairs(staged.u) do
+        local count = 0
+        for _ in pairs(values) do count = count + 1 end
+        uniqueCounts[set] = count
+    end
+    local session = ns.session
+    local liveID = session and ID(session.id) and session.id
+    local serial = ID(destination.meta.sessionSerial) and destination.meta.sessionSerial or 0
+    if liveID then serial = math.max(serial, liveID) end
+    local collision = false
+    for index, row in ipairs(staged.sessionlog) do
+        if row.id then
+            serial = math.max(serial, row.id)
+            if row.id == liveID and (row.s ~= session.wallStart or index < #staged.sessionlog) then
+                collision = true
+            end
+        end
+    end
+    if serial > MAX_ID - (collision and 2 or 1) then
+        return false, "The full backup contains an out-of-range session ID."
+    end
+    if collision then serial = serial + 1 end
+
+    -- Swap only durable fields in place. Runs, quest timers, identity,
+    -- revision and account settings remain on the existing character object.
+    if ns.char ~= destination or ns.charKey ~= character then return false, "The active character changed." end
+    for _, field in ipairs(FULL_FIELDS) do
+        if field ~= "meta" then destination[field] = staged[field] end
+    end
+    for field in pairs(FULL_META) do destination.meta[field] = staged.meta[field] end
+    destination.un, destination.meta.sessionSerial = uniqueCounts, serial
+    if collision then session.id = serial end
+    ns.db.chars[character] = destination
+    LifeTimeStatsCharDB.data = destination
+    ns.InvalidateAccount()
+    return true
+end

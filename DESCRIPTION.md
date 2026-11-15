@@ -6,6 +6,8 @@ LifeTimeStats keeps a lifetime tally of your character in World of Warcraft: For
 
 Version 1.13.0 adds 222 observation-based statistics: movement and combat contexts; measured ghost travel, confirmed corpse retrievals and other revivals; ten interface visit timers; combat survival and activity rates; and recorded XP, gold, healing and damage breakdowns. It also adds a bounded, backed-up personal-best timeline, optional local Journal milestones and new-record session recaps. Missing or hidden client data is skipped, and new counters are not reconstructed from pre-upgrade history.
 
+Version 1.14.0 adds Journal filters by entry type and zone, private notes on Journal entries, and up to four pinned Dashboard counters.
+
 ## The useless ones
 Steps taken. Times jumped. Time spent in the air. Dances, hugs and chickens. Perfect /rolls. How often you sat down, opened your bags or toggled auto-run. Red error messages seen ("Not enough mana", we know). How many times you checked these stats.
 
@@ -37,7 +39,7 @@ Times you got drunk (and completely smashed), campfires lit, nights camped under
 The Forever Journal theme uses Warcraft-style trim, ledger counters and dated journal entries. Browse sixteen pages, search your stats and switch between characters or time ranges.
 
 ## Safe with your data
-LifeTimeStats stores data locally in account and character SavedVariables. Text backup covers character statistics and personal-best history. Journal entries and play-session history stay in SavedVariables. Share posts to your selected WoW chat channel when you send it.
+LifeTimeStats stores data locally in account and character SavedVariables. Stats-only backup is the default and keeps the existing LTS1/LTS2 merge behavior. The optional full character backup includes saved history and private Journal notes. It previews a same-character replacement before you confirm. Account settings, other characters, Dashboard pins, and in-progress sessions and tracking stay outside the full backup. Share posts to your selected WoW chat channel when you send it.
 
 ## Commands
 | Command | |
@@ -50,6 +52,6 @@ LifeTimeStats stores data locally in account and character SavedVariables. Text 
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
+Unzip `LifeTimeStats-1.14.0-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.

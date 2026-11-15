@@ -2,7 +2,14 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.14.0-forever] - 2026-11-14
+
+Prerelease. The regression suites and live-client checks were skipped for this release.
+
+### Added
+- Journal filters by entry type and zone, and private notes on individual entries.
+- Up to four Dashboard pins with values for the selected character or account and date range.
+- Full character text backups for saved statistics, Journal entries and notes, level and travel history, and saved session history. Restore previews a same-character replacement before confirmation. Stats-only backup remains the default. Restore still accepts LTS1 and LTS2.
 
 ### Changed
 - Added a WoW Forever-inspired default skin and a dated Journal feed for character milestones.
@@ -14,7 +21,7 @@ All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepach
 - Deduplicated restored unique IDs and retained the newest personal-best records during restore.
 - Preserved session history across quick relogs and resumed Journal milestones after reload.
 - Logged meaningful movement records and marked incomplete dungeon boss rosters as provisional.
-- Made the packaging regression test pass on Windows and verified archives from the actual checkout.
+- Fixed the Windows packaging fixture and added archive verification from the actual checkout.
 
 ## [1.13.0-forever] - 2026-11-11
 

@@ -19,6 +19,8 @@ local BODY_H = CH - BODY_Y                        -- 570
 local win
 local pages = {}
 local current
+local pinLayer
+local noteLayer
 
 -- ------------------------------------------------------------ helpers
 local function c(v, k) return (v and v.c and v.c[k]) or 0 end
@@ -55,18 +57,21 @@ local function Series(base, key, n)
     return out, labels
 end
 
-local function KpiRow(page, defs)
+local function KpiRow(page, defs, allowFormatted)
     page.kpis = {}
     for i, d in ipairs(defs) do
-        page.kpis[i] = W.Odometer(page, (i - 1) * (KPI_W + GAP), 0, KPI_W, KPI_H, d.label, d.icon, d.tip)
+        page.kpis[i] = W.Odometer(page, (i - 1) * (KPI_W + GAP), 0, KPI_W, KPI_H, d.label, d.icon, d.tip, allowFormatted)
     end
     page.kpiDefs = defs
 end
 
+local function UpdateKpi(tile, def, view, base, sess)
+    tile:SetValue(def.value(view), def.sub and def.sub(view, base, sess) or "", def.exact and def.exact(view) or nil)
+end
+
 local function UpdateKpis(page, view, base, sess)
     for i, d in ipairs(page.kpiDefs) do
-        local v = d.value(view)
-        page.kpis[i]:SetValue(v, d.sub and d.sub(view, base, sess) or "", d.exact and d.exact(view) or nil)
+        UpdateKpi(page.kpis[i], d, view, base, sess)
     end
 end
 
@@ -128,18 +133,163 @@ local function Panel(page, title, icon, x, y, w, h, tip)
 end
 
 -- ============================================================ DASHBOARD
+local function UpdateDashboardKpis(page, view, base, sess)
+    local _, byID = ns.DashboardPinCatalog()
+    local used, nextSlot = {}, 1
+    local showCharacterParts = Settings().scope == "account" and Settings().range == "lifetime"
+    for _, id in ipairs(ns.DashboardPins()) do
+        local pin = byID[id]
+        local stat = pin.stat
+        local value = ns.StatValue(stat, view)
+        local unavailable, why = ns.IsNA(stat, value)
+        local tip = unavailable and why or stat.tip
+        if showCharacterParts and stat.key and not unavailable then
+            local parts = PerChar(stat.key)
+            if parts then tip = tip and (tip .. "\n\n" .. parts) or parts end
+        end
+        local tile = page.kpis[nextSlot]
+        tile:Configure(stat.label, pin.icon, tip)
+        tile:SetFormatted(unavailable and "n/a" or ns.FormatStat(stat, value), "Pinned · " .. pin.category)
+        used[id], nextSlot = true, nextSlot + 1
+    end
+    for _, def in ipairs(page.kpiDefs) do
+        if nextSlot > #page.kpis then break end
+        if not used[def.id] then
+            local tile = page.kpis[nextSlot]
+            tile:Configure(def.label, def.icon, def.tip)
+            UpdateKpi(tile, def, view, base, sess)
+            nextSlot = nextSlot + 1
+        end
+    end
+end
+
+local function CreateDashboardPinPicker()
+    local layer = CreateFrame("Frame", nil, win)
+    layer:SetAllPoints()
+    layer:SetFrameLevel((win:GetFrameLevel() or 0) + 10)
+    layer:EnableMouse(true)
+    layer:Hide()
+    local dim = W.Fill(layer, { 0.06, 0.04, 0.02, 0.66 })
+    dim:SetPoint("TOPLEFT", 1, -HEADER_H); dim:SetPoint("BOTTOMRIGHT", -1, FOOTER_H)
+
+    local width, height = 630, 390
+    local dlg = W.Window(layer)
+    dlg:SetSize(width, height)
+    dlg:SetPoint("CENTER")
+    dlg:EnableMouse(true)
+    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local banner = W.Fill(dlg, T.tile)
+    banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(37)
+    if ink then W.Shade(banner, ink.base, ink.top) end
+    local rule = W.Line(dlg, ink and ink.trim or nil)
+    rule:SetPoint("TOPLEFT", 1, -38); rule:SetPoint("TOPRIGHT", -1, -38); rule:SetHeight(1)
+    local title = W.Text(dlg, 16, ink and ink.gold or T.amber)
+    title:SetPoint("TOPLEFT", 13, -11)
+    title:SetText("Manage Dashboard pins")
+
+    local close
+    if ink then
+        local ok, native = pcall(CreateFrame, "Button", nil, dlg, "UIPanelCloseButtonNoScripts")
+        if ok then close = native end
+    end
+    if not close then close = W.FlatButton(dlg, "×", 24, 24) end
+    close:SetSize(24, 24); close:SetPoint("TOPRIGHT", -9, -7)
+    close:SetScript("OnClick", function() layer:Hide() end)
+    W.Tip(close, "Close", "Close the pin picker.")
+
+    local label = W.Text(dlg, 12, T.text)
+    label:SetPoint("TOPLEFT", 13, -56); label:SetText("Find a statistic")
+    local box = W.Panel(dlg, T.bg)
+    box:SetPoint("LEFT", label, "RIGHT", 9, 0); box:SetSize(236, 24)
+    local edit = CreateFrame("EditBox", nil, box)
+    edit:SetPoint("TOPLEFT", 7, 0); edit:SetPoint("BOTTOMRIGHT", -7, 0)
+    edit:SetFont(W.FONT, 12, "")
+    edit:SetTextColor(T.text[1], T.text[2], T.text[3])
+    edit:SetAutoFocus(false)
+    local placeholder = W.Text(box, 11, T.dim, nil, "LEFT")
+    placeholder:SetPoint("LEFT", 7, 0); placeholder:SetText("Search by name or category")
+    local count = W.Text(dlg, 12, ink and ink.gold or T.amber, nil, "RIGHT")
+    count:SetPoint("TOPRIGHT", -13, -56)
+
+    local done = W.FlatButton(dlg, "Done", 76, 20)
+    done:SetPoint("BOTTOMRIGHT", -13, 10)
+    done:SetScript("OnClick", function() layer:Hide() end)
+    local status = W.Text(dlg, 11, T.dim, nil, "LEFT")
+    status:SetPoint("BOTTOMLEFT", 13, 14); status:SetPoint("RIGHT", done, "LEFT", -8, 0)
+    local listParent = CreateFrame("Frame", nil, dlg)
+    listParent:SetPoint("TOPLEFT", 12, -82); listParent:SetSize(width - 24, height - 124)
+
+    local list
+    local function Refresh(keepOffset, message)
+        local catalog, byID = ns.DashboardPinCatalog()
+        local pins = ns.DashboardPins()
+        local limit = ns.DASHBOARD_PIN_LIMIT
+        local full = #pins >= limit
+        local query = (edit:GetText() or ""):match("^%s*(.-)%s*$"):lower()
+        local rows, pinned = {}, {}
+        local function Add(pin, selected)
+            if query ~= "" and not (pin.stat.label:lower():find(query, 1, true)
+                or pin.category:lower():find(query, 1, true)) then return end
+            rows[#rows + 1] = { pin.stat.label, pin.category, selected and "Unpin" or (full and "Slots full" or "Pin"),
+                id = pin.id, tip = pin.stat.tip }
+        end
+        for _, id in ipairs(pins) do
+            pinned[id] = true
+            Add(byID[id], true)
+        end
+        for _, pin in ipairs(catalog) do
+            if not pinned[pin.id] then Add(pin, false) end
+        end
+        list:SetData(rows, keepOffset)
+        count:SetText(string.format("%d of %d pins", #pins, limit))
+        status:SetText(message or (full and "Unpin a statistic to free a slot." or "Click a row to pin or unpin it. Scroll for more."))
+    end
+
+    list = W.Table(listParent, width - 24, height - 124, {
+        { "STATISTIC", 306, kind = "text" }, { "CATEGORY", 195, kind = "text" }, { "PINS", 0, kind = "text" },
+    }, function(row)
+        local ok, why = ns.ToggleDashboardPin(row.id)
+        GameTooltip:Hide()
+        Refresh(true, not ok and why or nil)
+        if ok then ns.RefreshWindow() end
+    end, "No statistics match this search.")
+
+    edit:SetScript("OnTextChanged", function(self)
+        placeholder:SetShown((self:GetText() or "") == "" and not self:HasFocus())
+        Refresh(false)
+    end)
+    edit:SetScript("OnEditFocusGained", function() placeholder:Hide() end)
+    edit:SetScript("OnEditFocusLost", function(self) placeholder:SetShown((self:GetText() or "") == "") end)
+    edit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    edit:SetScript("OnEscapePressed", function() layer:Hide() end)
+    layer:SetScript("OnShow", function()
+        Refresh(false)
+        edit:SetFocus()
+    end)
+    layer:SetScript("OnHide", function()
+        edit:ClearFocus()
+        GameTooltip:Hide()
+    end)
+    return layer
+end
+
+local function OpenDashboardPinPicker()
+    if not pinLayer then pinLayer = CreateDashboardPinPicker() end
+    pinLayer:Show()
+end
+
 local function BuildDashboard()
     local p = NewPage("dashboard")
     KpiRow(p, {
-        { label = "Steps taken", icon = "steps", value = ns.Steps, tip = "Distance on foot divided by a 0.75 m stride.",
+        { id = "computed:steps", label = "Steps taken", icon = "steps", value = ns.Steps, tip = "Distance on foot divided by a 0.75 m stride.",
           sub = function(v, b, s) return ns.GOLD .. PlusAlways(ns.Steps(s)) .. "|r this session" end },
-        { label = "Times jumped", icon = "jump", value = function(v) return c(v, "jumps") end, tip = "Jumps that actually left the ground.",
+        { id = "counter:jumps", label = "Times jumped", icon = "jump", value = function(v) return c(v, "jumps") end, tip = "Jumps that actually left the ground.",
           sub = function(v, b, s) return ns.GOLD .. PlusAlways(c(s, "jumps")) .. "|r this session" end },
-        { label = "Enemies killed", icon = "sword", value = ns.Kills, tip = "Creatures and hostile players that died after you damaged them.",
+        { id = "computed:kills", label = "Enemies killed", icon = "sword", value = ns.Kills, tip = "Creatures and hostile players that died after you damaged them.",
           sub = function(v, b, s) return ns.GOLD .. PlusAlways(ns.Kills(s)) .. "|r this session · " .. Int(c(v, "kills_pvp")) .. " players" end },
-        { label = "Deaths", icon = "skull", value = function(v) return c(v, "deaths") end, tip = "Times you died.",
+        { id = "counter:deaths", label = "Deaths", icon = "skull", value = function(v) return c(v, "deaths") end, tip = "Times you died.",
           sub = function(v) return "K/D " .. ns.GOLD .. string.format("%.1f", ns.Div(ns.Kills(v), c(v, "deaths"))) .. "|r · first: " .. (v.first and v.first.death or "—") end },
-    })
+    }, true)
     local hw = (CW - GAP) / 2
     local zc = Panel(p, "Kills vs deaths by zone", "combat", 0, BODY_Y, hw, 180, "Your five deadliest zones: kills on the left, deaths on the right.")
     p.mirror = W.Mirror(zc.body, zc.bw, zc.bh - 16, 5, C.amber, C.rust)
@@ -190,7 +340,7 @@ local function BuildDashboard()
     end
 
     function p:Update(view, base, sess)
-        UpdateKpis(self, view, base, sess)
+        UpdateDashboardKpis(self, view, base, sess)
         -- zones
         local zk = ns.TopList(base, "zonekills", 5)
         local zd = base.t.zonedeaths or {}
@@ -1055,12 +1205,215 @@ end
 -- ============================================================ JOURNAL
 local JOURNAL_PAGE_SIZE = 10
 
+local function JournalZoneLower(text)
+    local lower = C_Intl and C_Intl.ToLower
+    if type(lower) == "function" then
+        local ok, value = pcall(lower, text)
+        if ok and not ns.IsSecret(value) and type(value) == "string" then return value end
+    end
+    return text:lower()
+end
+
+local function JournalEntryTitle(entry)
+    local _, zone = ns.JournalEntryInfo(entry)
+    return DateLabel(entry[1]) .. "  ·  Level " .. (entry[3] or "?") .. (zone and ("  ·  " .. zone) or "")
+end
+
+local function CreateJournalNoteEditor()
+    local layer = CreateFrame("Frame", nil, win)
+    layer:SetAllPoints()
+    layer:SetFrameLevel((win:GetFrameLevel() or 0) + 10)
+    layer:EnableMouse(true)
+    layer:Hide()
+    local dim = W.Fill(layer, { 0.06, 0.04, 0.02, 0.66 })
+    dim:SetPoint("TOPLEFT", 1, -HEADER_H); dim:SetPoint("BOTTOMRIGHT", -1, FOOTER_H)
+
+    local width = 580
+    local dlg = W.Window(layer)
+    dlg:SetSize(width, 372)
+    dlg:SetPoint("CENTER")
+    dlg:EnableMouse(true)
+    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local banner = W.Fill(dlg, T.tile)
+    banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(38)
+    if ink then W.Shade(banner, ink.base, ink.top) end
+    local headerRule = W.Line(dlg, ink and ink.trim or nil)
+    headerRule:SetPoint("TOPLEFT", 1, -39); headerRule:SetPoint("TOPRIGHT", -1, -39); headerRule:SetHeight(1)
+    local title = W.Text(dlg, 16, ink and ink.gold or T.amber)
+    title:SetPoint("TOPLEFT", 13, -11)
+    local close
+    if ink then
+        local ok, native = pcall(CreateFrame, "Button", nil, dlg, "UIPanelCloseButtonNoScripts")
+        if ok then close = native end
+    end
+    if not close then close = W.FlatButton(dlg, "×", 24, 24) end
+    close:SetSize(24, 24); close:SetPoint("TOPRIGHT", -9, -7)
+    close:SetScript("OnClick", function() layer:Hide() end)
+    W.Tip(close, "Close", "Discard the draft and return to the Journal.")
+
+    local eventBox = W.Panel(dlg, T.tile)
+    eventBox:SetPoint("TOPLEFT", 13, -51); eventBox:SetSize(width - 26, 77)
+    local eventScroll = CreateFrame("ScrollFrame", nil, eventBox, "UIPanelScrollFrameTemplate")
+    eventScroll:SetPoint("TOPLEFT", 10, -7); eventScroll:SetPoint("BOTTOMRIGHT", -25, 7)
+    eventScroll.scrollBarHideIfUnscrollable = true
+    local eventBody = CreateFrame("Frame", nil, eventScroll)
+    local textWidth = width - 62
+    eventBody:SetSize(textWidth, 63)
+    eventBody:SetPoint("TOPLEFT", eventScroll, "TOPLEFT")
+    eventScroll:SetScrollChild(eventBody)
+    local meta = W.Text(eventBody, 11, T.dim, nil, "LEFT")
+    meta:SetPoint("TOPLEFT", 0, -1); meta:SetWidth(textWidth); meta:SetWordWrap(true)
+    local eventText = W.Text(eventBody, 14, T.text, nil, "LEFT")
+    eventText:SetPoint("TOPLEFT", meta, "BOTTOMLEFT", 0, -6); eventText:SetWidth(textWidth); eventText:SetWordWrap(true)
+
+    local label = W.Text(dlg, 13, ink and ink.gold or T.amber)
+    label:SetPoint("TOPLEFT", 13, -140); label:SetText("Personal note")
+    local limit = W.Text(dlg, 11, T.dim)
+    limit:SetPoint("TOPRIGHT", -13, -141)
+    limit:SetText(string.format("Up to %d characters", ns.JOURNAL_NOTE_LIMIT))
+    local box = W.Panel(dlg, T.bg)
+    box:SetPoint("TOPLEFT", 13, -160); box:SetSize(width - 26, 141)
+    local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 10, -7); scroll:SetPoint("BOTTOMRIGHT", -25, 7)
+    scroll.scrollBarHideIfUnscrollable = true
+    local edit = CreateFrame("EditBox", nil, scroll)
+    edit:SetMultiLine(true)
+    edit:SetAutoFocus(false)
+    edit:SetFont(W.FONT, 13, "")
+    edit:SetTextColor(T.text[1], T.text[2], T.text[3])
+    edit:SetSize(textWidth, 1)
+    edit:SetPoint("TOPLEFT", scroll, "TOPLEFT")
+    scroll:SetScrollChild(edit)
+    scroll:EnableMouse(true)
+    scroll:SetScript("OnMouseDown", function() edit:SetFocus() end)
+    local cursorY, cursorHeight
+    local function KeepCursorVisible()
+        if not layer:IsVisible() or not cursorY or not cursorHeight then return end
+        local offset, height = scroll:GetVerticalScroll(), scroll:GetHeight()
+        local top = -cursorY
+        if top + cursorHeight > offset + height then top = top + cursorHeight - height
+        elseif top >= offset then return end
+        scroll:SetVerticalScroll(math.max(0, math.min(top, scroll:GetVerticalScrollRange())))
+    end
+    edit:SetScript("OnCursorChanged", function(_, _, y, _, lineHeight)
+        cursorY, cursorHeight = y, lineHeight
+        KeepCursorVisible()
+    end)
+    scroll:HookScript("OnScrollRangeChanged", function()
+        if edit:HasFocus() then KeepCursorVisible() end
+    end)
+    edit:SetScript("OnEscapePressed", function() layer:Hide() end)
+
+    local privacy = "Saved in this character’s local journal."
+    local status = W.Text(dlg, 11, T.dim, nil, "LEFT")
+    status:SetPoint("TOPLEFT", 13, -313); status:SetWidth(width - 26)
+    local footerRule = W.Line(dlg)
+    footerRule:SetPoint("BOTTOMLEFT", 1, 39); footerRule:SetPoint("BOTTOMRIGHT", -1, 39); footerRule:SetHeight(1)
+    local save = W.FlatButton(dlg, "Save note", 83, 21)
+    save:SetPoint("BOTTOMRIGHT", -13, 9)
+    local cancel = W.FlatButton(dlg, "Cancel", 77, 21)
+    cancel:SetPoint("RIGHT", save, "LEFT", -8, 0)
+    cancel:SetScript("OnClick", function() layer:Hide() end)
+    local remove = W.FlatButton(dlg, "Remove note", 96, 21)
+    remove:SetPoint("BOTTOMLEFT", 13, 9)
+    remove.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
+
+    local entry
+    local function Apply(text)
+        local ok, why = ns.SetJournalNote(entry, text)
+        if not ok then
+            status:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
+            status:SetText(why or "The note could not be saved.")
+            return
+        end
+        layer:Hide()
+    end
+    save:SetScript("OnClick", function() Apply(edit:GetText() or "") end)
+    remove:SetScript("OnClick", function() Apply(nil) end)
+    layer:SetScript("OnHide", function()
+        entry, cursorY, cursorHeight = nil, nil, nil
+        edit:ClearFocus()
+        edit:SetText("")
+        GameTooltip:Hide()
+    end)
+
+    function layer:Open(selected)
+        entry = selected
+        local saved = ns.JournalNote(selected)
+        title:SetText(saved and "Edit journal note" or "Add journal note")
+        meta:SetText(JournalEntryTitle(selected))
+        eventText:SetText(selected[2])
+        remove:SetShown(saved ~= nil)
+        status:SetTextColor(T.dim[1], T.dim[2], T.dim[3]); status:SetText(privacy)
+        edit:SetText(saved or "")
+        GameTooltip:Hide()
+        self:Show()
+        eventBody:SetHeight(math.max(63, (meta:GetStringHeight() or 0) + (eventText:GetStringHeight() or 0) + 10))
+        eventScroll:SetVerticalScroll(0)
+        edit:SetCursorPosition(0)
+        scroll:SetVerticalScroll(0)
+        edit:SetFocus()
+    end
+
+    return layer
+end
+
+local function OpenJournalNote(entry)
+    if not noteLayer then noteLayer = CreateJournalNoteEditor() end
+    noteLayer:Open(entry)
+end
+
+local function JournalFilters(parent, width)
+    local categories = W.Segmented(parent, {
+        { id = "all", label = "All", tip = "Show every entry type." },
+        { id = "first", label = "Firsts", tip = "Show firsts and first visits." },
+        { id = "boss", label = "Boss kills", tip = "Show recorded boss kills." },
+        { id = "death", label = "Deaths", tip = "Show recorded deaths." },
+        { id = "personalBest", label = "Personal bests", tip = "Show personal records." },
+    }, function(id) parent:SetFilter(id, parent.zoneText) end)
+    categories:SetPoint("TOPLEFT", 9, -5)
+    categories:Select("all")
+
+    local label = W.Text(parent, 11, T.text)
+    label:SetText("Zone")
+    local box = W.Panel(parent, T.bg)
+    local room = width - categories:GetWidth() - label:GetStringWidth() - 36
+    local stacked = room < 76
+    local height = stacked and 60 or 34
+    box:SetSize(stacked and 122 or math.min(122, room), 23)
+    box:SetPoint("TOPRIGHT", -9, stacked and -33 or -5)
+    label:SetPoint("RIGHT", box, "LEFT", -6, 0)
+    local zone = CreateFrame("EditBox", nil, box)
+    zone:SetPoint("TOPLEFT", 7, 0); zone:SetPoint("BOTTOMRIGHT", -7, 0)
+    zone:SetFont(W.FONT, 11, "")
+    zone:SetTextColor(T.text[1], T.text[2], T.text[3])
+    zone:SetAutoFocus(false)
+    local hint = W.Text(box, 11, T.dim)
+    hint:SetPoint("LEFT", 7, 0); hint:SetText("All zones")
+    zone:SetScript("OnTextChanged", function(self)
+        local text = self:GetText() or ""
+        hint:SetShown(text == "" and not self:HasFocus())
+        parent:SetFilter(parent.kindFilter, text)
+    end)
+    zone:SetScript("OnEditFocusGained", function() hint:Hide() end)
+    zone:SetScript("OnEditFocusLost", function(self) hint:SetShown((self:GetText() or "") == "") end)
+    zone:SetScript("OnEscapePressed", zone.ClearFocus)
+    zone:SetScript("OnEnterPressed", zone.ClearFocus)
+    zone:SetScript("OnHide", zone.ClearFocus)
+    local rule = W.Line(parent)
+    rule:SetPoint("TOPLEFT", 1, -height); rule:SetPoint("TOPRIGHT", -1, -height); rule:SetHeight(1)
+    return categories, zone, height
+end
+
 local function JournalFeed(parent, width, height)
     local ink = ns.themeId == "forever" and W.JOURNAL or nil
     local f = W.Panel(parent, ink and ink.page or T.bg)
     f:SetAllPoints()
     f.offset, f.entries, f.rows = 0, {}, {}
+    f.source, f.kindFilter, f.zoneText = f.entries, "all", ""
     local gold = ink and ink.gold or T.amber
+    local categories, zoneEdit, toolbarHeight = JournalFilters(f, width)
+    f.zoneEdit = zoneEdit
     for i = 1, JOURNAL_PAGE_SIZE do
         local row = CreateFrame("Button", nil, f)
         row:SetWidth(width - 26)
@@ -1077,16 +1430,16 @@ local function JournalFeed(parent, width, height)
         row.prose:SetMaxLines(2)
         local line = W.Line(row)
         line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1); line:SetAlpha(0.5)
-        W.Tip(row, function() return DateLabel(row.entry[1]) .. "  ·  Level " .. (row.entry[3] or "?") end,
-            function() return row.entry[2] end)
+        W.Tip(row, function() return JournalEntryTitle(row.entry) end,
+            function() return row.entry[2] end, "Click to view the entry or write a personal note.")
         row:SetScript("OnClick", function(self)
             local e = self.entry
-            if e then ns.ShowText("Journal entry", DateLabel(e[1]) .. "  ·  Level " .. (e[3] or "?"), e[2]) end
+            if e then OpenJournalNote(e) end
         end)
         f.rows[i] = row
     end
     local empty = W.Text(f, 14, T.dim)
-    empty:SetPoint("TOP", 0, -27); empty:SetText("Your story will appear here as you play.")
+    empty:SetPoint("TOP", 0, -toolbarHeight - 27)
     local footerRule = W.Line(f)
     footerRule:SetPoint("BOTTOMLEFT", 1, 30); footerRule:SetPoint("BOTTOMRIGHT", -1, 30); footerRule:SetHeight(1)
     local newer = W.FlatButton(f, "Newer", 65, 20)
@@ -1111,8 +1464,8 @@ local function JournalFeed(parent, width, height)
         end
         -- Keep a usable two-line entry even when every row starts a different day.
         local dayHeight = 18
-        local rowHeight = math.min(38, math.floor((height - 42 - dayCount * dayHeight) / math.max(1, n)))
-        local y = -7
+        local rowHeight = math.min(38, math.floor((height - toolbarHeight - 42 - dayCount * dayHeight) / math.max(1, n)))
+        local y = -toolbarHeight - 7
         for i, row in ipairs(self.rows) do
             local e = i <= n and self.entries[total - self.offset - i + 1]
             if e then
@@ -1127,6 +1480,7 @@ local function JournalFeed(parent, width, height)
                 row.meta:SetText(date("%H:%M", e[1]) .. "  ·  Lv " .. (e[3] or "?"))
                 row.prose:ClearAllPoints()
                 row.prose:SetPoint("TOPLEFT", 94, -daySpace - 3)
+                row.prose:SetFont(W.FONT, rowHeight < 29 and 12 or 13, "")
                 row.prose:SetHeight(rowHeight - 2)
                 row.prose:SetText(e[2])
                 row.entry = e
@@ -1138,6 +1492,9 @@ local function JournalFeed(parent, width, height)
             end
         end
         self.anchor = self.offset > 0 and self.entries[total - self.offset] or nil
+        if n == 0 then
+            empty:SetText(self.total == 0 and "Your story will appear here as you play." or "No journal entries match these filters.")
+        end
         empty:SetShown(n == 0)
         position:SetText(n > 0 and string.format("Entries %d–%d of %d", self.offset + 1, self.offset + n, total) or "")
         newer:SetEnabled(self.offset > 0)
@@ -1149,16 +1506,42 @@ local function JournalFeed(parent, width, height)
     function f:SetEntries(entries)
         local total = #entries
         local latest = entries[total]
-        if entries == self.entries and total == self.total and latest == self.latest then return end
-        self.entries, self.total, self.latest = entries, total, latest
-        if self.offset > 0 and self.anchor then
-            -- New entries and retention trim must not move the reader's first entry.
-            for i = total, 1, -1 do
-                if entries[i] == self.anchor then self.offset = total - i; break end
+        local sourceChanged = entries ~= self.source
+        local filterChanged = self.kindFilter ~= self.cachedKind or self.zoneText ~= self.cachedZone
+        if not sourceChanged and not filterChanged and total == self.total and latest == self.latest then return end
+        self.source, self.total, self.latest = entries, total, latest
+        self.cachedKind, self.cachedZone = self.kindFilter, self.zoneText
+
+        local query = JournalZoneLower(self.zoneText:match("^%s*(.-)%s*$"))
+        local matches = entries
+        if self.kindFilter ~= "all" or query ~= "" then
+            matches = {}
+            for _, entry in ipairs(entries) do
+                local kind, zone, alsoKind = ns.JournalEntryInfo(entry)
+                local matchesKind = self.kindFilter == "all" or kind == self.kindFilter or alsoKind == self.kindFilter
+                if matchesKind and (query == "" or (zone and JournalZoneLower(zone):find(query, 1, true))) then
+                    matches[#matches + 1] = entry
+                end
             end
         end
-        self.offset = math.min(self.offset, math.max(0, total - 1))
+        self.entries = matches
+        if sourceChanged or filterChanged then
+            self.offset = 0
+        elseif self.offset > 0 and self.anchor then
+            -- New entries and retention trim must not move the reader's first entry.
+            for i = #matches, 1, -1 do
+                if matches[i] == self.anchor then self.offset = #matches - i; break end
+            end
+        end
+        self.offset = math.min(self.offset, math.max(0, #matches - 1))
         self:Render()
+    end
+
+    function f:SetFilter(kind, zone)
+        if self.kindFilter == kind and self.zoneText == zone then return end
+        self.kindFilter, self.zoneText = kind, zone
+        categories:Select(kind)
+        self:SetEntries(self.source)
     end
 
     local function Turn(direction)
@@ -1238,7 +1621,7 @@ ns.HELP = {
     { "Uniques and firsts", "Uniques count different things you met, killed, visited or used; each list stops growing at 20,000 entries. Firsts are the first time something happened after install." },
     { "Gold", "Every change in the gold you carry is counted. The source (loot, vendor, auction house, mail, flight master, trainer) comes from which window was open at the time." },
     { "Where you are", "Capital cities are the six Classic capitals. Continent and zone come from the game map. Time per place is sampled four times a second." },
-    { "Your data", "The addon stores its data locally in the account and character files. Backup copies statistics and personal-best history. The Journal and play-session history stay in the saved files. Use Share to post a summary to your selected WoW chat channel." },
+    { "Your data", "LifeTimeStats stores data locally in the account and character files. Stats only merges statistics and personal-best history on restore. Full character includes Journal entries, private notes and play-session history. A full restore replaces saved character data after confirmation. Share posts a summary without private notes to your selected WoW chat channel." },
     { "Achievements", "99 achievements with up to 6 tiers each (354 badges, 7,110 points), earned from your lifetime values. Fastest-time achievements are earned by being quicker than the target. Values you already had when 1.3 was installed are marked 'before v1.3'. Alerts are off by default; the sidebar shows how many are new. Settings can switch alerts to a chat line, an on-screen toast, or both." },
     { "Compare", "The Compare page lists every character on this account that has logged in with LifeTimeStats. Click one to put it on the right, Ctrl+click to put it on the left, or pick All characters. A + marks the side that leads; for fastest times lower is better. Forget character removes a deleted alt's data after asking." },
     { "Sharing", "Share (footer button or /lts share) shows a one-line summary of the page you are on. You can edit it, pick Say, Party, Raid, Guild or Instance, and press Send. Nothing is ever posted without that click, and /lts share g deaths posts straight to guild only because you typed it." },
@@ -1283,6 +1666,9 @@ function ns.ShowPage(id)
     if not pages[id] then id = "dashboard" end
     ns.activePage = id
     if id ~= "search" then Settings().lastCategory = id end
+    if id ~= "dashboard" and pinLayer then pinLayer:Hide() end
+    if id ~= "journal" and noteLayer then noteLayer:Hide() end
+    win:SetDashboardPinButtonShown(id == "dashboard")
     if current and current ~= pages[id] then current:Hide() end
     current = pages[id]
     current:Show()
@@ -1529,9 +1915,9 @@ local function CreateWindow()
     if ink then W.Shade(fbg, ink.base, ink.top) end
     local ftop = W.Line(foot); ftop:SetPoint("TOPLEFT"); ftop:SetPoint("TOPRIGHT"); ftop:SetHeight(1)
     win.footer = W.Text(foot, 10, T.dim); win.footer:SetPoint("LEFT", 10, 0)
-    local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Merge a LifeTimeStats text backup into this character.")
+    local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Merge a stats backup or preview a full character restore.")
     restore:SetPoint("RIGHT", -6, 0); restore:SetScript("OnClick", function() ns.ShowImport() end)
-    local backup = W.FlatButton(foot, "Backup", 64, 18, nil, "Copy this character's statistics and personal-best history as text.")
+    local backup = W.FlatButton(foot, "Backup", 64, 18, nil, "Choose a stats-only or full character text backup.")
     backup:SetPoint("RIGHT", restore, "LEFT", -6, 0); backup:SetScript("OnClick", function() ns.ShowExport() end)
     local share = W.FlatButton(foot, "Share", 64, 18, nil, "Preview a one-line summary of this page and post it to a chat channel you pick. Nothing is posted until you press Send.")
     share:SetPoint("RIGHT", backup, "LEFT", -6, 0)
@@ -1539,7 +1925,16 @@ local function CreateWindow()
     local sheet = W.FlatButton(foot, "Sheet", 64, 18, nil, "Show a character sheet you can copy and paste anywhere.")
     sheet:SetPoint("RIGHT", share, "LEFT", -6, 0)
     sheet:SetScript("OnClick", function() ns.ShowSheet() end)
-    local ver = W.Text(foot, 10, T.dim); ver:SetPoint("RIGHT", sheet, "LEFT", -12, 0); ver:SetText("v" .. ns.VERSION)
+    local pins = W.FlatButton(foot, "Manage pins", 91, 18, nil, "Choose which statistics appear first on the Dashboard.")
+    pins:SetPoint("RIGHT", sheet, "LEFT", -6, 0)
+    pins:SetScript("OnClick", OpenDashboardPinPicker)
+    pins:Hide()
+    local ver = W.Text(foot, 10, T.dim); ver:SetText("v" .. ns.VERSION)
+    function win:SetDashboardPinButtonShown(shown)
+        pins:SetShown(shown)
+        ver:ClearAllPoints()
+        ver:SetPoint("RIGHT", shown and pins or sheet, "LEFT", -12, 0)
+    end
 
     -- pages -----------------------------------------------------------
     BuildDashboard()
@@ -1561,7 +1956,11 @@ local function CreateWindow()
     win:SetScript("OnKeyDown", function(self, key)
         if InCombatLockdown() or not self.SetPropagateKeyboardInput then return end
         local handled = false
-        if self:IsMouseOver() and not win.search:HasFocus() then
+        local modal = pinLayer
+        if noteLayer and noteLayer:IsShown() then modal = noteLayer end
+        if modal and modal:IsShown() then
+            if key == "ESCAPE" then modal:Hide(); handled = true end
+        elseif self:IsMouseOver() and not win.search:HasFocus() and not pages.journal.story.zoneEdit:HasFocus() then
             if key == "F" and IsControlKeyDown() then
                 win.search:SetFocus(); handled = true
             elseif keyMap[key] and not IsModifierKeyDown() then
@@ -1578,6 +1977,10 @@ local function CreateWindow()
         ns.Add("lts_opens")
         if SetPortraitTexture then SetPortraitTexture(win.portrait, "player") end
         ns.ShowPage(Settings().lastCategory)
+    end)
+    win:SetScript("OnHide", function()
+        if pinLayer then pinLayer:Hide() end
+        if noteLayer then noteLayer:Hide() end
     end)
     local acc = 0
     win:SetScript("OnUpdate", function(_, el)
@@ -1683,6 +2086,125 @@ end
 
 -- ------------------------------------------------------------ backup dialog
 local dlg
+local RESTORE_HINT = "Paste a LifeTimeStats backup with Ctrl+V. Stats backups merge. Full character backups require confirmation before replacement."
+
+local function LayoutBackupDialog(mode, width, height)
+    dlg.mode, dlg.previewInput = mode, nil
+    dlg:SetSize(width, height)
+    dlg.eb:SetWidth(width - 70)
+    local export, restore = mode == "export", mode == "restore"
+    dlg.exportModes:SetShown(export)
+    dlg.summary:Hide()
+    dlg.editPaste:Hide()
+    dlg.box:Show()
+    local hintTop, boxTop = export and -66 or -32, export and -116 or -64
+    dlg.hint:ClearAllPoints()
+    dlg.hint:SetPoint("TOPLEFT", 12, hintTop); dlg.hint:SetPoint("RIGHT", -12, 0)
+    dlg.box:ClearAllPoints()
+    dlg.box:SetPoint("TOPLEFT", 12, boxTop); dlg.box:SetPoint("BOTTOMRIGHT", -12, 44)
+    dlg.action:SetShown(restore)
+    dlg.action.text:SetText("Restore")
+    dlg.action.text:SetTextColor(T.text[1], T.text[2], T.text[3])
+    dlg.close.text:SetText(restore and "Cancel" or "Close")
+    dlg.close:ClearAllPoints()
+    if restore then
+        dlg.close:SetPoint("RIGHT", dlg.action, "LEFT", -8, 0)
+    else
+        dlg.close:SetPoint("BOTTOMRIGHT", -12, 12)
+    end
+end
+
+local function SetRestoreInput(hint)
+    LayoutBackupDialog("restore", 480, 320)
+    dlg.title:SetText("Restore - " .. ns.charKey)
+    dlg.hint:SetText(hint or RESTORE_HINT)
+end
+
+local function ShowBackupExport(mode)
+    local full = mode == "full"
+    dlg.exportModes:Select(mode)
+    dlg.title:SetText("Backup - " .. ns.charKey)
+    if full then
+        local payload, why = ns.SerializeFullBackup()
+        dlg.hint:SetText(payload
+            and "Copy manually with Ctrl+A and Ctrl+C. Contains private Journal notes. Restore on this character only. Account settings and the active session are outside this backup."
+            or ("|cffd9604aCould not create full backup:|r " .. tostring(why)))
+        dlg.eb:SetText(payload or "")
+    else
+        dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
+        dlg.eb:SetText(ns.Serialize(ns.char))
+    end
+    dlg.eb:SetFocus()
+    dlg.eb:HighlightText()
+end
+
+local function ShowFullBackupPreview(input, snapshot)
+    dlg.previewInput = input
+    dlg:SetSize(560, 254)
+    dlg.title:SetText("Restore full character backup")
+    dlg.hint:SetText("This will replace this character’s statistics and saved history.")
+    dlg.eb:ClearFocus()
+    dlg.box:Hide()
+    local journal, sessions = snapshot.record.journal or {}, snapshot.record.sessionlog or {}
+    local noteCount = snapshot.noteCount
+    if not noteCount then
+        noteCount = 0
+        for _, entry in ipairs(journal) do
+            if ns.JournalNote(entry) then noteCount = noteCount + 1 end
+        end
+    end
+    local validDate, saved = pcall(date, "%b %d, %Y at %H:%M", snapshot.savedAt)
+    dlg.summary.source:SetText("Source: " .. snapshot.character:gsub("|", "||") .. "  ·  This character")
+    dlg.summary.saved:SetText(validDate and type(saved) == "string" and "Backed up " .. saved or "Backup date unavailable")
+    dlg.summary.counts:SetText(string.format("%d Journal entries  ·  %d personal notes  ·  %d saved sessions", #journal, noteCount, #sessions))
+    dlg.summary:Show()
+    dlg.editPaste:Show()
+    dlg.action.text:SetText("Replace history")
+    dlg.action.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
+end
+
+local function ApplyBackup()
+    if dlg.mode ~= "restore" then return end
+    local text = dlg.eb:GetText() or ""
+    if dlg.previewInput and dlg.previewInput ~= text then
+        SetRestoreInput("The pasted text changed. Review the backup again.")
+        return
+    end
+    if ns.IsFullBackup(text) then
+        local snapshot, why = ns.DeserializeFullBackup(text)
+        if not snapshot then
+            SetRestoreInput("|cffd9604aCould not read full backup:|r " .. tostring(why))
+            return
+        end
+        if snapshot.character ~= ns.charKey then
+            SetRestoreInput("|cffd9604aThis full backup belongs to another character.|r")
+            return
+        end
+        if not dlg.previewInput then
+            ShowFullBackupPreview(text, snapshot)
+            return
+        end
+        local ok, reason = ns.RestoreFullBackup(snapshot)
+        if not ok then
+            SetRestoreInput("|cffd9604aCould not restore full backup:|r " .. tostring(reason))
+            return
+        end
+        ns.Print("Full character backup restored.")
+    else
+        local data, why = ns.Deserialize(text)
+        if not data then
+            SetRestoreInput("|cffd9604aCould not read backup:|r " .. tostring(why))
+            return
+        end
+        local changed = ns.MergeMax(ns.char, data)
+        ns.InvalidateAccount()
+        ns.Save()
+        ns.Print(string.format("Restore complete. Entries updated: %d.", changed))
+    end
+    dlg:Hide()
+    ns.RefreshWindow()
+end
+
 local function CreateDialog()
     dlg = W.Window(UIParent)
     dlg:SetSize(480, 320)
@@ -1699,9 +2221,14 @@ local function CreateDialog()
     local bar = W.Fill(dlg, T.amber, "ARTWORK"); bar:SetPoint("TOPLEFT", 1, -1); bar:SetPoint("TOPRIGHT", -1, -1); bar:SetHeight(2)
     dlg.title = W.Text(dlg, 13, T.amber); dlg.title:SetPoint("TOPLEFT", 12, -12)
     dlg.hint = W.Text(dlg, 11, T.dim); dlg.hint:SetPoint("TOPLEFT", 12, -32); dlg.hint:SetPoint("RIGHT", -12, 0); dlg.hint:SetJustifyH("LEFT"); dlg.hint:SetWordWrap(true)
-    local box = W.Panel(dlg, T.tile)
-    box:SetPoint("TOPLEFT", 12, -64); box:SetPoint("BOTTOMRIGHT", -12, 44)
-    local sf = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
+    dlg.exportModes = W.Segmented(dlg, {
+        { id = "stats", label = "Stats only", tip = "Back up statistics and personal-best history for a merge restore." },
+        { id = "full", label = "Full character", tip = "Back up this character’s statistics and saved history including private Journal notes." },
+    }, function(id) if dlg.mode == "export" then ShowBackupExport(id) end end)
+    dlg.exportModes:SetPoint("TOPLEFT", 12, -34)
+    dlg.exportModes:Hide()
+    dlg.box = W.Panel(dlg, T.tile)
+    local sf = CreateFrame("ScrollFrame", nil, dlg.box, "UIPanelScrollFrameTemplate")
     sf:SetPoint("TOPLEFT", 6, -6); sf:SetPoint("BOTTOMRIGHT", -26, 6)
     local eb = CreateFrame("EditBox", nil, sf)
     eb:SetMultiLine(true)
@@ -1710,49 +2237,61 @@ local function CreateDialog()
     eb:SetTextColor(T.text[1], T.text[2], T.text[3])
     eb:SetWidth(410)
     eb:SetScript("OnEscapePressed", function() dlg:Hide() end)
+    eb:SetScript("OnTextChanged", function(self)
+        if dlg.mode == "restore" and dlg.previewInput and self:GetText() ~= dlg.previewInput then
+            SetRestoreInput("The pasted text changed. Review the backup again.")
+        end
+    end)
     sf:SetScrollChild(eb)
     dlg.eb = eb
-    local closeB = W.FlatButton(dlg, "Close", 80, 22, nil, "Close this dialog.")
-    closeB:SetPoint("BOTTOMRIGHT", -12, 12)
-    closeB:SetScript("OnClick", function() dlg:Hide() end)
-    dlg.action = W.FlatButton(dlg, "Restore", 80, 22, nil, "Merge the pasted statistics and personal-best history into this character.")
-    dlg.action:SetPoint("RIGHT", closeB, "LEFT", -8, 0)
-    dlg.action:SetScript("OnClick", function()
-        local data, n = ns.Deserialize(eb:GetText())
-        if not data then
-            dlg.hint:SetText("|cffd9604aCould not read backup:|r " .. tostring(n))
-            return
-        end
-        local changed = ns.MergeMax(ns.char, data)
-        ns.InvalidateAccount()
-        ns.Save()
-        ns.Print(string.format("Restore complete. Entries updated: %d.", changed))
-        dlg:Hide()
-        ns.RefreshWindow()
+    dlg.summary = W.Panel(dlg, T.tile)
+    dlg.summary:SetPoint("TOPLEFT", 12, -62); dlg.summary:SetPoint("TOPRIGHT", -12, -62); dlg.summary:SetHeight(96)
+    dlg.summary.source = W.Text(dlg.summary, 13, T.amber, nil, "LEFT")
+    dlg.summary.source:SetPoint("TOPLEFT", 10, -10); dlg.summary.source:SetWidth(514)
+    dlg.summary.saved = W.Text(dlg.summary, 11, T.dim, nil, "LEFT")
+    dlg.summary.saved:SetPoint("TOPLEFT", 10, -32)
+    local rule = W.Line(dlg.summary)
+    rule:SetPoint("TOPLEFT", 10, -52); rule:SetPoint("TOPRIGHT", -10, -52); rule:SetHeight(1)
+    dlg.summary.counts = W.Text(dlg.summary, 12, T.text, nil, "LEFT")
+    dlg.summary.counts:SetPoint("TOPLEFT", 10, -66)
+    local ready = W.Text(dlg.summary, 11, T.dim, nil, "LEFT")
+    ready:SetPoint("TOPLEFT", dlg.summary, "BOTTOMLEFT", 0, -9)
+    ready:SetText("The backup text is ready. Choose Edit paste to change it.")
+    dlg.summary:Hide()
+    dlg.close = W.FlatButton(dlg, "Close", 80, 22, nil, "Close this dialog.")
+    dlg.close:SetScript("OnClick", function() dlg:Hide() end)
+    dlg.action = W.FlatButton(dlg, "Restore", 128, 22)
+    dlg.action:SetPoint("BOTTOMRIGHT", -12, 12)
+    dlg.action:SetScript("OnClick", ApplyBackup)
+    dlg.action:Hide()
+    dlg.editPaste = W.FlatButton(dlg, "Edit paste", 93, 22)
+    dlg.editPaste:SetPoint("BOTTOMLEFT", 12, 12)
+    dlg.editPaste:SetScript("OnClick", function()
+        SetRestoreInput()
+        eb:SetFocus()
+    end)
+    dlg.editPaste:Hide()
+    dlg:SetScript("OnHide", function()
+        local clear = dlg.mode == "export" or dlg.mode == "restore"
+        dlg.mode, dlg.previewInput = nil, nil
+        eb:ClearFocus()
+        if clear then eb:SetText("") end
     end)
 end
 
-local function DlgDefault() dlg:SetSize(480, 320); dlg.eb:SetWidth(410) end
 function ns.ShowExport()
     if not dlg then CreateDialog() end
-    DlgDefault()
-    dlg.title:SetText("Backup - " .. ns.charKey)
-    dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
-    dlg.action:Hide()
-    dlg.eb:SetText(ns.Serialize(ns.char))
+    LayoutBackupDialog("export", 540, 355)
     dlg:Show()
-    dlg.eb:SetFocus()
-    dlg.eb:HighlightText()
+    ShowBackupExport("stats")
 end
 
 -- Plain text window for /lts debug, /lts dm and /lts errors.
 function ns.ShowText(title, hint, text)
     if not dlg then CreateDialog() end
-    dlg:SetSize(620, 460)
-    dlg.eb:SetWidth(550)
+    LayoutBackupDialog("text", 620, 460)
     dlg.title:SetText(title)
     dlg.hint:SetText(hint or "Ctrl+A then Ctrl+C to copy.")
-    dlg.action:Hide()
     dlg.eb:SetText(text or "")
     dlg:Show()
     dlg.eb:SetFocus()
@@ -1762,10 +2301,9 @@ end
 
 function ns.ShowSheet()
     if not dlg then CreateDialog() end
-    DlgDefault()
+    LayoutBackupDialog("text", 480, 320)
     dlg.title:SetText("Character sheet - " .. ns.TitledName())
     dlg.hint:SetText("Ctrl+A then Ctrl+C to copy. Paste it into Discord, a forum post or your notes.")
-    dlg.action:Hide()
     dlg.eb:SetText(ns.CharacterSheet())
     dlg:Show()
     dlg.eb:SetFocus()
@@ -1774,10 +2312,7 @@ end
 
 function ns.ShowImport()
     if not dlg then CreateDialog() end
-    DlgDefault()
-    dlg.title:SetText("Restore - " .. ns.charKey)
-    dlg.hint:SetText("Paste a LifeTimeStats backup with Ctrl+V. Restore merges statistics and personal-best history into this character.")
-    dlg.action:Show()
+    SetRestoreInput()
     dlg.eb:SetText("")
     dlg:Show()
     dlg.eb:SetFocus()
