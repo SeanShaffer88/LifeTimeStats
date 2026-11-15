@@ -28,6 +28,7 @@ local DEFAULTS = {
     lockWindow   = false,
     classColor   = true,
     recap        = true,
+    recapWindow  = true,
     achAnnounce  = "off", -- off | chat | toast | both
     countPet     = true,
     milestones   = false,
@@ -149,7 +150,7 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary", "people" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary", "people", "reps", "items", "goals" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
@@ -859,6 +860,10 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.ShowText("Adventurer score", "How your score is made. Ctrl+A, Ctrl+C to copy.", ns.ScoreText())
     elseif cmd == "csv" or cmd == "sessions" then
         ns.ShowText("Session history (CSV)", "One line per play session. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.SessionCSV())
+    elseif cmd == "goal" or cmd == "goals" then
+        ns.GoalCommand(msg:match("^%S+%s*(.-)$"))
+    elseif cmd == "summary" then
+        ns.ShowSessionSummary(true)
     elseif cmd == "export" then
         ns.ShowText("Compendium (CSV)", "Every statistic for every character, plus the account total. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.CompendiumCSV())
     elseif cmd == "recap" then
@@ -888,6 +893,8 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("/lts score - your Adventurer score and how it is made")
         ns.Print("/lts csv - your play sessions as CSV for a spreadsheet")
         ns.Print("/lts export - every statistic for every character as CSV")
+        ns.Print("/lts goal <words> <target> - set a goal · /lts goal list · /lts goal remove <n>")
+        ns.Print("/lts summary - this session at a glance")
     end
 end
 

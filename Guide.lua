@@ -176,6 +176,7 @@ function ns.GuideEngaged() return engage end
 
 -- Every boss kill, from the encounter event or the unit fallback (Trackers calls this).
 local lastBoss
+function ns.GuideLastBoss() return lastBoss end
 function ns.OnBossKill(name, kind)
     if not ns.char then return end
     if kind ~= "party" and kind ~= "raid" then

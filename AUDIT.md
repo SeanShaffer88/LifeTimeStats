@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.18.2-forever
+# Audit - LifeTimeStats 1.19.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,27 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.19.0
+- Verified (offline): new `tests/compendium_collections.py` (111 assertions) covers:
+  - **reputation:** read, standing gained with its date and Journal line, standing lost;
+  - **currencies:** read, with the record of the highest amount;
+  - **item log sources:** loot, quest, vendor, crafted and boss, with item level, quality, white items not logged, and one Journal line per epic;
+  - **gathering:** items gathered by zone;
+  - **mail:** gold sent and received, and items taken (via the `SendMail`/`TakeInbox*` hooks);
+  - **trades:** partner, gold each way and items;
+  - **goals:** found by words, refused targets, reached once, and the slash commands with commas;
+  - **trends, summary text and the page:** every Characters section button;
+  - **backup:** the LTS3 round trip of reputation, items and goals.
+
+  All nine suites pass. The catalog has 937 entries. Every new client call is in the captured Forever API dump: `C_Reputation`, `C_CurrencyInfo`, `SendMail`, `GetSendMailMoney`, `TakeInboxMoney`, `TakeInboxItem`, `GetInboxHeaderInfo`, `GetPlayerTradeMoney`, `GetTargetTradeMoney`, `GetTradePlayerItemLink` and `GetTradeTargetItemLink`.
+- Unverified (in client):
+  - the `C_Reputation.GetFactionDataByIndex` field names on Forever (`reaction`, `currentStanding`, thresholds), and collapsed reputation headers hiding their factions;
+  - `C_CurrencyInfo` list contents;
+  - hooking `SendMail` and the inbox functions with `hooksecurefunc` on Forever;
+  - `UnitName("NPC")` as the trade partner;
+  - item-level reads for links not yet cached;
+  - layout of the 10 section buttons on the Characters page.
 
 ## 1.18.2
 - In game (1.18.1, 16 screenshots):

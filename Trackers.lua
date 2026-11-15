@@ -627,6 +627,7 @@ On("CHAT_MSG_LOOT", function(_, msg)
     if c then
         local name = (c[1] and c[1]:match("%[(.-)%]")) or c[1] or "?"
         Add("items_crafted", qty2)
+        if ns.OnCreateItem and c[1] then pcall(ns.OnCreateItem, c[1], qty2) end
         Tally("created", name, qty2)
         if name:find("^Conjured") then Add("conjured", qty2) end
     end
@@ -644,7 +645,11 @@ On("CHAT_MSG_SYSTEM", function(_, msg)
         if c[1] == myName then Add("duels_won") elseif c[2] == myName then Add("duels_lost") end
         return
     end
-    if Match(P.tradeDone, msg) then Add("trades") return end
+    if Match(P.tradeDone, msg) then
+        Add("trades")
+        if ns.OnTradeComplete then pcall(ns.OnTradeComplete) end
+        return
+    end
     c = Match(P.instReset, msg)
     if c then
         local run = ns.char.run

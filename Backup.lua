@@ -304,7 +304,7 @@ local FULL_META = {
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "meta",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "meta",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -336,8 +336,18 @@ local SESSION_ROW = {
     id = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
     s = Timestamp, d = Timestamp, afk = Timestamp, l = Level, steps = Nonnegative,
     k = Nonnegative, de = Nonnegative, q = Nonnegative, xp = Nonnegative, dmg = Nonnegative, z = Text,
-    g = Number, mi = Nonnegative, lv = Nonnegative, it = Nonnegative,
+    g = Number, mi = Nonnegative, lv = Nonnegative, it = Nonnegative, gh = Nonnegative,
 }
+local function StandingDates(value)
+    if type(value) ~= "table" or IsSecret(value) or getmetatable(value) ~= nil then return false end
+    for k, v in pairs(value) do
+        if not Integer(k, 1, 8) or not Timestamp(v) then return false end
+    end
+    return true
+end
+local REP_ROW = { s = function(v) return Integer(v, 1, 8) end, c = Nonnegative, m = Nonnegative, f = Timestamp, u = Timestamp, h = StandingDates, war = Boolean }
+local ITEM_ROW = { t = Timestamp, n = Text, id = Nonnegative, q = function(v) return Integer(v, 0, 8) end, src = Key, from = Text, z = Text, l = Level, il = Nonnegative, c = Nonnegative }
+local GOAL_ROW = { id = Key, target = Nonnegative, t = Timestamp, done = Timestamp }
 local PERSON_ROW = {
     f = Timestamp, l = Timestamp, n = Nonnegative, t = Nonnegative, cls = Key, lvl = Level, z = Text,
 }
@@ -471,6 +481,16 @@ local function StageFullSnapshot(snapshot, exportLegacy)
     -- Run history and bestiary arrived in 1.15; older full backups have neither.
     section = "dungeon run history"; record.runlog = Sequence(source.runlog == nil and {} or source.runlog, ns.RUNLOG_CAP or 200, function(row)
         return Row(row, RUN_ROW, { "s" })
+    end)
+    -- Reputation history, item log and goals arrived in 1.19.
+    section = "reputation history"; record.reps = Map(source.reps == nil and {} or source.reps, Key, function(row)
+        return Row(row, REP_ROW, { "s" })
+    end)
+    section = "item log"; record.items = Sequence(source.items == nil and {} or source.items, ns.ITEM_LOG_CAP or 1000, function(row)
+        return Row(row, ITEM_ROW, { "t" })
+    end)
+    section = "goals"; record.goals = Sequence(source.goals == nil and {} or source.goals, ns.GOAL_CAP or 20, function(row)
+        return Row(row, GOAL_ROW, { "id", "target" })
     end)
     section = "people you grouped with"; record.people = Map(source.people == nil and {} or source.people, Key, function(row)
         return Row(row, PERSON_ROW, {})

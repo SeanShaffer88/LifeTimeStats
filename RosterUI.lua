@@ -302,7 +302,11 @@ function ns.BuildRosterPage(env)
 
     -- ---------------------------------------------------- right: character cards
     local side = env.Panel(p, "Characters", "person", LW + env.GAP, 0, RW, env.CH, "Every character on this account, kept on this computer only.")
-    local listH = side.bh - 108
+    local btnSections = {}
+    for _, s in ipairs(SECTIONS) do btnSections[#btnSections + 1] = s end
+    local BTN_H, BTN_GAP = 24, 4
+    local btnRows = math.ceil(#btnSections / 2)
+    local listH = side.bh - 46 - btnRows * (BTN_H + BTN_GAP)
     p.visibleCards = math.max(1, math.floor((listH + CARD_GAP) / (CARD_H + CARD_GAP)))
     p.cards, p.offset = {}, 0
     for i = 1, p.visibleCards do
@@ -332,13 +336,17 @@ function ns.BuildRosterPage(env)
     end)
     p.summary = W.Text(side.body, 11, T.text); p.summary:SetPoint("TOPLEFT", 2, -(listH + 6)); p.summary:SetWidth(side.bw - 4)
     p.summary2 = W.Text(side.body, 10, T.dim); p.summary2:SetPoint("TOPLEFT", p.summary, "BOTTOMLEFT", 0, -4); p.summary2:SetWidth(side.bw - 4)
-    local half = (side.bw - 6) / 2
-    p.peopleBtn = W.FlatButton(side.body, "People", half, 26, "People", SECTIONS[2].tip)
-    p.peopleBtn:SetPoint("BOTTOMLEFT", 0, 0)
-    p.peopleBtn:SetScript("OnClick", function() state.section = "people"; p.force = true; ns.RefreshWindow() end)
-    p.farmBtn = W.FlatButton(side.body, "Farming", half, 26, "Farming sessions", SECTIONS[3].tip)
-    p.farmBtn:SetPoint("BOTTOMRIGHT", 0, 0)
-    p.farmBtn:SetScript("OnClick", function() state.section = "farming"; p.force = true; ns.RefreshWindow() end)
+    local half = (side.bw - BTN_GAP) / 2
+    p.sectionButtons = {}
+    for i, s in ipairs(btnSections) do
+        local label = s.id == "all" and "All characters" or (s.id == "farming" and "Farming" or s.name)
+        local b = W.FlatButton(side.body, label, half, BTN_H, s.name, s.tip)
+        local row, col = math.floor((i - 1) / 2), (i - 1) % 2
+        b:SetPoint("BOTTOMLEFT", col * (half + BTN_GAP), (btnRows - 1 - row) * (BTN_H + BTN_GAP))
+        b:SetScript("OnClick", function() state.section = s.id; p.force = true; ns.RefreshWindow() end)
+        p.sectionButtons[s.id] = b
+    end
+    p.peopleBtn, p.farmBtn = p.sectionButtons.people, p.sectionButtons.farming
 
     local function ShowCards(chars)
         local n = #chars
