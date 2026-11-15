@@ -2,6 +2,30 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.20.0-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
+
+### Added
+- **Quest history** (Characters > Quest history): every quest turned in, with date, zone, level, XP, gold and the time from accepting it. It keeps up to 1,000.
+- **Level history** (Characters > Level history): the per-level snapshot now also keeps gold, item level, /played, base stats and zone.
+- **Profession history** (Characters > Professions): the date of every skill-up, the time each 75-point stretch took, and Journal lines at 75, 150, 225 and 300.
+- **Death map** (Characters > Death map): each death's map position, cause, zone and level, plus skulls on the world map with tooltips (`/lts deathpins` toggles them). It keeps up to 500.
+- **Play habits** (Characters > Play habits): time online by weekday and hour.
+- **Item tooltips**: where and when you got an item from the item log.
+- **Saved data size**: `/lts size`, the settings panel, and a warning at login above 4 MB per character.
+- **Daily snapshots**: the newest three per character, kept in that character's own saved file. `/lts snapshot` lists them, with show and restore (merge).
+- **CSV exports**: `/lts export items`, `quests`, `runs` and `deaths`.
+- **Dashboard**: a pinned statistic with a goal shows its progress.
+- **Locale table** (`ns.L`): new section names go through it, ready for translations.
+- 6 catalog entries (943 in total). Full backups (LTS3) include quests, profession history, the death log and the new level-snapshot fields.
+
+### Fixed
+- `/lts summary` had two meanings; it now opens the session summary window.
+
+### Not in this release
+- Merging the eight per-frame timers into one, caching the all-characters view, and splitting UI.lua into one file per page were left out. They change nothing you can see, so they wait until there's an in-game check to compare against.
+
 ## [1.19.0-forever] - 2026-11-15
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.

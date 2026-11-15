@@ -182,7 +182,10 @@ On("CHAT_MSG_COMBAT_FACTION_CHANGE", function(_, msg)
 end)
 On("CHAT_MSG_SKILL", function(_, msg)
     local c = ns.Match(PX.skill, msg)
-    if c then Add("skillups"); Tally("skills", c[1]); Max("max_skill", tonumber(c[2]) or 0, c[1]) end
+    if c then
+        Add("skillups"); Tally("skills", c[1]); Max("max_skill", tonumber(c[2]) or 0, c[1])
+        if ns.OnSkillUp then pcall(ns.OnSkillUp, c[1], c[2]) end
+    end
 end)
 On("UI_ERROR_MESSAGE", function(_, a, b)
     local msg = type(b) == "string" and b or a

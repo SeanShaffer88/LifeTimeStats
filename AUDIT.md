@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.19.0-forever
+# Audit - LifeTimeStats 1.20.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,26 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.20.0
+- In game (1.19.0 screenshots): every page renders, including the 10 section buttons. `C_Reputation` was read (factions met: 4). No item log entries yet (no green loot).
+- Verified (offline): new `tests/history.py` (62 assertions) covers:
+  - **quests:** title, XP, gold, duration and zone;
+  - **level snapshots:** the new fields;
+  - **skills:** skill-up dates, the 75 milestone with its Journal line, and span maths;
+  - **deaths:** map position, and skulls drawn only on the matching map and only while enabled;
+  - **play habits:** weekday-hour tallies;
+  - **item tooltips:** the line text, the `TooltipDataProcessor` hook, and the setting;
+  - **size and snapshots:** the size estimate and report, the daily snapshot (replace on the same day, keep 3, restore merges);
+  - **exports and the rest:** all four CSV exports, the locale fallback, goals on pins, the five new Characters sections, and the LTS3 round trip.
+
+  Bugs caught and fixed: a CSV row with an empty field broke the join, and Upkeep, History and HistoryUI were listed twice in the TOC while the release was being built. The `WorldMapFrame.ScrollContainer` read is now defensive. All 11 suites pass.
+- Unverified (in client):
+  - `C_Map.GetPlayerMapPosition` at death, which may be unreadable in instances, and skull placement and scale on the Forever world map;
+  - `TooltipDataProcessor` on Forever;
+  - the skill-up chat line wording for profession history;
+  - `UnitStat` values at level-up;
+  - the size of the per-character snapshot texts.
 
 ## 1.19.0
 - Verified (offline): new `tests/compendium_collections.py` (111 assertions) covers:

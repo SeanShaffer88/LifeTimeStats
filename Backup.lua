@@ -304,7 +304,7 @@ local FULL_META = {
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "meta",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog", "meta",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -323,6 +323,8 @@ local LEVEL_ROW = {
     t = Timestamp, partial = Boolean, dist_foot = Nonnegative, jumps = Nonnegative, kills_npc = Nonnegative,
     kills_pvp = Nonnegative, deaths = Nonnegative, quests_done = Nonnegative, money_in = Nonnegative,
     time_online = Nonnegative, critter_kills = Nonnegative, times_drunk = Nonnegative,
+    gold = Nonnegative, il = Nonnegative, played = Nonnegative, zone = Text,
+    str = Nonnegative, agi = Nonnegative, sta = Nonnegative, int = Nonnegative, spi = Nonnegative,
 }
 local ZONE_ROW = { [1] = Timestamp, [2] = Level, [3] = Timestamp }
 local RUN_ROW = {
@@ -348,6 +350,17 @@ end
 local REP_ROW = { s = function(v) return Integer(v, 1, 8) end, c = Nonnegative, m = Nonnegative, f = Timestamp, u = Timestamp, h = StandingDates, war = Boolean }
 local ITEM_ROW = { t = Timestamp, n = Text, id = Nonnegative, q = function(v) return Integer(v, 0, 8) end, src = Key, from = Text, z = Text, l = Level, il = Nonnegative, c = Nonnegative }
 local GOAL_ROW = { id = Key, target = Nonnegative, t = Timestamp, done = Timestamp }
+local QUEST_ROW = { t = Timestamp, id = Nonnegative, n = Text, z = Text, l = Level, xp = Nonnegative, g = Nonnegative, d = Nonnegative }
+local function Fraction(v) return Number(v) and v >= -0.5 and v <= 1.5 end
+local DEATH_ROW = { t = Timestamp, m = Nonnegative, x = Fraction, y = Fraction, z = Text, c = Text, l = Level }
+local function RankDates(value)
+    if type(value) ~= "table" or IsSecret(value) or getmetatable(value) ~= nil then return false end
+    for k, v in pairs(value) do
+        if not Integer(k, 0, 1000) or not Timestamp(v) then return false end
+    end
+    return true
+end
+local SKILL_ROW = { f = Timestamp, r = Nonnegative, h = RankDates }
 local PERSON_ROW = {
     f = Timestamp, l = Timestamp, n = Nonnegative, t = Nonnegative, cls = Key, lvl = Level, z = Text,
 }
@@ -488,6 +501,16 @@ local function StageFullSnapshot(snapshot, exportLegacy)
     end)
     section = "item log"; record.items = Sequence(source.items == nil and {} or source.items, ns.ITEM_LOG_CAP or 1000, function(row)
         return Row(row, ITEM_ROW, { "t" })
+    end)
+    -- Quest history, profession history and the death log arrived in 1.20.
+    section = "quest history"; record.quests = Sequence(source.quests == nil and {} or source.quests, ns.QUEST_LOG_CAP or 1000, function(row)
+        return Row(row, QUEST_ROW, { "t" })
+    end)
+    section = "profession history"; record.skills = Map(source.skills == nil and {} or source.skills, Key, function(row)
+        return Row(row, SKILL_ROW, {})
+    end)
+    section = "death log"; record.deathlog = Sequence(source.deathlog == nil and {} or source.deathlog, ns.DEATH_LOG_CAP or 500, function(row)
+        return Row(row, DEATH_ROW, { "t" })
     end)
     section = "goals"; record.goals = Sequence(source.goals == nil and {} or source.goals, ns.GOAL_CAP or 20, function(row)
         return Row(row, GOAL_ROW, { "id", "target" })
