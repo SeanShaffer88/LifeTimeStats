@@ -11,7 +11,7 @@ local HEADER_H, SIDEBAR_W, FOOTER_H, PAD = 44, 176, 24, 10
 local CW = WIN_W - SIDEBAR_W - PAD * 2           -- content width  (944)
 local CH = WIN_H - HEADER_H - FOOTER_H - PAD * 2 -- content height (652)
 local KPI_H, GAP = 72, 10
-local NAV_STEP = 31
+local NAV_STEP = 29 -- 18 pages still leave room for the 7-row Today box
 local KPI_W = (CW - GAP * 3) / 4
 local BODY_Y = KPI_H + GAP                        -- y where panels start (82)
 local BODY_H = CH - BODY_Y                        -- 570
@@ -1765,7 +1765,7 @@ function ns.RefreshWindow()
             Int(d.deaths or 0), Int(d.quests_done or 0), Time(d.time_online or 0) }
         for i, fs in ipairs(win.today) do fs:SetText(vals[i]) end
     end
-    win.level:SetText(string.format("%s · Level %d%s", UnitClass("player") or "", UnitLevel("player") or 0,
+    win.level:SetText(string.format("Level %d%s", UnitLevel("player") or 0,
         ns.Score and ("  ·  " .. ns.FormatInt((ns.Score(ns.char))) .. " pts") or ""))
 end
 
@@ -1864,7 +1864,7 @@ local function CreateWindow()
     ring:SetSize(36, 36); ring:SetPoint("CENTER", portrait); ring:SetTexture(W.MEDIA .. "dot"); ring:SetVertexColor(T.amber[1], T.amber[2], T.amber[3]); ring:SetDrawLayer("BACKGROUND")
     local name = W.Text(head, 13, T.text, nil, "RIGHT"); name:SetPoint("BOTTOMRIGHT", portrait, "LEFT", -8, 1); name:SetText(UnitName("player") or "")
     win.nameText = name
-    win.level = W.Text(head, 10, T.dim, nil, "RIGHT"); win.level:SetPoint("TOPRIGHT", portrait, "LEFT", -8, -1)
+    win.level = W.Text(head, 10, T.dim, nil, "RIGHT"); win.level:SetPoint("TOPRIGHT", portrait, "LEFT", -8, -1); win.level:SetWidth(136)
 
     local gear = W.FlatButton(head, "Settings", 66, 24, nil, "Open LifeTimeStats settings.")
     gear:SetPoint("RIGHT", portrait, "LEFT", -150, 0)

@@ -126,6 +126,16 @@ ns.db.chars["Forever-Alt"] = { meta = { rev = 1, name = "Altie", realm = "Foreve
     c = { played_server = 7200 }, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {},
     runlog = {}, bestiary = {}, people = { Thrall = { f = 10, l = 20, n = 4, t = 600, cls = "SHAMAN" } },
     snap = { t = 50, level = 12, gold = 1234, played = 7200, class = "MAGE", className = "Mage" } }
+ns.db.chars["Forever-Hex"] = { meta = { rev = 1, name = "Hex", realm = "Forever", class = "WARLOCK", level = 7, created = 1 },
+    c = { played_server = 600 }, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {} }
+local allRows = ns.RosterRows({ section = "all" })
+local hexRow
+for _, row in ipairs(allRows) do if type(row[2]) == "string" and row[2]:find("^Hex") then hexRow = row end end
+eq(hexRow[4], "—", "no snapshot yet: gold is a dash, not 0c")
+eq(hexRow[5]:find("log in to update", 1, true) ~= nil, true, "no snapshot yet: says to log in")
+eq(hexRow[2]:find("Warlock", 1, true) ~= nil, true, "class file name shown as a class name")
+eq(ns.RosterTotals().unseen, 1, "one character without a snapshot")
+ns.db.chars["Forever-Hex"] = nil
 local totals = ns.RosterTotals()
 eq(totals.chars, 2, "two characters")
 eq(totals.gold, state.money + 1234, "account gold")

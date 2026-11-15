@@ -147,10 +147,11 @@ end
 
 -- Account totals over every character's snapshot.
 function ns.RosterTotals()
-    local t = { chars = 0, gold = 0, played = 0, levels = 0, rested = 0, maxLevel = 0 }
+    local t = { chars = 0, gold = 0, played = 0, levels = 0, rested = 0, maxLevel = 0, unseen = 0 }
     for _, c in ipairs(ns.RosterCharacters()) do
         t.chars = t.chars + 1
         t.gold = t.gold + (c.snap.gold or 0)
+        if not c.snap.t then t.unseen = t.unseen + 1 end
         t.played = t.played + (c.snap.played or c.rec.c.played_server or 0)
         local lvl = c.snap.level or c.rec.meta.level or 0
         t.levels = t.levels + lvl

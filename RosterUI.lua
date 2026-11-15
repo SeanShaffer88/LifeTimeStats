@@ -20,6 +20,13 @@ local function Ago(t)
 end
 ns.RosterAgo = Ago
 
+local function ClassName(file, fallback)
+    if type(fallback) == "string" and fallback ~= "" and fallback ~= file then return fallback end
+    if type(file) ~= "string" or file == "" then return fallback or "" end
+    return (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[file]) or (file:sub(1, 1) .. file:sub(2):lower())
+end
+ns.RosterClassName = ClassName
+
 local function ClassColor(cls)
     local c = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
     if c and c.r then return { c.r, c.g, c.b, 1 } end
@@ -41,14 +48,16 @@ function R.all()
     for i, c in ipairs(list) do
         local s = c.snap
         local played = s.played or c.rec.c.played_server or 0
-        rows[#rows + 1] = { tostring(i), c.name .. "  " .. DIM .. "level " .. (s.level or c.rec.meta.level or "?") .. " " .. (s.className or c.rec.meta.class or "") .. "|r",
-            most > 0 and played / most or 0, Money(s.gold or 0),
-            Time(played) .. " played · " .. (s.ilvl and ("ilvl " .. s.ilvl .. " · ") or "") .. Ago(s.t),
+        local seen = s.t ~= nil
+        rows[#rows + 1] = { tostring(i), c.name .. "  " .. DIM .. (s.level or c.rec.meta.level or "?") .. " " .. ClassName(s.class or c.rec.meta.class, s.className) .. "|r",
+            most > 0 and played / most or 0, seen and Money(s.gold or 0) or "—",
+            Time(played) .. (s.ilvl and (" · ilvl " .. s.ilvl) or "") .. " · " .. (seen and Ago(s.t) or "log in to update"),
             key = c.key, tip = (c.realm or "") .. (s.zone and ("\nLast seen in " .. s.zone) or "") .. (s.guild and ("\n<" .. s.guild .. ">") or "") }
     end
     local t = ns.RosterTotals()
     rows[#rows + 1] = { "", "|cffffb238ACCOUNT|r", nil, Money(t.gold),
-        Time(t.played) .. " played · " .. Int(t.chars) .. " characters · " .. Int(t.levels) .. " levels", head = true }
+        Time(t.played) .. " · " .. Int(t.chars) .. " characters · " .. Int(t.levels) .. " levels", head = true,
+        tip = t.unseen > 0 and (Int(t.unseen) .. " character" .. (t.unseen == 1 and " has" or "s have") .. " not logged in since 1.17, so their gold is not in this total yet.") or nil }
     return rows
 end
 
@@ -61,7 +70,8 @@ function R.char(key)
     local function Head(text) rows[#rows + 1] = { "", "|cffffb238" .. text:upper() .. "|r", nil, "", "", head = true } end
     rows[#rows + 1] = { "", (meta.name or key) .. (meta.realm and ("  " .. DIM .. meta.realm .. "|r") or ""), nil, "", Ago(s.t), head = true }
     Rw("Level", tostring(s.level or meta.level or "?"), (s.xp and s.xpMax and s.xpMax > 0) and string.format("%.0f%% to next", s.xp * 100 / s.xpMax) or "")
-    Rw("Race and class", "", ((s.race or "") .. " " .. (s.className or meta.class or "")):gsub("^%s+", ""))
+    if not s.t then Rw("Snapshot", "", "Log in with this character to fill in this page") end
+    Rw("Race and class", "", ((s.race or "") .. " " .. ClassName(s.class or meta.class, s.className)):gsub("^%s+", ""))
     Rw("Title", "", s.title or s.titleLTS or "—")
     Rw("Guild", "", s.guild and (s.guild .. (s.guildRank and (" · " .. s.guildRank) or "")) or "—")
     Rw("Gold", Money(s.gold or 0))
@@ -169,14 +179,14 @@ function ns.BuildRosterPage(env)
     p.state = state
     ns.rosterPage = p
     local lc = env.Panel(p, "Characters", "person", 0, 0, lw, env.CH, "Every character on this account, kept on this computer only.")
-    p.nav = W.Table(lc.body, lc.bw, lc.bh, { { "CHARACTER", 190, kind = "text" }, { "", 0, kind = "dim" } }, function(d)
+    p.nav = W.Table(lc.body, lc.bw, lc.bh, { { "CHARACTER", 172, kind = "text" }, { "", 0, kind = "dim" } }, function(d)
         state.section, state.key = d.section, d.key
         ns.RefreshWindow()
     end)
     local rc = env.Panel(p, "All characters", "person", lw + env.GAP, 0, env.CW - lw - env.GAP, env.CH)
     p.title = rc.title
     p.list = W.Table(rc.body, rc.bw, rc.bh, {
-        { "#", 36, kind = "dim" }, { "ENTRY", 290, kind = "text" }, { "", 110, kind = "bar" }, { "VALUE", 130, kind = "num" }, { "DETAIL", 0, kind = "dim" },
+        { "#", 32, kind = "dim" }, { "ENTRY", 236, kind = "text" }, { "", 80, kind = "bar" }, { "VALUE", 112, kind = "num" }, { "DETAIL", 0, kind = "dim" },
     }, function(d)
         if d.back then state.section, state.key = d.back, nil
         elseif d.key then state.section, state.key = "char", d.key

@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.17.0-forever
+# Audit - LifeTimeStats 1.17.1-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,14 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.17.1
+- In game (1.17.0, 4 screenshots and `/lts debug`):
+  - The Characters page opens and lists 3 characters. /played (5h 12m) matches the game's /played.
+  - Wealth shows the new loot-value and per-hour rows. Most bag slots is 38. Adventurer's Life renders.
+  - `/lts errors`: none recorded. Damage meter readable. Speed readable. Hit sizes and player health hidden, as known.
+  - Layout defects found there are fixed in this release.
+- Still to check in client: loot value after new loot (no loot messages yet in that session), professions and lockouts on a character page, the people log in a group, and Adventure Guide boss pages after a dungeon.
 
 ## 1.17.0
 - Verified (offline): new `tests/roster.py` (47 assertions) covers:
