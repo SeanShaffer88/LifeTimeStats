@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.16.0-forever
+# Audit - LifeTimeStats 1.17.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,19 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.17.0
+- Verified (offline): new `tests/roster.py` (47 assertions) covers:
+  - the snapshot: race, class, guild, gold, rested XP, hearthstone, professions, lockouts, bag space and best reputation;
+  - gold updates on PLAYER_MONEY;
+  - the people log: joins counted once per grouping, grouped seconds, rejoining, and the account merge;
+  - vendor value of loot and unpriced loot;
+  - session farming fields and the best gold-per-hour record;
+  - every Characters section and character page;
+  - the LTS3 round trip of the people log and the new session fields.
+- Bug caught by those tests and fixed: `GetProfessions` can return nil for a middle slot, which would have stopped the profession scan early.
+- Every new client call is in the captured Forever API dump: `GetProfessions`, `GetProfessionInfo`, `GetSavedInstanceInfo`, `GetXPExhaustion`, `GetGuildInfo`, `UnitRace`, `GetCurrentTitle`, `GetTitleName`, `C_Container.GetContainerNumFreeSlots`, `C_Reputation.*`, `C_Item.GetItemInfo` and `RAID_CLASS_COLORS`. The globals check still passes.
+- Unverified (in client): the sell price index of `C_Item.GetItemInfo` on Forever (11th return, as on Retail), whether profession ranks are readable and not secret, lockout reset seconds, class and level of party members out of range, and the sidebar Today box, which now has 5 rows with 18 pages.
 
 ## 1.16.0
 - Research instead of in-game checks (2026-11-15):

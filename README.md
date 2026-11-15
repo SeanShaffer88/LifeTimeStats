@@ -7,7 +7,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 888 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
+- **Tracks:** 903 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
 ![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.16.0 prerelease archive, `LifeTimeStats-1.16.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.17.0 prerelease archive, `LifeTimeStats-1.17.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -121,6 +121,17 @@ Boss rosters for the nine Forever dungeons and the Forever encounter IDs come fr
 
 Everything here is also counted as statistics and top lists (boss wipes, kills by group size, boss loot by quality, kills by creature type and classification, deaths by hour and by level, and more). Tracking starts with 1.15.0, so nothing earlier is backfilled.
 
+## Characters (key R)
+
+Every character on this account in one place, kept on this computer only.
+
+- **All characters**: level, class, gold, /played, item level and when you last played, with account totals.
+- **One page per character**: race and class, title, guild and rank, gold, /played, rested XP, where you logged out, hearthstone, item level, bag space, best reputation, Adventurer score, professions with skill levels, and saved instances with time to reset. The page is refreshed every minute while you play that character.
+- **People**: everyone who was in your group, with time grouped, how often they joined, first and last time, class and level. Account scope merges your characters.
+- **Farming sessions**: your play sessions ranked by net gold per active hour, with XP, kills and the vendor value of your loot per hour.
+
+New statistics: vendor value of your loot (by quality), the most valuable single loot, best gold, loot value, XP and kills per hour, and players grouped with.
+
 ## Export everything
 
 `/lts export` opens every statistic, fastest time, unique count, first and top list for every character, plus the account total, as CSV. Values are raw numbers: times in seconds, money in copper, distances in yards, firsts as Unix time. The Timeline page has a **Days / Months** switch; Months shows the last 12 months from the monthly totals.
@@ -145,7 +156,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.16.0-forever.zip`.
+1. Download `LifeTimeStats-1.17.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -218,8 +229,8 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 LifeTimeStats/
   LifeTimeStats.toc
   Core.lua  Themes.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Life.lua  Story.lua
-  Meter.lua  Chronicle.lua  Dungeons.lua  Guide.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
-  UI.lua  GuideUI.lua  Options.lua  Expanded.lua
+  Meter.lua  Chronicle.lua  Dungeons.lua  Guide.lua  Roster.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
+  UI.lua  GuideUI.lua  RosterUI.lua  Options.lua  Expanded.lua
   Media/icon.tga  Media/dot.tga  Media/icons/*.tga  icon.png  logo.png
   README.md  CHANGELOG.md  DESCRIPTION.md  AUDIT.md  CREDITS.md  LICENSE
 ```

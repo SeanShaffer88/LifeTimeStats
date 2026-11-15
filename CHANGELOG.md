@@ -2,6 +2,26 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.17.0-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
+
+### Added
+- **Characters** page (key R), with ideas from Exlist, Warbandeer: Characters, PlayerTracker and Haul (public descriptions only):
+  - **All characters**: level, class, gold, /played, item level, last seen, and account totals.
+  - **A page for each character**: race, class, title, guild and rank, gold, /played, rested XP, last zone, hearthstone, item level, bag space, best reputation, score, professions, and saved instances with time to reset. It is refreshed every minute and at logout.
+  - **People**: a local log of the players who were in your group, with time grouped, times joined, first and last time, class, level and the zone where you met. It holds up to 2,000 players per character.
+  - **Farming sessions**: sessions ranked by net gold per active hour, with XP, kills and loot value per hour.
+- 15 statistics:
+  - vendor value of loot, in total and by quality;
+  - the most valuable single loot;
+  - items without a known price;
+  - best gold, loot value, XP and kills per hour (sessions with 10+ active minutes);
+  - most bag slots;
+  - players grouped with, and times a player joined your group.
+- The session log records net gold, gold earned, loot value and items looted.
+- Full text backups (LTS3) include the people log and the new session fields. Snapshots are rebuilt at login and are not backed up.
+
 ## [1.16.0-forever] - 2026-11-15
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.

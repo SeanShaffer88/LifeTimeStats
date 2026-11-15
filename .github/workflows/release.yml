@@ -35,6 +35,8 @@ jobs:
         run: python tests/guide.py
       - name: Verify trends, export, compartment and globals
         run: python tests/compendium.py
+      - name: Verify the Characters page
+        run: python tests/roster.py
       - name: Verify release packaging
         run: python tests/package_release.py
 
