@@ -448,22 +448,29 @@ function ns.Add(key, n)
     end
 end
 
+-- ns.quietRecords: the value still updates, but no history entry or Journal moment is made.
+-- Used while a running interval grows, so one long stretch is one record, not one every 10 s.
 function ns.Max(key, v, label)
     if not ns.char or ns.IsSecret(v) or Bad(v) then return end
     if ns.IsSecret(label) then label = nil end
     local r = ns.char.r
+    local improved = false
     if v > (r[key] or 0) then
         r[key] = v
+        improved = true
         if label then r[key .. "_what"] = tostring(label) end
-        local event = ns.AddRecordHistory(ns.char, key, v, label, "max")
-        if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
+        if not ns.quietRecords then
+            local event = ns.AddRecordHistory(ns.char, key, v, label, "max")
+            if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
+        end
     end
     local s = ns.session.r
     if v > (s[key] or 0) then
         s[key] = v
         if label then s[key .. "_what"] = tostring(label) end
-        ns.AddRecordHistory(ns.session, key, v, label, "max")
+        if not ns.quietRecords then ns.AddRecordHistory(ns.session, key, v, label, "max") end
     end
+    return improved
 end
 
 -- Fastest / shortest records: lower is better.
@@ -815,9 +822,19 @@ SlashCmdList.LIFETIMESTATS = function(msg)
     elseif cmd == "settings" or cmd == "options" or cmd == "config" then
         ns.OpenOptions()
     elseif cmd == "minimap" then
-        ns.settings.minimap.hide = not ns.settings.minimap.hide
-        ns.UpdateMinimapButton()
-        ns.Print("Minimap button " .. (ns.settings.minimap.hide and "hidden" or "shown") .. ".")
+        local arg = msg:match("^%S+%s+(%S+)")
+        if arg == "reset" then
+            ns.ResetMinimapButton()
+            ns.Print("Minimap button shown again at the bottom-left of the minimap.")
+        elseif arg == "square" or arg == "round" then
+            ns.settings.minimap.square = arg == "square"
+            ns.UpdateMinimapButton()
+            ns.Print("Minimap button placed for a " .. arg .. " minimap.")
+        else
+            ns.settings.minimap.hide = not ns.settings.minimap.hide
+            ns.UpdateMinimapButton()
+            ns.Print("Minimap button " .. (ns.settings.minimap.hide and "hidden" or "shown") .. ". /lts minimap reset brings it back; /lts minimap square or round sets the shape.")
+        end
     elseif cmd == "share" then
         ns.ShareCommand(msg:match("^share%s*(.*)$"))
     elseif cmd == "compare" then
@@ -860,7 +877,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("/lts - open or close the window")
         ns.Print("/lts summary - print a few headline stats")
         ns.Print("/lts settings - open settings")
-        ns.Print("/lts minimap - show/hide minimap button")
+        ns.Print("/lts minimap - show/hide minimap button · /lts minimap reset · /lts minimap square|round")
         ns.Print("/lts session - reset session counters")
         ns.Print("/lts export | import - backup or restore this character")
         ns.Print("/lts share [s|p|r|g|i] [topic] - share a stat line (no channel = preview first)")

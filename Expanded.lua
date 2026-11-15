@@ -60,17 +60,73 @@ local measured = {
     { "casting", "Casting", "combat", true, "expandedCasting" },
     { "channeling", "Channeling", "combat", true, "expandedChanneling" },
 }
+-- A record set by a running interval is kept quiet until the interval ends; then one
+-- history entry (and Journal moment) is written for it.
+local function RecordIntervalEnd(key, value, zone)
+    if not ns.char or not value or value <= 0 then return end
+    local event = ns.AddRecordHistory(ns.char, key, value, zone, "max")
+    if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
+    ns.AddRecordHistory(ns.session, key, value, zone, "max")
+end
 local function Observe(key, active, dt, distance)
     local st = contexts[key]
     if not st then st = { seconds = 0, distance = 0 }; contexts[key] = st end
-    if active ~= true then st.seconds, st.distance = 0, 0; return end
+    if active ~= true then
+        if st.recordTime then RecordIntervalEnd("ex_longest_" .. key, st.seconds, st.zone) end
+        if st.recordDist then RecordIntervalEnd("ex_farthest_" .. key, st.distance, st.zone) end
+        st.seconds, st.distance, st.recordTime, st.recordDist = 0, 0, nil, nil
+        return
+    end
     st.seconds = st.seconds + dt
     st.distance = st.distance + (distance or 0)
     Add("ex_time_" .. key, dt)
     if distance and distance > 0 then Add("ex_dist_" .. key, distance) end
-    Max("ex_longest_" .. key, st.seconds, Zone())
-    if distance then Max("ex_farthest_" .. key, st.distance, Zone()) end
+    st.zone = st.zone or Zone()
+    ns.quietRecords = true
+    local okT, newTime = pcall(Max, "ex_longest_" .. key, st.seconds, st.zone)
+    local okD, newDist = true, nil
+    if distance then okD, newDist = pcall(Max, "ex_farthest_" .. key, st.distance, st.zone) end
+    ns.quietRecords = false
+    if okT and newTime then st.recordTime = true end
+    if okD and newDist then st.recordDist = true end
 end
+ns.ObserveInterval = Observe
+
+-- 1.18.2: earlier versions wrote a record every 10 s while an interval kept growing.
+-- Keep only the last entry of each run (same record, consecutive, within 2 minutes).
+local function RepairRecordSpam()
+    local ch = ns.char
+    if not ch then return end
+    ch.meta.repairs = ch.meta.repairs or {}
+    if ch.meta.repairs.recordSpam then return end
+    ch.meta.repairs.recordSpam = true
+    local function IsInterval(k) return type(k) == "string" and (k:match("^ex_longest_") or k:match("^ex_farthest_")) end
+    local rh, kept = ch.rh or {}, {}
+    for i, e in ipairs(rh) do
+        local nextE = rh[i + 1]
+        local dup = type(e) == "table" and IsInterval(e.k) and type(nextE) == "table" and nextE.k == e.k
+            and type(e.at) == "number" and type(nextE.at) == "number" and nextE.at - e.at <= 120
+        if not dup then kept[#kept + 1] = e end
+    end
+    ch.rh = kept
+    local journal, out = ch.journal or {}, {}
+    local function Title(e)
+        local text = type(e) == "table" and type(e[2]) == "string" and e[2]
+        return text and text:match("^New personal record: (Longest observed interval: .-) —")
+            or text and text:match("^New personal record: (Farthest observed .-) —")
+    end
+    for i, e in ipairs(journal) do
+        local t, nextE = Title(e), journal[i + 1]
+        local dup = t and nextE and Title(nextE) == t and type(e[1]) == "number" and type(nextE[1]) == "number"
+            and nextE[1] - e[1] <= 120 and not e.note
+        if not dup then out[#out + 1] = e end
+    end
+    ch.journal = out
+end
+ns.RepairRecordSpam = RepairRecordSpam
+ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
+    if isLogin or isReload then pcall(RepairRecordSpam) end
+end)
 
 -- Confirmed ghost intervals, rather than button clicks or time spent offline.
 -- Persistent progress survives /reload. A login already in ghost form is a

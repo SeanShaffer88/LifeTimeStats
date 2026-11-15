@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.18.1-forever
+# Audit - LifeTimeStats 1.18.2-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,20 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.18.2
+- In game (1.18.1, 16 screenshots):
+  - Every page renders. The Characters page is left-aligned with labelled columns. Hex's snapshot and Troll model load.
+  - The minimap button sat inside a square minimap. The Journal had a stationary-interval record every 10 s (55 entries in about 3 days).
+  - `/lts errors`: none.
+- Verified (offline): new `tests/minimap.py` (32 assertions) covers:
+  - round and square placement maths, corner shapes, and the reset, hide, square and round commands;
+  - LibDBIcon registration, click and tooltip, with the own button not created;
+  - the one-time record-spam repair of the Journal and history;
+  - a long stationary stretch writing no Journal entry while it lasts.
+
+  The expanded suite now checks one record when an interval ends instead of six milestones during it.
+- Unverified (in client): `GetMinimapShape` from the user's minimap addon, and LibDBIcon presence and behaviour with Leatrix Plus.
 
 ## 1.18.1
 - In game (1.18.0 screenshot): PlayerModel `SetUnit("player")` shows the character, framed well. `GetClassAtlas` crests load for Druid, Mage and Warlock. Cards, the fact grid and the details table render. A FontString with a width set defaults to centered text, so the hero and card texts now set LEFT explicitly.

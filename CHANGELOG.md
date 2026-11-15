@@ -2,6 +2,18 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.18.2-forever] - 2026-11-15
+
+From in-game screenshots of 1.18.1.
+
+### Fixed
+- Minimap button on square minimaps: it was placed on a circle, so on a square minimap it sat over the map near the bottom-left corner and was easy to miss. It now follows the shape your minimap addon reports (`GetMinimapShape`, as used by Leatrix Plus, ElvUI, SexyMap and others) and sits on the edge. The icon is a little larger and round.
+- The Journal got a "New personal record: Longest observed interval: stationary" entry every 10 seconds while you stood still. The same happened for any interval that kept growing. A running interval now records quietly and writes one entry when it ends. Duplicates already saved are cleaned up once at login (same record, back to back, within 2 minutes; entries with notes are kept). The personal-best history is cleaned the same way.
+
+### Added
+- With LibDataBroker and LibDBIcon loaded (bundled by Leatrix Plus, ElvUI, Titan Panel and many minimap-button bags), LifeTimeStats registers as a launcher, so those addons can place, hide or collect its button. Nothing is bundled here.
+- `/lts minimap reset` shows the button again at the bottom-left. `/lts minimap square` and `/lts minimap round` set the shape when no minimap addon reports one.
+
 ## [1.18.1-forever] - 2026-11-15
 
 From an in-game screenshot of 1.18.0. The 3D model and the class crests (`GetClassAtlas`) work on Forever.
