@@ -274,23 +274,23 @@ function ns.BuildRosterPage(env)
     crestNote:SetText("Log in with this character to see more here")
     p.crestNote = crestNote
     local x0 = 228
-    p.nameText = W.Text(hv, 22, T.text); p.nameText:SetPoint("TOPLEFT", x0, -2)
-    p.line1 = W.Text(hv, 13, T.text); p.line1:SetPoint("TOPLEFT", x0, -32)
-    p.line2 = W.Text(hv, 11, T.dim); p.line2:SetPoint("TOPLEFT", x0, -52)
-    p.line3 = W.Text(hv, 11, T.dim); p.line3:SetPoint("TOPLEFT", x0, -68); p.line3:SetWidth(LW - x0 - 30)
+    p.nameText = W.Text(hv, 22, T.text, nil, "LEFT"); p.nameText:SetPoint("TOPLEFT", x0, -2)
+    p.line1 = W.Text(hv, 13, T.text, nil, "LEFT"); p.line1:SetPoint("TOPLEFT", x0, -32)
+    p.line2 = W.Text(hv, 11, T.dim, nil, "LEFT"); p.line2:SetPoint("TOPLEFT", x0, -52)
+    p.line3 = W.Text(hv, 11, T.dim, nil, "LEFT"); p.line3:SetPoint("TOPLEFT", x0, -68); p.line3:SetWidth(LW - x0 - 30)
     p.facts = {}
     local colW = (LW - 20 - x0) / 2
     for i = 1, 10 do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-        local lbl = W.Text(hv, 10, T.dim); lbl:SetPoint("TOPLEFT", x0 + col * colW, -98 - row * 34)
-        local val = W.Text(hv, 13, T.amber, W.NUM); val:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -2); val:SetWidth(colW - 10)
+        local lbl = W.Text(hv, 10, T.dim, nil, "LEFT"); lbl:SetPoint("TOPLEFT", x0 + col * colW, -98 - row * 34)
+        local val = W.Text(hv, 13, T.amber, W.NUM, "LEFT"); val:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -2); val:SetWidth(colW - 10)
         p.facts[i] = { lbl, val }
     end
     local detailY = 282
     local dh = CreateFrame("Frame", nil, hv)
     dh:SetPoint("TOPLEFT", hv, "TOPLEFT", 0, -detailY); dh:SetSize(hero.bw, hero.bh - detailY)
     p.details = W.Table(dh, hero.bw, hero.bh - detailY, {
-        { "#", 30, kind = "dim" }, { "", 250, kind = "text" }, { "", 110, kind = "bar" }, { "", 110, kind = "num" }, { "", 0, kind = "dim" },
+        { "#", 30, kind = "dim" }, { "ENTRY", 250, kind = "text" }, { "", 110, kind = "bar" }, { "VALUE", 110, kind = "num" }, { "DETAIL", 0, kind = "dim" },
     }, nil, "Nothing recorded yet.")
 
     -- People / Farming fill the left side instead
@@ -311,9 +311,9 @@ function ns.BuildRosterPage(env)
         b.bg = W.Fill(b, T.tileHi, "BACKGROUND"); b.bg:SetAllPoints()
         b.sel = W.Fill(b, T.amber, "BORDER"); b.sel:SetPoint("TOPLEFT"); b.sel:SetPoint("BOTTOMLEFT"); b.sel:SetWidth(3)
         b.icon = b:CreateTexture(nil, "ARTWORK"); b.icon:SetSize(40, 40); b.icon:SetPoint("LEFT", 10, 0)
-        b.name = W.Text(b, 14, T.text); b.name:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 10, 0)
-        b.info = W.Text(b, 11, T.text); b.info:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -2)
-        b.zone = W.Text(b, 10, T.dim); b.zone:SetPoint("TOPLEFT", b.info, "BOTTOMLEFT", 0, -2); b.zone:SetWidth(side.bw - 70)
+        b.name = W.Text(b, 14, T.text, nil, "LEFT"); b.name:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 10, 0)
+        b.info = W.Text(b, 11, T.text, nil, "LEFT"); b.info:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -2)
+        b.zone = W.Text(b, 10, T.dim, nil, "LEFT"); b.zone:SetPoint("TOPLEFT", b.info, "BOTTOMLEFT", 0, -2); b.zone:SetWidth(side.bw - 70)
         b:SetScript("OnClick", function(self)
             if not self.key then return end
             state.section, state.key = "char", self.key
