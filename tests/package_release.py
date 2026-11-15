@@ -5,7 +5,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "package_release.py"
+REPO = Path(__file__).resolve().parents[1]
+SCRIPT = REPO / "scripts" / "package_release.py"
 SPEC = importlib.util.spec_from_file_location("package_release", SCRIPT)
 package = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(package)
@@ -26,7 +27,7 @@ with tempfile.TemporaryDirectory() as temporary:
     (root / "Core.lua").write_text("return true\n", encoding="utf-8")
     (root / "Expanded.lua").write_text("return false\n", encoding="utf-8")
     (root / "LICENSE").write_text("GPL-3.0-or-later\n", encoding="utf-8")
-    (root / "README.md").write_text("release fixture\n", encoding="utf-8")
+    (root / "README.md").write_bytes(b"release fixture\n")
     (root / "CHANGELOG.md").write_text(
         "## [1.13.0-forever] - 2026-11-11\n\n### Added\n- fixture\n\n## [1.12.2-forever]\n",
         encoding="utf-8",
@@ -75,4 +76,23 @@ with tempfile.TemporaryDirectory() as temporary:
     )
     expect_error(lambda: package.build(root, dist, "v1.13.0-forever"), "files missing from the package")
 
-print("PACKAGE PASS: deterministic archive, manifest coverage, exclusions and SHA-256 verified")
+    # Package the actual checkout on pull requests and main, too.
+    version = package.version_from_toc(REPO)
+    archive, checksum, notes = package.build(REPO, Path(temporary) / "checkout-dist", f"v{version}-forever")
+    assert archive.name == f"LifeTimeStats-{version}-forever.zip"
+    assert checksum.read_text(encoding="ascii").split() == [
+        hashlib.sha256(archive.read_bytes()).hexdigest(), archive.name
+    ]
+    assert notes.read_text(encoding="utf-8").startswith(f"# LifeTimeStats {version}-forever\n")
+    with zipfile.ZipFile(archive) as zf:
+        assert zf.testzip() is None
+        names = zf.namelist()
+        assert len(names) == len(set(names)) and all(name.startswith("LifeTimeStats/") for name in names)
+        source_toc = (REPO / "LifeTimeStats.toc").read_bytes()
+        assert zf.read("LifeTimeStats/LifeTimeStats.toc") == source_toc
+        for line in source_toc.decode("utf-8").splitlines():
+            reference = line.strip().replace("\\", "/")
+            if reference and not reference.startswith("#"):
+                assert zf.read(f"LifeTimeStats/{reference}") == (REPO / reference).read_bytes()
+
+print("PACKAGE PASS: deterministic fixture, actual checkout layout, TOC references and SHA-256 verified")
