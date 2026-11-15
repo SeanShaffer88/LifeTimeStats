@@ -110,7 +110,9 @@ function ns.TakeSnapshot()
             snap.title = nil
         end
     end
-    snap.titleLTS = ns.TitledName and Str(ns.TitledName()) or nil
+    -- Only a real LifeTimeStats title, not the plain name TitledName falls back to.
+    local titled = ns.TitledName and Str(ns.TitledName())
+    snap.titleLTS = (titled and titled ~= UnitName("player")) and titled or nil
     snap.profs = Professions()
     snap.locks = Lockouts()
     snap.rep = BestReputation() or snap.rep

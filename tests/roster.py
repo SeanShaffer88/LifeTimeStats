@@ -149,6 +149,37 @@ for _, c in ipairs(ns.RosterCharacters()) do
     local rows = ns.RosterRows(p.state)
     eq(rows[1].back, "all", "character page back row " .. c.key)
 end
+-- character-select layout: cards on the right, the chosen character on the left
+p.state.section, p.state.key = "char", ns.charKey
+p.force = true; ns.RefreshWindow()
+eq(p.cards[1].key, ns.charKey, "newest login is the first card")
+eq(p.cards[1].selected, true, "your card is selected")
+eq(p.cards[2].key, "Forever-Alt", "alt card")
+eq(p.cards[2].name.text, "Altie", "alt card name")
+eq(p.cards[2].info.text, "Level 12 Mage", "alt card level and class")
+eq(p.model.shown, true, "your 3D model shows")
+eq(p.crest.shown, false, "no crest for you")
+eq(p.heroView.shown, true, "character view shown")
+eq(p.listView.shown, false, "list view hidden")
+eq(p.nameText.text, "Malikor", "hero name")
+eq(p.line1.text, "Level " .. ch.snap.level .. " Tauren Druid", "hero level, race and class")
+eq(p.facts[3][1].text, "RESTED XP", "fact label")
+eq(p.facts[3][2].text:find("1,500", 1, true) ~= nil, true, "rested XP fact")
+local det = p.details.data
+local heads = {}
+for _, r in ipairs(det) do if r.head then heads[#heads + 1] = r[2] end end
+eq(table.concat(heads, ","):find("PROFESSIONS", 1, true) ~= nil, true, "professions in the details table")
+eq(table.concat(heads, ","):find("LIFETIME", 1, true) ~= nil, true, "lifetime highlights in the details table")
+p.cards[2].scripts.OnClick(p.cards[2])
+eq(p.state.key, "Forever-Alt", "clicking a card selects that character")
+eq(p.model.shown, false, "alts show no model")
+eq(p.crest.shown, true, "alts show their class crest")
+p.peopleBtn.scripts.OnClick(p.peopleBtn)
+eq(p.listView.shown, true, "People replaces the character view")
+eq(p.heroView.shown, false, "character view hidden for People")
+p.farmBtn.scripts.OnClick(p.farmBtn)
+eq(p.state.section, "farming", "Farming button")
+eq(ch.snap.titleLTS, nil, "no title: the plain name is not shown as a title")
 local mine = ns.RosterRows({ section = "char", key = ns.charKey })
 local sawProf, sawLock = false, false
 for _, row in ipairs(mine) do

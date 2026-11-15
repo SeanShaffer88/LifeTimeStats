@@ -2,6 +2,21 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.18.0-forever] - 2026-11-15
+
+From in-game screenshots of 1.17.1.
+
+### Changed
+- The Characters page is laid out like the character select screen:
+  - **Right side:** a card for each character, with class crest, name in class colour, level, class, last zone and how long ago you played it. The newest login is first, and the list scrolls with the mouse wheel. Account totals and **People** / **Farming** buttons sit below the cards.
+  - **Left side:** the chosen character. You see your own 3D model; other characters show their class crest, because the client does not give addons other characters' appearance. Beside it are name, level, race, class, title, guild, last zone and ten key facts (gold, played, rested XP, progress to the next level, item level, bags, hearthstone, reputation, score, counting since). Below is a table of professions, saved instances and lifetime highlights.
+
+### Fixed
+- The character page's title line showed your own name when you had no title.
+
+### Verified in game (1.17.1)
+- Professions (Mining 14/75, Skinning 93/150, Fishing, Cooking), rested XP, hearthstone, bag space, best reputation (Friendly, Darkspear Trolls) and loot value (26c) all read correctly on Forever. The header and the 7-row Today box fit.
+
 ## [1.17.1-forever] - 2026-11-15
 
 From in-game screenshots of 1.17.0 (Druid level 10, three characters, no Lua errors).
