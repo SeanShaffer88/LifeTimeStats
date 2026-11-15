@@ -11,22 +11,19 @@ local SESSION_KEEP = 300
 local function N(v) if type(v) == "number" and not S(v) and v == v then return v end end
 
 -- ------------------------------------------------------------ session history
--- One entry per play session (a /reload continues the same session). Updated every 5 minutes
--- and at logout, so a crash loses at most 5 minutes.
-local function SessionStart()
-    return math.floor(time() - (GetTime() - (ns.session.start or GetTime())))
-end
+-- One entry per session, updated in memory every five minutes and at logout.
+-- WoW writes it with the character's SavedVariables on normal saves.
 function ns.LogSession()
     if not ns.char or not ns.session then return end
     local ch, s = ns.char, ns.session
     ch.sessionlog = ch.sessionlog or {}
     local log = ch.sessionlog
-    local start = SessionStart()
+    local start = s.wallStart
     local dur = math.floor(GetTime() - s.start)
     if dur < 5 then return end
     local e = log[#log]
-    if not (e and math.abs((e.s or 0) - start) < 180) then
-        e = { s = start }
+    if not (e and e.id == s.id) then
+        e = { id = s.id, s = start }
         log[#log + 1] = e
         while #log > SESSION_KEEP do table.remove(log, 1) end
     end

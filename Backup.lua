@@ -27,7 +27,7 @@ end
 local function Val(v)
     if type(v) == "boolean" then return v and "1" or "0" end
     if type(v) == "string" then return "s:" .. Esc(v) end
-    if v == math.floor(v) then return string.format("%d", v) end
+    if v == math.floor(v) then return string.format("%.0f", v) end
     return string.format("%.3f", v)
 end
 
@@ -108,7 +108,40 @@ function ns.Deserialize(str)
     return out, n
 end
 
--- Restore never lowers anything: counters/records/tallies keep the larger number,
+local function MergeHistory(dst, src)
+    local records, seen = {}, {}
+    local function Collect(history, imported)
+        for _, entry in ipairs(history) do
+            if type(entry) == "table" and type(entry.k) == "string" and entry.k ~= ""
+                and not ns.BadNumber(entry.v) and not ns.BadNumber(entry.at)
+                and (entry.d == "max" or entry.d == "min") then
+                -- Use the precision already used by LTS2 so a record's own
+                -- rounded backup value does not become a second milestone.
+                local key = entry.d .. ":" .. Val(entry.at) .. ":" .. Val(entry.v) .. ":" .. entry.k
+                if not seen[key] then
+                    seen[key] = true
+                    records[#records + 1] = { entry = entry, order = #records + 1, imported = imported }
+                end
+            end
+        end
+    end
+    Collect(dst.rh, false)
+    Collect(src.rh or {}, true)
+    table.sort(records, function(a, b)
+        if a.entry.at == b.entry.at then return a.order < b.order end
+        return a.entry.at < b.entry.at
+    end)
+    local latest, changed = {}, 0
+    for i = math.max(1, #records - ns.RECORD_HISTORY_CAP + 1), #records do
+        local record = records[i]
+        latest[#latest + 1] = record.entry
+        if record.imported then changed = changed + 1 end
+    end
+    dst.rh = latest
+    return changed
+end
+
+-- Counters/records/tallies keep the larger number,
 -- unique sets are unioned, fastest times keep the smaller time, firsts keep the earliest.
 function ns.MergeMax(dst, src)
     ns.EnsureRecord(dst)
@@ -134,6 +167,7 @@ function ns.MergeMax(dst, src)
     for set, t in pairs(src.u or {}) do
         dst.u[set] = dst.u[set] or {}
         for k in pairs(t) do
+            k = ns.UniqueKey(k)
             if not dst.u[set][k] then dst.u[set][k] = true; changed = changed + 1 end
         end
     end
@@ -162,22 +196,7 @@ function ns.MergeMax(dst, src)
             if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v end
         end
     end
-    for _, entry in ipairs(src.rh or {}) do
-        if type(entry) == "table" and type(entry.k) == "string" and type(entry.v) == "number"
-            and type(entry.at) == "number" and (entry.d == "max" or entry.d == "min") then
-            local duplicate = false
-            for _, old in ipairs(dst.rh or {}) do
-                if old.k == entry.k and old.v == entry.v and old.at == entry.at and old.d == entry.d then
-                    duplicate = true; break
-                end
-            end
-            if not duplicate then
-                dst.rh[#dst.rh + 1] = { k = entry.k, v = entry.v, at = entry.at, d = entry.d, w = entry.w }
-                if #dst.rh > 200 then table.remove(dst.rh, 1) end
-                changed = changed + 1
-            end
-        end
-    end
+    changed = changed + MergeHistory(dst, src)
     ns.EnsureRecord(dst) -- recount unique sets
     return changed
 end

@@ -133,7 +133,7 @@ local function Swatches(parent)
         f.chips[i] = c
     end
     function f:Show(id)
-        local t = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.odometer
+        local t = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.forever
         local list = { t.bg, t.tile, t.text, t.amber, t.rust }
         for i, c in ipairs(self.chips) do local col = list[i] c:SetBackdropColor(col[1], col[2], col[3], 1) end
     end
@@ -183,20 +183,23 @@ function ns.CreateOptions()
     local sw = Swatches(b); sw:SetPoint("TOPLEFT", 6, -36)
     local reload = Button(b, "Reload now", 90, "Reload the interface to apply the new theme.", function() ReloadUI() end)
     reload:SetPoint("TOPRIGHT", -2, -30); reload:Hide()
-    local function ThemeId() return S.theme == "auto" and ns.DetectUI() or (S.theme or "auto") end
-    local themeCyc = Cycler(b, 160, function() return ns.ThemeName(S.theme or "auto") end, function(dir)
+    local function ThemeId()
+        local theme = S.theme or "auto"
+        return theme == "auto" and ns.DetectUI() or theme
+    end
+    local themeCyc = Cycler(b, 174, function() return ns.ThemeName(S.theme or "auto") end, function(dir)
         local i = 1
         for k, id in ipairs(ns.THEME_ORDER) do if id == (S.theme or "auto") then i = k end end
         S.theme = ns.THEME_ORDER[(i - 1 + dir) % #ns.THEME_ORDER + 1]
         sw:Show(ThemeId()); reload:SetShown(ThemeId() ~= ns.themeId or S.theme ~= ns.themeChosen)
     end, { "Theme", function()
-        local t = ns.THEME_BY_ID[ThemeId()] or ns.THEME_BY_ID.odometer
-        return "Auto matches the UI addon you run (EllesmereUI, ElvUI or Tukui), else Odometer.\n\n" .. t.name .. ": " .. t.desc
+        local t = ns.THEME_BY_ID[ThemeId()] or ns.THEME_BY_ID.forever
+        return "Auto follows EllesmereUI, ElvUI or Tukui when loaded. On the stock UI, Auto uses Forever Journal.\n\n" .. t.name .. " — " .. t.desc
     end })
     themeCyc:SetPoint("TOPRIGHT", -2, -2)
     sw:Show(ThemeId())
     ns.themeChosen = S.theme
-    Track(Toggle(b, 0, 56, ap.bw, "Class colour accent", "Tint numbers, borders and charts with your class colour. After /reload.",
+    Track(Toggle(b, 0, 56, ap.bw, "Class colour accent", "Use your class colour for numbers and charts. Applies after /reload.",
         function() return S.classColor end, function(v) S.classColor = v; reload:Show() end))
     RowLabel(b, 0, 98, "Window scale")
     local sl = FlatSlider(b, 130, 0.6, 1.6, 0.05, function() return S.window.scale or 1 end,

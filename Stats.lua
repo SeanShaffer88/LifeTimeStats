@@ -685,12 +685,15 @@ ns.LISTS = {
           local rows = {}
           for i, d in ipairs(ns.DUNGEONS or {}) do
               local found, total = ns.DungeonProgress(d, v)
-              local clears = (v.t.dungeonclears or {})[d.name] or 0
+              local clears = not d.learn and (v.t.dungeonclears or {})[d.name] or 0
               local runs = (v.t.dungeonruns or {})[d.name] or 0
-              local fast = v.f and v.f["clear:" .. d.key]
+              local fast = not d.learn and v.f and v.f["clear:" .. d.key]
               local tag = (d.raid and "raid " or "") .. d.min .. (d.max ~= d.min and ("-" .. d.max) or "") .. (d.new and " · new" or "")
               local extra = runs > 0 and (Int(runs) .. " run" .. (runs == 1 and "" or "s") .. (clears > 0 and (" · " .. Int(clears) .. " clear" .. (clears == 1 and "" or "s")) or "") .. (fast and (" · best " .. Time(type(fast) == "table" and fast.v or fast)) or "")) or ""
-              rows[#rows + 1] = { tostring(i), d.name .. "  |cff8a8a8a" .. tag .. "|r", total > 0 and found / total or 0, found .. " / " .. total, extra }
+              local progress = d.learn and (found .. " known") or (found .. " / " .. total)
+              if d.learn then extra = extra == "" and "Roster incomplete" or (extra .. " · roster incomplete") end
+              rows[#rows + 1] = { tostring(i), d.name .. "  |cff8a8a8a" .. tag .. "|r",
+                  not d.learn and total > 0 and found / total or 0, progress, extra }
           end
           return rows
       end },

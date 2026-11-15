@@ -34,10 +34,10 @@ Put two characters side by side (or one against all of them) across every stat, 
 Times you got drunk (and completely smashed), campfires lit, nights camped under the stars vs at the inn, hearthstones collected and every inn you have called home, books read, potions drunk, mounts ridden, time spent naked. A journal that writes your story as you play, life per level, a travel log, and titles to show off.
 
 ## The window
-Dashboard with odometer counters and charts, sixteen pages, search, Lifetime / Session / Today, this character or all characters, 30-day timeline.
+The Forever Journal theme uses Warcraft-style trim, ledger counters and dated journal entries. Browse sixteen pages, search your stats and switch between characters or time ranges.
 
 ## Safe with your data
-Stored twice so one lost SavedVariables file cannot wipe your history, plus a text backup. Restoring never lowers anything. Nothing is ever sent anywhere.
+LifeTimeStats stores data locally in account and character SavedVariables. Text backup covers character statistics and personal-best history. Journal entries and play-session history stay in SavedVariables. Share posts to your selected WoW chat channel when you send it.
 
 ## Commands
 | Command | |
@@ -50,6 +50,6 @@ Stored twice so one lost SavedVariables file cannot wipe your history, plus a te
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip so the folder is `World of Warcraft\_classic_beta_\Interface\AddOns\LifeTimeStats`.
+Unzip so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.

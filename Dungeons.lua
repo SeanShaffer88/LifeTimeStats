@@ -176,21 +176,15 @@ function ns.DungeonBossKill(name, kind)
     if Unique("djboss_" .. d.key, label) then
         Add("dj_bosses_found")
         local found, total = ns.DungeonProgress(d)
-        if found >= total and total > 0 and Unique("dj_books", d.key) then
+        if not d.learn and found >= total and total > 0 and Unique("dj_books", d.key) then
             if ns.Journal then ns.Journal("Every boss of " .. d.name .. " found (" .. total .. ")") end
         end
     end
     -- full clear: every required boss down in this one run
-    if not run.cleared then
-        local need = 0
+    if not d.learn and not run.cleared and d.required > 0 then
         for _, b in ipairs(d.bosses) do
-            if not b.optional then
-                need = need + 1
-                if not run.killedSet[b.name] then return end
-            end
+            if not b.optional and not run.killedSet[b.name] then return end
         end
-        for n in pairs(Set(ns.char, "djlearn_" .. d.key)) do if not run.killedSet[n] then return end end
-        if need == 0 then return end
         run.cleared = true
         Add("dj_full_clears")
         Add("dj_clears_" .. (run.band or "in"))

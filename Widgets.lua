@@ -1,4 +1,4 @@
--- LifeTimeStats - UI building blocks (Odometer theme)
+-- LifeTimeStats - themed UI building blocks
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local ADDON, ns = ...
 
@@ -10,6 +10,15 @@ W.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\Media\\"
 W.WHITE = "Interface\\Buttons\\WHITE8x8"
 W.FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 W.NUM = "Fonts\\ARIALN.TTF"
+
+W.JOURNAL = {
+    gold = { 0.918, 0.780, 0.451 },
+    trim = { 0.698, 0.529, 0.306 },
+    top = { 0.263, 0.192, 0.122 },
+    base = { 0.165, 0.114, 0.075 },
+    tab = { 0.298, 0.204, 0.125 },
+    page = { 0.183, 0.136, 0.094 },
+}
 
 -- Chart palette (amber family + cream + rust + teal, all on charcoal)
 W.C = {
@@ -29,6 +38,15 @@ function W.Fill(parent, c, layer, a)
     local t = parent:CreateTexture(nil, layer or "BACKGROUND")
     W.Color(t, c, a)
     return t
+end
+
+function W.Shade(texture, low, high)
+    if texture.SetGradient and CreateColor and pcall(function()
+        texture:SetColorTexture(1, 1, 1, 1)
+        texture:SetGradient("VERTICAL", CreateColor(low[1], low[2], low[3], 1),
+            CreateColor(high[1], high[2], high[3], 1))
+    end) then return end
+    W.Color(texture, low)
 end
 
 function W.Text(parent, size, c, font, justify)
@@ -80,14 +98,40 @@ function W.Panel(parent, c, edge)
     return f
 end
 
+function W.Window(parent)
+    local f = W.Panel(parent, T.bg)
+    if ns.themeId == "forever" and BackdropTemplateMixin then
+        local created, rim = pcall(CreateFrame, "Frame", nil, f, "BackdropTemplate")
+        if created and rim then
+            local applied = pcall(rim.SetBackdrop, rim, {
+                edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border",
+                edgeSize = 11,
+                tileEdge = true,
+            })
+            if applied then
+                rim:SetPoint("TOPLEFT", f, "TOPLEFT", -4, 4)
+                rim:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 4, -4)
+                rim:SetFrameLevel((f:GetFrameLevel() or 0) + 6)
+            else
+                rim:Hide()
+            end
+        end
+    end
+    return f
+end
+
 function W.FlatButton(parent, label, w, h, tipTitle, tip)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(w, h)
     b.bg = W.Fill(b, T.tile); b.bg:SetAllPoints()
-    b.edge = W.Fill(b, T.amber, "BORDER"); b.edge:SetPoint("BOTTOMLEFT"); b.edge:SetPoint("BOTTOMRIGHT"); b.edge:SetHeight(1); b.edge:SetAlpha(0.5)
+    local journal = ns.themeId == "forever"
+    local trim = journal and W.JOURNAL.trim or T.amber
+    b.edge = W.Fill(b, trim, "BORDER"); b.edge:SetPoint("BOTTOMLEFT"); b.edge:SetPoint("BOTTOMRIGHT"); b.edge:SetHeight(1); b.edge:SetAlpha(0.5)
     b.text = W.Text(b, 11, T.text); b.text:SetPoint("CENTER"); b.text:SetText(label)
+    local idle = journal and W.JOURNAL.base or T.tile
+    if journal then W.Color(b.bg, idle) end
     b:SetScript("OnEnter", function() W.Color(b.bg, T.tileHi); b.edge:SetAlpha(1) end)
-    b:SetScript("OnLeave", function() W.Color(b.bg, T.tile); b.edge:SetAlpha(0.5) end)
+    b:SetScript("OnLeave", function() W.Color(b.bg, idle); b.edge:SetAlpha(0.5) end)
     if tip then W.Tip(b, tipTitle or label, tip) end
     return b
 end
@@ -95,6 +139,8 @@ end
 -- Segmented toggle: options = { {id, label, tip}, ... }
 function W.Segmented(parent, options, onPick)
     local f = W.Panel(parent, T.bg)
+    local journal = ns.themeId == "forever"
+    local trim = journal and W.JOURNAL.trim or T.amber
     f.buttons = {}
     local x = 1
     for i, o in ipairs(options) do
@@ -103,7 +149,7 @@ function W.Segmented(parent, options, onPick)
         local w = math.max(56, b.text:GetStringWidth() + 20)
         b:SetSize(w, 22); b:SetPoint("LEFT", x, 0); x = x + w
         b.bg = W.Fill(b, T.tileHi); b.bg:SetAllPoints()
-        b.bar = W.Fill(b, T.amber, "ARTWORK"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetPoint("BOTTOMRIGHT"); b.bar:SetHeight(2)
+        b.bar = W.Fill(b, trim, "ARTWORK"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetPoint("BOTTOMRIGHT"); b.bar:SetHeight(2)
         b.id = o.id
         b:SetScript("OnClick", function() onPick(o.id) end)
         W.Tip(b, o.label, o.tip)
@@ -114,7 +160,7 @@ function W.Segmented(parent, options, onPick)
         for _, b in ipairs(self.buttons) do
             local on = b.id == id
             b.bg:SetShown(on); b.bar:SetShown(on)
-            local c = on and T.amber or T.dim
+            local c = on and (journal and W.JOURNAL.gold or T.amber) or T.dim
             b.text:SetTextColor(c[1], c[2], c[3])
         end
     end
@@ -128,11 +174,18 @@ function W.Card(parent, title, icon, x, y, w, h, tip)
     f:SetSize(w, h)
     local head = CreateFrame("Frame", nil, f)
     head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1); head:SetHeight(27)
+    local journal = ns.themeId == "forever"
+    if journal then
+        local banner = W.Fill(head, W.JOURNAL.base)
+        banner:SetAllPoints()
+        W.Shade(banner, W.JOURNAL.base, W.JOURNAL.top)
+    end
     local rule = W.Line(head); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
-    local ic = W.Icon(head, icon or "star", 14)
+    local ic = W.Icon(head, icon or "star", 14, journal and W.JOURNAL.gold or nil)
     ic:SetPoint("LEFT", 9, 0)
-    f.title = W.Text(head, 12, T.text); f.title:SetPoint("LEFT", ic, "RIGHT", 8, 0)
-    f.title:SetText(title:upper())
+    f.title = W.Text(head, journal and 13 or 12, journal and W.JOURNAL.gold or T.text)
+    f.title:SetPoint("LEFT", ic, "RIGHT", 8, 0)
+    f.title:SetText(journal and title or title:upper())
     if tip then head:EnableMouse(true); W.Tip(head, title, tip) end
     f.body = CreateFrame("Frame", nil, f)
     f.body:SetPoint("TOPLEFT", 10, -36)
@@ -177,19 +230,32 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip)
     local f = W.Panel(parent, T.tile)
     f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
     f:SetSize(w, h)
-    local top = W.Fill(f, T.amber, "ARTWORK"); top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(3)
+    local journal = ns.themeId == "forever"
+    local top = W.Fill(f, journal and W.JOURNAL.trim or T.amber, "ARTWORK")
+    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(journal and 2 or 3)
     f.label = W.Text(f, 10, T.dim); f.label:SetPoint("TOPLEFT", 12, -10)
-    f.icon = W.Icon(f, icon or "star", 26); f.icon:SetPoint("RIGHT", -14, -2)
-    f.cells = {}
-    for i = 1, DIGITS do
-        local cell = CreateFrame("Frame", nil, f)
-        cell:SetSize(15, 24)
-        cell:SetPoint("TOPLEFT", 12 + (i - 1) * 17, -26)
-        local bg = W.Fill(cell, T.bg); bg:SetAllPoints()
-        local shine = W.Fill(cell, T.tileHi, "BORDER"); shine:SetPoint("TOPLEFT"); shine:SetPoint("TOPRIGHT"); shine:SetHeight(12)
-        local seam = W.Fill(cell, T.bg, "ARTWORK"); seam:SetPoint("LEFT"); seam:SetPoint("RIGHT"); seam:SetHeight(1)
-        cell.d = W.Text(cell, 17, T.amber, W.NUM); cell.d:SetPoint("CENTER", 0, 0)
-        f.cells[i] = cell
+    f.icon = W.Icon(f, icon or "star", 26, journal and W.JOURNAL.gold or nil)
+    f.icon:SetPoint("RIGHT", -14, -2)
+    local number
+    if journal then
+        local wash = W.Fill(f, W.JOURNAL.base)
+        wash:SetPoint("TOPLEFT", 1, -2); wash:SetPoint("BOTTOMRIGHT", -1, 1)
+        W.Shade(wash, W.JOURNAL.base, W.JOURNAL.top)
+        number = W.Text(f, 23, T.amber, W.NUM, "LEFT")
+        number:SetPoint("TOPLEFT", 12, -23)
+        number:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
+    else
+        f.cells = {}
+        for i = 1, DIGITS do
+            local cell = CreateFrame("Frame", nil, f)
+            cell:SetSize(15, 24)
+            cell:SetPoint("TOPLEFT", 12 + (i - 1) * 17, -26)
+            local bg = W.Fill(cell, T.bg); bg:SetAllPoints()
+            local shine = W.Fill(cell, T.tileHi, "BORDER"); shine:SetPoint("TOPLEFT"); shine:SetPoint("TOPRIGHT"); shine:SetHeight(12)
+            local seam = W.Fill(cell, T.bg, "ARTWORK"); seam:SetPoint("LEFT"); seam:SetPoint("RIGHT"); seam:SetHeight(1)
+            cell.d = W.Text(cell, 17, T.amber, W.NUM); cell.d:SetPoint("CENTER", 0, 0)
+            f.cells[i] = cell
+        end
     end
     f.sub = W.Text(f, 10, ns.THEME.text); f.sub:SetPoint("BOTTOMLEFT", 12, 7); f.sub:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
     f:EnableMouse(true)
@@ -208,17 +274,21 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip)
     end
     function f:SetValue(v, sub, exact)
         v = math.max(0, math.floor((v or 0) + 0.5))
-        local s = tostring(v)
-        if #s > DIGITS then s = string.rep("9", DIGITS) end
-        s = string.rep("0", DIGITS - #s) .. s
-        local leading = true
-        for i = 1, DIGITS do
-            local ch = s:sub(i, i)
-            if ch ~= "0" or i == DIGITS then leading = false end
-            local cell = self.cells[i]
-            cell.d:SetText(ch)
-            if leading then cell.d:SetTextColor(T.dim[1], T.dim[2], T.dim[3], 0.12)
-            else cell.d:SetTextColor(T.amber[1], T.amber[2], T.amber[3], 1) end
+        if number then
+            number:SetText(ns.FormatInt(v))
+        else
+            local s = tostring(v)
+            if #s > DIGITS then s = string.rep("9", DIGITS) end
+            s = string.rep("0", DIGITS - #s) .. s
+            local leading = true
+            for i = 1, DIGITS do
+                local ch = s:sub(i, i)
+                if ch ~= "0" or i == DIGITS then leading = false end
+                local cell = self.cells[i]
+                cell.d:SetText(ch)
+                if leading then cell.d:SetTextColor(T.dim[1], T.dim[2], T.dim[3], 0.12)
+                else cell.d:SetTextColor(T.amber[1], T.amber[2], T.amber[3], 1) end
+            end
         end
         self.sub:SetText(sub or "")
         self.exact = exact

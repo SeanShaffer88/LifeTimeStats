@@ -166,22 +166,53 @@ local function Valid(rec)
 end
 ns.ValidRecord = Valid
 
+-- LTS1/LTS2 backup paths have always represented unique IDs as text.
+function ns.UniqueKey(key)
+    if type(key) == "number" then return tostring(key) end
+    return key
+end
+
 -- Upgrades a 1.0 record in place and recounts unique sets.
 local function Ensure(rec)
     for _, k in ipairs(SECTIONS) do
         if type(rec[k]) ~= "table" then rec[k] = {} end
     end
     for set, t in pairs(rec.u) do
-        local n = 0
-        for _ in pairs(t) do n = n + 1 end
+        local n, numeric = 0, nil
+        if type(t) == "table" then
+            for key in pairs(t) do
+                if type(key) == "number" then
+                    numeric = numeric or {}
+                    numeric[#numeric + 1] = key
+                else
+                    n = n + 1
+                end
+            end
+            if numeric then
+                for _, key in ipairs(numeric) do
+                    local canonical = ns.UniqueKey(key)
+                    if t[canonical] == nil then n = n + 1 end
+                    t[key], t[canonical] = nil, true
+                end
+            end
+        else
+            rec.u[set] = nil
+        end
         rec.un[set] = n
     end
     return rec
 end
 ns.EnsureRecord = Ensure
 
-local function NewSession()
-    return { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, rh = {}, start = GetTime() }
+local function NewSession(rec)
+    local id
+    if rec then
+        local serial = rec.meta.sessionSerial
+        id = (ns.BadNumber(serial) and 0 or serial) + 1
+        rec.meta.sessionSerial = id
+    end
+    return { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, rh = {},
+        id = id, start = GetTime(), wallStart = time() }
 end
 ns.session = NewSession()
 
@@ -222,11 +253,27 @@ function ns.InitDB()
 
     -- Session survives /reload: restored here, reset on a real login (PLAYER_ENTERING_WORLD isLogin).
     local saved = LifeTimeStatsCharDB.session
-    if type(saved) == "table" and type(saved.c) == "table" and type(saved.savedAt) == "number" and time() - saved.savedAt < 900 then
+    if type(saved) == "table" and type(saved.c) == "table" and not ns.BadNumber(saved.savedAt) then
         local sess = NewSession()
         for k in pairs(sess) do if type(saved[k]) == "table" then sess[k] = saved[k] end end
-        sess.start = GetTime() - (saved.elapsed or 0)
+        local elapsed = ns.BadNumber(saved.elapsed) and 0 or math.max(0, saved.elapsed)
+        sess.start = GetTime() - elapsed
+        sess.wallStart = ns.BadNumber(saved.wallStart) and math.floor(saved.savedAt - elapsed) or saved.wallStart
+        if not ns.BadNumber(saved.id) and saved.id > 0 then
+            sess.id = saved.id
+            local serial = rec.meta.sessionSerial
+            if ns.BadNumber(serial) or serial < sess.id then rec.meta.sessionSerial = sess.id end
+        else
+            sess.id = NewSession(rec).id
+            local log = rec.sessionlog
+            local entry = type(log) == "table" and log[#log]
+            if type(entry) == "table" and entry.id == nil and entry.s == sess.wallStart then entry.id = sess.id end
+        end
         ns.session = sess
+        ns.savedFightCorrelation = saved.fightCorrelation
+    else
+        ns.session = NewSession(rec)
+        ns.savedFightCorrelation = nil
     end
     LifeTimeStatsCharDB.session = nil
 
@@ -271,7 +318,9 @@ function ns.Save()
     if type(LifeTimeStatsCharDB) == "table" then
         local s = ns.session
         LifeTimeStatsCharDB.session = { c = s.c, r = s.r, t = s.t, u = s.u, un = s.un, f = s.f, fw = s.fw, fd = s.fd,
-            first = s.first, firstd = s.firstd, rh = s.rh, elapsed = GetTime() - s.start, savedAt = time() }
+            first = s.first, firstd = s.firstd, rh = s.rh, id = s.id, wallStart = s.wallStart,
+            elapsed = GetTime() - s.start, savedAt = time(),
+            fightCorrelation = ns.SaveFightCorrelation and ns.SaveFightCorrelation() }
     end
     ns.char.meta.rev = (ns.char.meta.rev or 0) + 1
     ns.char.meta.saved = time()
@@ -318,6 +367,8 @@ ns.BadNumber = Bad
 -- Keep only recent, validated record breakthroughs. The history is local to
 -- the character/session and never contains arbitrary API objects or secret data.
 local HISTORY_CAP = 200
+ns.RECORD_HISTORY_CAP = HISTORY_CAP
+local movementMilestones = setmetatable({}, { __mode = "k" })
 local baseEnsureRecord = ns.EnsureRecord
 function ns.EnsureRecord(rec)
     baseEnsureRecord(rec)
@@ -338,20 +389,34 @@ function ns.EnsureRecord(rec)
     return rec
 end
 
-function ns.AddRecordHistory(rec, key, value, label, direction, previous)
+local function MovementMilestone(history, key, value)
+    local minStep
+    if key:match("^ex_longest_") then minStep = 10
+    elseif key:match("^ex_farthest_") then minStep = 50 end
+    if not minStep then return true end
+    local anchors = movementMilestones[history]
+    if not anchors then
+        anchors = {}
+        for _, entry in ipairs(history) do
+            if type(entry) == "table" and entry.d == "max" and type(entry.k) == "string" and not Bad(entry.v) then
+                anchors[entry.k] = math.max(anchors[entry.k] or 0, entry.v)
+            end
+        end
+        movementMilestones[history] = anchors
+    end
+    local previous = anchors[key] or 0
+    if value - previous < math.max(minStep, previous * 0.05) then return false end
+    anchors[key] = value
+    return true
+end
+
+function ns.AddRecordHistory(rec, key, value, label, direction)
     if not rec or type(key) ~= "string" or ns.IsSecret(value) or Bad(value)
         or (direction ~= "max" and direction ~= "min") then return end
-    -- Movement interval records can change every 0.25-second sample. Log
-    -- useful milestones, not each tick.
-    if previous and direction == "max" then
-        local minStep
-        if key:match("^ex_longest_") then minStep = 10
-        elseif key:match("^ex_farthest_") then minStep = 50 end
-        if minStep and value - previous < math.max(minStep, math.abs(previous) * 0.05) then return end
-    end
     if type(rec.rh) ~= "table" then rec.rh = {} end
     local at = time()
     if ns.IsSecret(at) or Bad(at) then return end
+    if direction == "max" and not MovementMilestone(rec.rh, key, value) then return end
     local event = { k = key, v = value, at = at, d = direction }
     if not ns.IsSecret(label) and type(label) == "string" and label ~= "" then event.w = label:sub(1, 100) end
     local log = rec.rh
@@ -388,18 +453,16 @@ function ns.Max(key, v, label)
     if ns.IsSecret(label) then label = nil end
     local r = ns.char.r
     if v > (r[key] or 0) then
-        local previous = r[key] or 0
         r[key] = v
         if label then r[key .. "_what"] = tostring(label) end
-        local event = ns.AddRecordHistory(ns.char, key, v, label, "max", previous)
+        local event = ns.AddRecordHistory(ns.char, key, v, label, "max")
         if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
     end
     local s = ns.session.r
     if v > (s[key] or 0) then
-        local previous = s[key] or 0
         s[key] = v
         if label then s[key .. "_what"] = tostring(label) end
-        ns.AddRecordHistory(ns.session, key, v, label, "max", previous)
+        ns.AddRecordHistory(ns.session, key, v, label, "max")
     end
 end
 
@@ -413,7 +476,7 @@ function ns.Min(key, v, label)
         lifetime.f[key] = v
         lifetime.fw[key] = label and tostring(label) or nil
         lifetime.fd[key] = time()
-        local event = ns.AddRecordHistory(lifetime, key, v, label, "min", cur)
+        local event = ns.AddRecordHistory(lifetime, key, v, label, "min")
         if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
     end
     cur = session.f[key]
@@ -421,7 +484,7 @@ function ns.Min(key, v, label)
         session.f[key] = v
         session.fw[key] = label and tostring(label) or nil
         session.fd[key] = time()
-        ns.AddRecordHistory(session, key, v, label, "min", cur)
+        ns.AddRecordHistory(session, key, v, label, "min")
     end
 end
 
@@ -444,6 +507,7 @@ local UNIQUE_CAP = 20000
 ns.UNIQUE_CAP = UNIQUE_CAP
 function ns.Unique(set, key)
     if not ns.char or key == nil or ns.IsSecret(key) or key == "" then return false end
+    key = ns.UniqueKey(key)
     local ch = ns.char
     local u = ch.u[set]
     if not u then u = {}; ch.u[set] = u end
@@ -626,6 +690,7 @@ ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin)
 end)
 
 ns.On("PLAYER_LOGOUT", function()
+    if ns.FlushCombatDamage then ns.FlushCombatDamage() end
     if ns.OnLogout then ns.OnLogout() end
     if ns.char then ns.PruneTallies(ns.char) end
     ns.Save()
@@ -699,7 +764,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
 end
 
 function ns.ResetSession()
-    ns.session = NewSession()
+    ns.session = NewSession(ns.char)
     if ns.RefreshWindow then ns.RefreshWindow() end
 end
 

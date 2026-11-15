@@ -1,7 +1,6 @@
 -- LifeTimeStats - window themes. Match the look of popular UI replacements.
--- "Auto" follows the UI addon you run (EllesmereUI, ElvUI, Tukui), reading its live
--- colours and font when it is loaded. Applied when the window is first built (/reload
--- to switch). The class-colour option still overrides the accent.
+-- "Auto" follows supported UI replacements or uses Forever Journal. Themes are
+-- applied when the window is first built (/reload to switch).
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local _, ns = ...
 
@@ -14,6 +13,10 @@ local ARIALN, FRIZ = "Fonts\\ARIALN.TTF", "Fonts\\FRIZQT__.TTF"
 
 -- Each theme: palette, fonts and a short description for the settings button.
 ns.THEMES = {
+    { id = "forever", name = "Forever Journal", desc = "A bound adventurer's journal with gold trim, warm paper panels and WoW's own fonts.",
+      bg = hex("19130f", 0.98), tile = hex("251d16"), tileHi = hex("463324"), edge = hex("795b36"),
+      text = hex("f5e9d2"), dim = hex("c3ae89"), amber = hex("eac773"),
+      cream2 = hex("ddc49a"), rust = hex("e17a65"), teal = hex("88bca7"), font = STANDARD_TEXT_FONT or FRIZ, num = FRIZ },
     { id = "odometer", name = "Odometer", desc = "LifeTimeStats' own look: charcoal, cream text, amber digits.",
       bg = hex("17191c", 0.97), tile = hex("24272b"), tileHi = hex("2e3237"), edge = hex("33363b"),
       text = hex("efe6d2"), dim = hex("9b9486"), amber = hex("ffb238"),
@@ -51,7 +54,7 @@ function ns.DetectUI()
     if Loaded("EllesmereUI") or type(_G.EllesmereUI) == "table" and _G.EllesmereUI.ELLESMERE_GREEN then return "ellesmere" end
     if Loaded("ElvUI") then return "elvui" end
     if Loaded("Tukui") then return "tukui" end
-    return "odometer"
+    return "forever"
 end
 
 -- Live colours / font from the UI addon itself, if loaded. Every read is guarded.
@@ -112,9 +115,10 @@ local function Copy(dst, src) if src then dst[1], dst[2], dst[3], dst[4] = src[1
 
 -- Resolve the chosen theme into ns.THEME (in place, so every holder of these tables sees it).
 function ns.ApplyTheme()
-    local want = (ns.settings and ns.settings.theme) or "odometer"
+    local want = (ns.settings and ns.settings.theme) or "auto"
     local id = want == "auto" and ns.DetectUI() or want
-    local base = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.odometer
+    local base = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.forever
+    id = base.id
     local p = {}
     for k, v in pairs(base) do p[k] = type(v) == "table" and { v[1], v[2], v[3], v[4] } or v end
     p.liveUsed = base.live and LIVE[base.live] and (function() local ok, r = pcall(LIVE[base.live], p) return ok and r end)() or false
@@ -137,9 +141,9 @@ end
 
 function ns.ThemeName(id)
     if id == "auto" then return "Auto (" .. (ns.THEME_BY_ID[ns.DetectUI()] or {}).name .. ")" end
-    return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.odometer).name
+    return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.forever).name
 end
-ns.THEME_ORDER = { "auto", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
+ns.THEME_ORDER = { "auto", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
 
 -- EllesmereUI skinning API: register once; the getters feed the EllesmereUI theme.
 if type(_G.EllesmereUI) == "table" and type(_G.EllesmereUI.RegisterSkin) == "function" then
