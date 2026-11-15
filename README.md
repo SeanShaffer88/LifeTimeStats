@@ -25,7 +25,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 | ![Achievements](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/achievements.png)<br>Achievements | ![Compare](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/compare.png)<br>Compare |
 | ![How it works](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/how-it-works.png)<br>How it works |  |
 
-In-game captures from version 1.12.1 (Mage, level 6, class-colour accent).
+In-game captures from version 1.12.1 show the previous Odometer layout (Mage, level 6, class-colour accent).
 </details>
 
 ## Download
@@ -33,13 +33,13 @@ Get the latest `LifeTimeStats-X.Y.Z-forever.zip` from the [Releases](../../relea
 
 ## The window
 
-A dashboard-style window (`/lts`): charcoal panels, odometer digit counters and tick-ring charts. The accent colour follows your **class colour** (switch back to the theme colour in settings).
+A Warcraft-style adventurer's journal (`/lts`) with gold trim, warm page panels, chapter accents and ledger counters. The accent colour can follow your **class colour**.
 
-**Themes** (Settings → Theme, applies after /reload): **Auto** (default: matches the UI addon you run), **Odometer** (LifeTimeStats' own look), **Blizzard** (gold on black, Friz Quadrata), **ElvUI**, **Tukui** and **EllesmereUI**. With ElvUI, Tukui or EllesmereUI loaded, their live colours and font are used (EllesmereUI through its official skinning API).
+**Themes** (Settings → Theme, applies after /reload): **Auto** follows ElvUI, Tukui or EllesmereUI when available and uses **Forever Journal** otherwise. You can also select **Forever Journal**, **Odometer**, **Blizzard**, **ElvUI**, **Tukui** or **EllesmereUI** directly. Supported UI replacements supply live colours and fonts.
 
 - **Header:** search box (Ctrl+F, also finds entries in the Top Lists, e.g. a spell or creature), Character / Account, Lifetime / Session / Today / Week / Month, settings, your portrait. In Account + Lifetime, hover a value to see each character's part.
 - **Sidebar pages:** Dashboard, Travel, Combat, Deaths, Adventure, Wealth & Loot, Social & Silly, Records, Fastest & Uniques, Top Lists, Timeline, Adventurer's Life, Journal, Achievements, Compare, How it works. Keys 1–9, 0, F, A, C and H jump between pages while the mouse is over the window (never in combat, never while typing).
-- **Every page** opens with four odometer counters, then a gridded table of every statistic on that page and charts beside it.
+- **Statistic pages** pair headline counters with detailed tables and charts.
 - Hover any row, counter or chart bar for exactly how it is measured and where a record came from.
 - Ctrl + mouse wheel on the header changes the window scale. The default scale fits your screen height.
 
@@ -98,7 +98,7 @@ Times drunk (tipsy, drunk, completely smashed) and sobered up · campfires lit a
 
 ## Journal (key L)
 
-Writes itself: firsts, level-ups, new zones (with your level), first inn visits, deaths, achievements. **Life per level** compares what happened at each level. **Travel log** lists every zone with first-visit date and level.
+The Journal writes itself as you explore. Dated entries collect firsts, level-ups, new zones, first inn visits, deaths, achievements and personal bests. Browse from the newest group with **Newer** and **Older**. **Life per level** compares what happened at each level, and **Travel log** lists each zone with its first-visit date and level.
 
 ## Titles and character sheet
 
@@ -165,11 +165,11 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Counting starts when you install it.** The game does not keep most of these numbers. /played and lifetime honorable kills come from the server.
 - **Steps** = distance on foot ÷ 0.75 m stride. Travel and Cat form count as on foot.
 - **Kills** count when something you or your pet damaged dies, so group kills count for each helper. Killing blows are separate.
-- **Dungeon runs:** a /reload, disconnect or zoning out and back within 30 minutes stays the same run; an instance reset starts a new one. Classic has no "dungeon complete" event, so the addon counts runs with a boss kill. **Fastest clear** = entering to the last boss, and only runs that killed as many bosses as your best run there qualify. Raids count a **full clear** from your raid lockout.
+- **Dungeon runs:** a /reload, disconnect or zoning out and back within 30 minutes stays the same run; an instance reset starts a new one. In the **Dungeon Book**, fastest clear measures entry to the final required boss in a complete roster. The book labels incomplete rosters and tracks discoveries while withholding new clear, completion and fastest-clear awards. The highest Dungeon Crawler, Brave New World and Bestiary Complete tiers depend on verified rosters. Previously recorded clears and earned achievements stay in your history.
 - **Falls:** "survived" means you were still alive 1.5 s after the fall damage. Airtime is measured from leaving the ground to landing.
 - **Corpse runs** go from releasing your spirit to getting your body back (or using the spirit healer).
 - **Session** is since you logged in; a /reload keeps it. **Today** resets at local midnight. 40 days of daily history are kept for the charts.
-- **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. **Backup** gives a text copy; restoring never lowers a value.
+- **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. **Backup** copies character statistics and personal-best history into text. Restore merges those records and keeps the newest 200 personal bests. Journal entries and play-session history stay in SavedVariables.
 - The **How it works** page in the window explains every measurement.
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
 - Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days.
