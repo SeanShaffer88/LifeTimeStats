@@ -57,9 +57,9 @@ fire("ADDON_LOADED", "LifeTimeStats")
 fire("PLAYER_ENTERING_WORLD", true, false)
 ns.ToggleWindow()
 eq(expandedFrameDelta, 0, "module adds no polling frame")
-eq(baseCount, 665, "baseline catalog measured")
+eq(baseCount, 680, "baseline catalog measured")
 eq(ns.EXPANDED_STAT_COUNT, 222, "222 new catalog entries")
-eq(ns.CountStats(), 888, "complete catalog")
+eq(ns.CountStats(), 903, "complete catalog")
 
 local function tick(n, distance, speed)
     for i = 1, n do

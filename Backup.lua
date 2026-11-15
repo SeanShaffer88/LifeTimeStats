@@ -304,7 +304,7 @@ local FULL_META = {
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "meta",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "meta",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -336,6 +336,10 @@ local SESSION_ROW = {
     id = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
     s = Timestamp, d = Timestamp, afk = Timestamp, l = Level, steps = Nonnegative,
     k = Nonnegative, de = Nonnegative, q = Nonnegative, xp = Nonnegative, dmg = Nonnegative, z = Text,
+    g = Number, mi = Nonnegative, lv = Nonnegative, it = Nonnegative,
+}
+local PERSON_ROW = {
+    f = Timestamp, l = Timestamp, n = Nonnegative, t = Nonnegative, cls = Key, lvl = Level, z = Text,
 }
 
 local function StageFullSnapshot(snapshot, exportLegacy)
@@ -467,6 +471,9 @@ local function StageFullSnapshot(snapshot, exportLegacy)
     -- Run history and bestiary arrived in 1.15; older full backups have neither.
     section = "dungeon run history"; record.runlog = Sequence(source.runlog == nil and {} or source.runlog, ns.RUNLOG_CAP or 200, function(row)
         return Row(row, RUN_ROW, { "s" })
+    end)
+    section = "people you grouped with"; record.people = Map(source.people == nil and {} or source.people, Key, function(row)
+        return Row(row, PERSON_ROW, {})
     end)
     section = "bestiary"; record.bestiary = Map(source.bestiary == nil and {} or source.bestiary, Key, function(row)
         return Row(row, BESTIARY_ROW, { "k" })

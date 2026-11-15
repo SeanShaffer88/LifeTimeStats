@@ -149,7 +149,7 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary", "people" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
