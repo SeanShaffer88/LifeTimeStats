@@ -50,6 +50,6 @@ Stored twice so one lost SavedVariables file cannot wipe your history, plus a te
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip so the folder is `World of Warcraft\_classic_beta_\Interface\AddOns\LifeTimeStats`.
+Unzip so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.

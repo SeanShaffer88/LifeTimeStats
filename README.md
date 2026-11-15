@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 (Mage, level 6, class-colour accent).
 </details>
 
 ## Download
-Get the latest `LifeTimeStats-vX.Y.Z-forever.zip` from the [Releases](../../releases) page and unzip it into `World of Warcraft\_classic_beta_\Interface\AddOns\`.
+Get the latest `LifeTimeStats-X.Y.Z-forever.zip` from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -118,8 +118,8 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-v1.13.0-forever.zip`.
-2. Unzip into `World of Warcraft\_classic_beta_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
+1. Download `LifeTimeStats-1.13.0-forever.zip`.
+2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
 Upgrading from any earlier version keeps all your existing stats.
