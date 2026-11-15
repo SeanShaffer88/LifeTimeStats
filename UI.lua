@@ -1,4 +1,4 @@
--- LifeTimeStats - main window, pages, minimap button, backup dialog (Odometer theme)
+-- LifeTimeStats - main window, pages, minimap button and backup dialog
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local ADDON, ns = ...
 
@@ -1053,6 +1053,129 @@ local function BuildCompare()
 end
 
 -- ============================================================ JOURNAL
+local JOURNAL_PAGE_SIZE = 10
+
+local function JournalFeed(parent, width, height)
+    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local f = W.Panel(parent, ink and ink.page or T.bg)
+    f:SetAllPoints()
+    f.offset, f.entries, f.rows = 0, {}, {}
+    local gold = ink and ink.gold or T.amber
+    for i = 1, JOURNAL_PAGE_SIZE do
+        local row = CreateFrame("Button", nil, f)
+        row:SetWidth(width - 26)
+        row.day = W.Text(row, 13, gold, nil, "LEFT")
+        row.day:SetPoint("TOPLEFT", 0, -1)
+        row.rule = W.Line(row, gold)
+        row.rule:SetPoint("TOPLEFT", 0, -16); row.rule:SetPoint("TOPRIGHT", 0, -16)
+        row.rule:SetHeight(1); row.rule:SetAlpha(0.45)
+        row.meta = W.Text(row, 11, T.dim, nil, "LEFT")
+        row.prose = W.Text(row, 13, T.text, nil, "LEFT")
+        row.prose:SetWidth(width - 120)
+        row.prose:SetJustifyV("TOP")
+        row.prose:SetWordWrap(true)
+        row.prose:SetMaxLines(2)
+        local line = W.Line(row)
+        line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1); line:SetAlpha(0.5)
+        W.Tip(row, function() return DateLabel(row.entry[1]) .. "  ·  Level " .. (row.entry[3] or "?") end,
+            function() return row.entry[2] end)
+        row:SetScript("OnClick", function(self)
+            local e = self.entry
+            if e then ns.ShowText("Journal entry", DateLabel(e[1]) .. "  ·  Level " .. (e[3] or "?"), e[2]) end
+        end)
+        f.rows[i] = row
+    end
+    local empty = W.Text(f, 14, T.dim)
+    empty:SetPoint("TOP", 0, -27); empty:SetText("Your story will appear here as you play.")
+    local footerRule = W.Line(f)
+    footerRule:SetPoint("BOTTOMLEFT", 1, 30); footerRule:SetPoint("BOTTOMRIGHT", -1, 30); footerRule:SetHeight(1)
+    local newer = W.FlatButton(f, "Newer", 65, 20)
+    newer:SetPoint("BOTTOMLEFT", 9, 5)
+    local older = W.FlatButton(f, "Older", 65, 20)
+    older:SetPoint("BOTTOMRIGHT", -9, 5)
+    local position = W.Text(f, 11, T.dim)
+    position:SetPoint("BOTTOM", 0, 9)
+
+    function f:Render()
+        local total = #self.entries
+        local n = math.min(JOURNAL_PAGE_SIZE, total - self.offset)
+        local days, dayCount, lastDay = {}, 0, nil
+        for i = 1, n do
+            local e = self.entries[total - self.offset - i + 1]
+            local day = date("%Y-%m-%d", e[1])
+            if day ~= lastDay then
+                days[i] = date("%A, %B %d, %Y", e[1])
+                dayCount = dayCount + 1
+                lastDay = day
+            end
+        end
+        -- Keep a usable two-line entry even when every row starts a different day.
+        local dayHeight = 18
+        local rowHeight = math.min(38, math.floor((height - 42 - dayCount * dayHeight) / math.max(1, n)))
+        local y = -7
+        for i, row in ipairs(self.rows) do
+            local e = i <= n and self.entries[total - self.offset - i + 1]
+            if e then
+                local daySpace = days[i] and dayHeight or 0
+                local h = rowHeight + daySpace
+                row:ClearAllPoints(); row:SetPoint("TOPLEFT", f, "TOPLEFT", 13, y)
+                row:SetHeight(h)
+                row.day:SetText(days[i] or "")
+                row.day:SetShown(daySpace > 0); row.rule:SetShown(daySpace > 0)
+                row.meta:ClearAllPoints()
+                row.meta:SetPoint("TOPLEFT", 0, -daySpace - 4)
+                row.meta:SetText(date("%H:%M", e[1]) .. "  ·  Lv " .. (e[3] or "?"))
+                row.prose:ClearAllPoints()
+                row.prose:SetPoint("TOPLEFT", 94, -daySpace - 3)
+                row.prose:SetHeight(rowHeight - 2)
+                row.prose:SetText(e[2])
+                row.entry = e
+                row:Show()
+                y = y - h
+            else
+                row.entry = nil
+                row:Hide()
+            end
+        end
+        self.anchor = self.offset > 0 and self.entries[total - self.offset] or nil
+        empty:SetShown(n == 0)
+        position:SetText(n > 0 and string.format("Entries %d–%d of %d", self.offset + 1, self.offset + n, total) or "")
+        newer:SetEnabled(self.offset > 0)
+        newer:SetAlpha(self.offset > 0 and 1 or 0.55)
+        older:SetEnabled(self.offset + n < total)
+        older:SetAlpha(self.offset + n < total and 1 or 0.55)
+    end
+
+    function f:SetEntries(entries)
+        local total = #entries
+        local latest = entries[total]
+        if entries == self.entries and total == self.total and latest == self.latest then return end
+        self.entries, self.total, self.latest = entries, total, latest
+        if self.offset > 0 and self.anchor then
+            -- New entries and retention trim must not move the reader's first entry.
+            for i = total, 1, -1 do
+                if entries[i] == self.anchor then self.offset = total - i; break end
+            end
+        end
+        self.offset = math.min(self.offset, math.max(0, total - 1))
+        self:Render()
+    end
+
+    local function Turn(direction)
+        local nextOffset = f.offset + direction * JOURNAL_PAGE_SIZE
+        if nextOffset >= #f.entries then return end
+        nextOffset = math.max(0, nextOffset)
+        if f.offset == nextOffset then return end
+        f.offset = nextOffset
+        f:Render()
+    end
+    newer:SetScript("OnClick", function() Turn(-1) end)
+    older:SetScript("OnClick", function() Turn(1) end)
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta) if delta ~= 0 then Turn(delta > 0 and -1 or 1) end end)
+    return f
+end
+
 local function BuildJournal()
     local p = NewPage("journal")
     KpiRow(p, {
@@ -1063,16 +1186,14 @@ local function BuildJournal()
     })
     local lw = 560
     local jc = Panel(p, "Your story", "scroll", 0, BODY_Y, lw, BODY_H, "Firsts, level-ups, new zones, inns, deaths and achievements, newest first.")
-    p.jT = W.Table(jc.body, jc.bw, jc.bh, { { "WHEN", 92, kind = "dim" }, { "LV", 32, kind = "num" }, { "ENTRY", 0, kind = "text" } })
+    p.story = JournalFeed(jc.body, jc.bw, jc.bh)
     local rc = Panel(p, "Life per level", "adventure", lw + GAP, BODY_Y, CW - lw - GAP, 290, "What happened while you were at each level (from the level-ups seen since install).")
     p.lvT = W.Table(rc.body, rc.bw, rc.bh, { { "LV", 34, kind = "num" }, { "TIME", 70, kind = "dim" }, { "KILLS", 52, kind = "num" }, { "DEATHS", 52, kind = "num" }, { "STEPS", 0, kind = "num" } })
     local zc = Panel(p, "Travel log", "travel", lw + GAP, BODY_Y + 300, CW - lw - GAP, BODY_H - 300, "Every zone, when you first arrived and at what level.")
     p.zT = W.Table(zc.body, zc.bw, zc.bh, { { "ZONE", 170, kind = "text" }, { "LV", 34, kind = "num" }, { "ARRIVED", 0, kind = "dim" } })
     function p:Update(view, base, sess)
         UpdateKpis(self, view, base, sess)
-        local j, rows = ns.char.journal or {}, {}
-        for i = #j, 1, -1 do rows[#rows + 1] = { date("%b %d %H:%M", j[i][1]), tostring(j[i][3] or ""), j[i][2], tipTitle = j[i][2] } end
-        self.jT:SetData(rows, true)
+        self.story:SetEntries(ns.char.journal or self.emptyStory)
         local snaps, levels = ns.char.lvlsnap or {}, {}
         for k in pairs(snaps) do levels[#levels + 1] = tonumber(k) end
         table.sort(levels)
@@ -1098,6 +1219,7 @@ local function BuildJournal()
         table.sort(zr, function(a, b) return a.when > b.when end)
         self.zT:SetData(zr, true)
     end
+    p.emptyStory = {}
 end
 
 -- ============================================================ HOW IT WORKS
@@ -1116,7 +1238,7 @@ ns.HELP = {
     { "Uniques and firsts", "Uniques count different things you met, killed, visited or used; each list stops growing at 20,000 entries. Firsts are the first time something happened after install." },
     { "Gold", "Every change in the gold you carry is counted. The source (loot, vendor, auction house, mail, flight master, trainer) comes from which window was open at the time." },
     { "Where you are", "Capital cities are the six Classic capitals. Continent and zone come from the game map. Time per place is sampled four times a second." },
-    { "Your data", "Stored twice: in the account file and the character file. If one fails to load, the other restores your totals. Backup gives a text copy; Restore never lowers a value. Nothing is ever sent anywhere." },
+    { "Your data", "The addon stores its data locally in the account and character files. Backup copies statistics and personal-best history. The Journal and play-session history stay in the saved files. Use Share to post a summary to your selected WoW chat channel." },
     { "Achievements", "99 achievements with up to 6 tiers each (354 badges, 7,110 points), earned from your lifetime values. Fastest-time achievements are earned by being quicker than the target. Values you already had when 1.3 was installed are marked 'before v1.3'. Alerts are off by default; the sidebar shows how many are new. Settings can switch alerts to a chat line, an on-screen toast, or both." },
     { "Compare", "The Compare page lists every character on this account that has logged in with LifeTimeStats. Click one to put it on the right, Ctrl+click to put it on the left, or pick All characters. A + marks the side that leads; for fastest times lower is better. Forget character removes a deleted alt's data after asking." },
     { "Sharing", "Share (footer button or /lts share) shows a one-line summary of the page you are on. You can edit it, pick Say, Party, Raid, Guild or Instance, and press Send. Nothing is ever posted without that click, and /lts share g deaths posts straight to guild only because you typed it." },
@@ -1164,11 +1286,13 @@ function ns.ShowPage(id)
     if current and current ~= pages[id] then current:Hide() end
     current = pages[id]
     current:Show()
+    local ink = ns.themeId == "forever" and W.JOURNAL or nil
     for _, b in ipairs(win.navButtons) do
         local sel = b.id == id
         b.bar:SetShown(sel)
-        W.Color(b.bg, sel and T.tileHi or T.bg)
-        local col = sel and T.amber or T.text
+        W.Color(b.bg, sel and (ink and ink.tab or T.tileHi) or T.bg, ink and not sel and 0.20 or nil)
+        if ink then b.tabEdge:SetShown(sel) end
+        local col = sel and (ink and ink.gold or T.amber) or T.text
         b.text:SetTextColor(col[1], col[2], col[3])
         b.icon:SetVertexColor(sel and T.amber[1] or T.dim[1], sel and T.amber[2] or T.dim[2], sel and T.amber[3] or T.dim[3])
     end
@@ -1211,16 +1335,18 @@ function ns.RefreshWindow()
 end
 
 local function DefaultScale()
-    local h = UIParent:GetHeight() or 768
-    local sc = math.min(1, (h * 0.92) / WIN_H)
-    return math.floor(sc * 20) / 20
+    local w, h = UIParent:GetWidth() or WIN_W, UIParent:GetHeight() or WIN_H
+    local sc = math.min(1, w * 0.96 / WIN_W, h * 0.92 / WIN_H)
+    return math.max(0.05, math.floor(sc * 20) / 20)
 end
 
 local function CreateWindow()
     if ns.ApplyTheme then pcall(ns.ApplyTheme) end
     W.Init()
     C = W.C
-    win = W.Panel(UIParent, T.bg)
+    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local trim = ink and ink.trim or T.amber
+    win = W.Window(UIParent)
     win:SetSize(WIN_W, WIN_H)
     win:SetFrameStrata("HIGH")
     win:SetClampedToScreen(true)
@@ -1253,9 +1379,10 @@ local function CreateWindow()
         win:SetScale(s.scale)
     end)
     local hbg = W.Fill(head, T.tile); hbg:SetAllPoints()
-    local rule = W.Fill(head, T.amber, "ARTWORK"); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(2)
+    if ink then W.Shade(hbg, ink.base, ink.top) end
+    local rule = W.Fill(head, trim, "ARTWORK"); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(2)
     local logo = head:CreateTexture(nil, "ARTWORK"); logo:SetSize(28, 28); logo:SetPoint("LEFT", 10, 0); logo:SetTexture(W.MEDIA .. "icon")
-    local t1 = W.Text(head, 18, T.amber); t1:SetPoint("LEFT", logo, "RIGHT", 8, 0); t1:SetText("LifeTime")
+    local t1 = W.Text(head, 18, ink and ink.gold or T.amber); t1:SetPoint("LEFT", logo, "RIGHT", 8, 0); t1:SetText("LifeTime")
     local t2 = W.Text(head, 18, T.text); t2:SetPoint("LEFT", t1, "RIGHT", 0, 0); t2:SetText("Stats")
 
     local sb = W.Panel(head, T.bg)
@@ -1279,12 +1406,19 @@ local function CreateWindow()
     W.Tip(sb, "Search", "Type part of a statistic's name to find it on any page. Esc clears.")
     win.search = search
 
-    local close = CreateFrame("Button", nil, head)
+    local close
+    if ink then
+        local ok, native = pcall(CreateFrame, "Button", nil, head, "UIPanelCloseButtonNoScripts")
+        if ok then close = native end
+    end
+    if not close then
+        close = CreateFrame("Button", nil, head)
+        close.t = W.Text(close, 18, T.text); close.t:SetPoint("CENTER"); close.t:SetText("x")
+        close:SetScript("OnEnter", function() close.t:SetTextColor(T.amber[1], T.amber[2], T.amber[3]) end)
+        close:SetScript("OnLeave", function() close.t:SetTextColor(T.text[1], T.text[2], T.text[3]) end)
+    end
     close:SetSize(26, 26); close:SetPoint("RIGHT", -8, 0)
-    close.t = W.Text(close, 18, T.text); close.t:SetPoint("CENTER"); close.t:SetText("x")
     close:SetScript("OnClick", function() win:Hide() end)
-    close:SetScript("OnEnter", function() close.t:SetTextColor(T.amber[1], T.amber[2], T.amber[3]) end)
-    close:SetScript("OnLeave", function() close.t:SetTextColor(T.text[1], T.text[2], T.text[3]) end)
     W.Tip(close, "Close", "Closes the window (Esc also works).")
 
     local portrait = head:CreateTexture(nil, "ARTWORK")
@@ -1319,6 +1453,10 @@ local function CreateWindow()
     local side = CreateFrame("Frame", nil, win)
     side:SetPoint("TOPLEFT", 1, -HEADER_H - 1); side:SetPoint("BOTTOMLEFT", 1, FOOTER_H)
     side:SetWidth(SIDEBAR_W - 1)
+    if ink then
+        local spine = W.Fill(side, ink.base); spine:SetAllPoints()
+        W.Shade(spine, ink.base, ink.top)
+    end
     local sr = W.Line(side); sr:SetPoint("TOPRIGHT"); sr:SetPoint("BOTTOMRIGHT"); sr:SetWidth(1)
     win.navButtons = {}
     for i, cat in ipairs(ns.CATEGORIES) do
@@ -1327,7 +1465,11 @@ local function CreateWindow()
         b:SetPoint("TOPLEFT", 0, -6 - (i - 1) * NAV_STEP)
         b.bg = W.Fill(b, T.bg); b.bg:SetAllPoints()
         local line = W.Line(b); line:SetPoint("BOTTOMLEFT", 8, 0); line:SetPoint("BOTTOMRIGHT", -8, 0); line:SetHeight(1); line:SetAlpha(0.5)
-        b.bar = W.Fill(b, T.amber, "ARTWORK"); b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3)
+        b.bar = W.Fill(b, trim, "ARTWORK"); b.bar:SetPoint("TOPLEFT"); b.bar:SetPoint("BOTTOMLEFT"); b.bar:SetWidth(3)
+        if ink then
+            b.tabEdge = W.Line(b, trim, "ARTWORK")
+            b.tabEdge:SetPoint("BOTTOMLEFT", 3, 0); b.tabEdge:SetPoint("BOTTOMRIGHT", 0, 0); b.tabEdge:SetHeight(1)
+        end
         b.icon = W.Icon(b, cat.icon, 16, T.dim); b.icon:SetPoint("LEFT", 14, 0)
         b.text = W.Text(b, 12, T.text); b.text:SetPoint("LEFT", b.icon, "RIGHT", 9, 0); b.text:SetText(cat.short or cat.name)
         b.text:SetWidth(SIDEBAR_W - 14 - 16 - 9 - 34); b.text:SetJustifyH("LEFT")
@@ -1347,7 +1489,7 @@ local function CreateWindow()
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function(self)
-            if current ~= pages[self.id] then W.Color(self.bg, T.bg) end
+            if current ~= pages[self.id] then W.Color(self.bg, T.bg, ink and 0.20 or nil) end
             GameTooltip:Hide()
         end)
         win.navButtons[i] = b
@@ -1384,11 +1526,12 @@ local function CreateWindow()
     local foot = CreateFrame("Frame", nil, win)
     foot:SetPoint("BOTTOMLEFT", 1, 1); foot:SetPoint("BOTTOMRIGHT", -1, 1); foot:SetHeight(FOOTER_H)
     local fbg = W.Fill(foot, T.tile); fbg:SetAllPoints()
+    if ink then W.Shade(fbg, ink.base, ink.top) end
     local ftop = W.Line(foot); ftop:SetPoint("TOPLEFT"); ftop:SetPoint("TOPRIGHT"); ftop:SetHeight(1)
     win.footer = W.Text(foot, 10, T.dim); win.footer:SetPoint("LEFT", 10, 0)
-    local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Paste a backup string. Values only ever go up: the larger number wins.")
+    local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Merge a LifeTimeStats text backup into this character.")
     restore:SetPoint("RIGHT", -6, 0); restore:SetScript("OnClick", function() ns.ShowImport() end)
-    local backup = W.FlatButton(foot, "Backup", 64, 18, nil, "Copy a text backup of this character's stats.")
+    local backup = W.FlatButton(foot, "Backup", 64, 18, nil, "Copy this character's statistics and personal-best history as text.")
     backup:SetPoint("RIGHT", restore, "LEFT", -6, 0); backup:SetScript("OnClick", function() ns.ShowExport() end)
     local share = W.FlatButton(foot, "Share", 64, 18, nil, "Preview a one-line summary of this page and post it to a chat channel you pick. Nothing is posted until you press Send.")
     share:SetPoint("RIGHT", backup, "LEFT", -6, 0)
@@ -1541,7 +1684,7 @@ end
 -- ------------------------------------------------------------ backup dialog
 local dlg
 local function CreateDialog()
-    dlg = W.Panel(UIParent, T.bg)
+    dlg = W.Window(UIParent)
     dlg:SetSize(480, 320)
     dlg:SetPoint("CENTER")
     dlg:SetFrameStrata("DIALOG")
@@ -1572,7 +1715,7 @@ local function CreateDialog()
     local closeB = W.FlatButton(dlg, "Close", 80, 22, nil, "Close this dialog.")
     closeB:SetPoint("BOTTOMRIGHT", -12, 12)
     closeB:SetScript("OnClick", function() dlg:Hide() end)
-    dlg.action = W.FlatButton(dlg, "Restore", 80, 22, nil, "Merge the pasted backup into this character. Nothing is ever lowered.")
+    dlg.action = W.FlatButton(dlg, "Restore", 80, 22, nil, "Merge the pasted statistics and personal-best history into this character.")
     dlg.action:SetPoint("RIGHT", closeB, "LEFT", -8, 0)
     dlg.action:SetScript("OnClick", function()
         local data, n = ns.Deserialize(eb:GetText())
@@ -1581,8 +1724,9 @@ local function CreateDialog()
             return
         end
         local changed = ns.MergeMax(ns.char, data)
+        ns.InvalidateAccount()
         ns.Save()
-        ns.Print(string.format("Restore complete: %d of %d values raised.", changed, n))
+        ns.Print(string.format("Restore complete. Entries updated: %d.", changed))
         dlg:Hide()
         ns.RefreshWindow()
     end)
@@ -1593,7 +1737,7 @@ function ns.ShowExport()
     if not dlg then CreateDialog() end
     DlgDefault()
     dlg.title:SetText("Backup - " .. ns.charKey)
-    dlg.hint:SetText("Press Ctrl+A then Ctrl+C and keep the text somewhere safe. Restore it with /lts import.")
+    dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
     dlg.action:Hide()
     dlg.eb:SetText(ns.Serialize(ns.char))
     dlg:Show()
@@ -1632,7 +1776,7 @@ function ns.ShowImport()
     if not dlg then CreateDialog() end
     DlgDefault()
     dlg.title:SetText("Restore - " .. ns.charKey)
-    dlg.hint:SetText("Paste a backup made by LifeTimeStats (Ctrl+V). Nothing is lowered: counters keep the larger number, fastest times keep the faster one.")
+    dlg.hint:SetText("Paste a LifeTimeStats backup with Ctrl+V. Restore merges statistics and personal-best history into this character.")
     dlg.action:Show()
     dlg.eb:SetText("")
     dlg:Show()
@@ -1642,7 +1786,7 @@ end
 -- ------------------------------------------------------------ share dialog
 local sd
 local function CreateShare()
-    sd = W.Panel(UIParent, T.bg)
+    sd = W.Window(UIParent)
     sd:SetSize(520, 190)
     sd:SetPoint("CENTER", 0, 120)
     sd:SetFrameStrata("DIALOG")

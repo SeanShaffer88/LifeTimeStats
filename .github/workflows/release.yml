@@ -29,6 +29,8 @@ jobs:
         run: python tests/run.py
       - name: Run the observation-statistics regression suite
         run: python tests/expanded.py
+      - name: Verify Journal paging and theme behavior
+        run: python tests/journal.py
       - name: Verify release packaging
         run: python tests/package_release.py
 
