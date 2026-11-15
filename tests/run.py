@@ -4,13 +4,13 @@ from lupa import lua51
 _here = pathlib.Path(__file__).resolve().parent.parent
 ROOT = _here if (_here / "LifeTimeStats.toc").exists() else _here / "LifeTimeStats"
 L = lua51.LuaRuntime(unpack_returned_tuples=True)
-L.execute((pathlib.Path(__file__).parent / "harness.lua").read_text())
+L.execute((pathlib.Path(__file__).parent / "harness.lua").read_text(encoding="utf-8"))
 
-toc = (ROOT / "LifeTimeStats.toc").read_text().splitlines()
+toc = (ROOT / "LifeTimeStats.toc").read_text(encoding="utf-8").splitlines()
 files = [l.strip() for l in toc if l.strip().endswith(".lua")]
 L.execute("ns = {}; addonChunks = {}")
 for f in files:
-    src = (ROOT / f).read_text()
+    src = (ROOT / f).read_text(encoding="utf-8")
     chunk = L.eval("function(src, name) local f, e = loadstring(src, name); if not f then error(e) end; return f end")(src, f)
     L.eval("function(f) addonChunks[#addonChunks + 1] = f; f('LifeTimeStats', ns) end")(chunk)
 
@@ -1298,6 +1298,29 @@ do
   eq(#reloaded.errors, 0, "reload handlers have no errors")
   C_DamageMeter = nil
   time = realTime
+end
+
+-- a failing logout step must not skip the save
+do
+  local origLogout, errCount = ns.OnLogout, #ns.errors
+  ns.OnLogout = function() error("boom") end
+  local revBefore = ns.char.meta.rev or 0
+  fire("PLAYER_LOGOUT")
+  eq(ns.char.meta.rev, revBefore + 1, "save still runs when a logout step fails")
+  eq(#ns.errors, errCount + 1, "failing logout step is logged")
+  ns.OnLogout = origLogout
+  while #ns.errors > errCount do table.remove(ns.errors) end
+end
+
+-- /played stays hidden only until the login reply, or 10 s without one
+do
+  local before = #printed
+  fire("PLAYER_ENTERING_WORLD", true, false)
+  ChatFrame_DisplayTimePlayed()
+  eq(#printed, before, "login /played reply is hidden")
+  NOW = NOW + 11; RunTimers()
+  ChatFrame_DisplayTimePlayed()
+  eq(printed[#printed], "PLAYED", "/played shows again when the login reply never came")
 end
 
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))

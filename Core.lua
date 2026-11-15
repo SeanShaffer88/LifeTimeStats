@@ -553,7 +553,7 @@ function ns.PruneTallies(rec)
     end
     rec.qa = rec.qa or {}
     local cutoff = time() - 30 * 86400
-    for q, t in pairs(rec.qa) do if t < cutoff then rec.qa[q] = nil end end
+    for q, t in pairs(rec.qa) do if Bad(t) or t < cutoff then rec.qa[q] = nil end end
 end
 
 -- ---------------------------------------------------------------- views
@@ -689,10 +689,17 @@ ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin)
     ns.ResetSession()
 end)
 
+-- Each logout step runs on its own so a failure in one can never skip ns.Save(),
+-- which bumps the revision that decides which stored copy wins at the next login.
+local function LogoutStep(name, fn, ...)
+    if not fn then return end
+    local ok, err = pcall(fn, ...)
+    if not ok then ns.LogError("logout:" .. name, err) end
+end
 ns.On("PLAYER_LOGOUT", function()
-    if ns.FlushCombatDamage then ns.FlushCombatDamage() end
-    if ns.OnLogout then ns.OnLogout() end
-    if ns.char then ns.PruneTallies(ns.char) end
+    LogoutStep("flush", ns.FlushCombatDamage)
+    LogoutStep("hooks", ns.OnLogout)
+    if ns.char then LogoutStep("prune", ns.PruneTallies, ns.char) end
     ns.Save()
 end)
 
