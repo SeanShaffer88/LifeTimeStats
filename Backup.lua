@@ -280,6 +280,13 @@ local function Note(value)
     return true
 end
 
+local function MonthKey(value)
+    if type(value) ~= "string" or IsSecret(value) then return false end
+    local year, month = value:match("^(%d%d%d%d)(%d%d)$")
+    year, month = tonumber(year), tonumber(month)
+    return year ~= nil and year >= 1970 and year <= 2100 and month >= 1 and month <= 12
+end
+
 local function DayKey(value)
     if type(value) ~= "string" or IsSecret(value) then return false end
     local year, month, day = value:match("^(%d%d%d%d)(%d%d)(%d%d)$")
@@ -293,9 +300,10 @@ end
 local FULL_META = {
     created = Timestamp, achInit = Boolean, achUnseen = Nonnegative, levelMark = Nonnegative,
     levelMarkLevel = Level, levelMarkPartial = Boolean, bgStreak = Nonnegative, repairs = true,
+    monthsThrough = function(value) return DayKey(value) end,
 }
 local FULL_FIELDS = {
-    "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "ach", "achr",
+    "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
     "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "meta",
 }
 local FULL_FIELD_SET = {}
@@ -432,6 +440,9 @@ local function StageFullSnapshot(snapshot, exportLegacy)
         record.firstd.death = legacyDeathDate
     end
     section = "daily history"; record.days = Map(source.days, DayKey, function(day) return Map(day, Key, Scalar(Number)) end)
+    -- Monthly totals arrived in 1.15; older full backups simply have none.
+    section = "monthly history"; record.months = Map(source.months == nil and {} or source.months, MonthKey,
+        function(month) return Map(month, Key, Scalar(Number)) end)
     section = "achievement dates"; record.ach = Map(source.ach, Key, Scalar(Timestamp))
     section = "retroactive achievements"; record.achr = Map(source.achr, Key, Scalar(Boolean))
     section = "personal-best history"; record.rh = Sequence(source.rh, ns.RECORD_HISTORY_CAP or 200, function(row)

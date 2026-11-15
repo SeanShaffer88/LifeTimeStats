@@ -2,6 +2,20 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.14.1-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; the changes below have not been checked in the live client yet.
+
+### Fixed
+- The login `/played` reply is hidden without replacing Blizzard's chat function. Chat frames briefly stop listening for the reply instead, which avoids tainting the default UI.
+- If the login `/played` reply never arrives, `/played` shows again after 10 seconds.
+- Time online, `/played`, AFK, combat and other time counters no longer lose loading screens and frame hitches longer than 2 seconds. Each gap counts up to 2 minutes and is never turned into distance.
+- Daily history older than 40 days is folded into monthly totals instead of being deleted. A day restored again from a backup is not counted twice.
+- Logout always saves, even when an earlier logout step fails.
+
+### Changed
+- Full text backups (LTS3) include the monthly totals. Older full backups still restore. Stats-only backups (LTS2) are unchanged.
+
 ## [1.14.0-forever] - 2026-11-14
 
 Prerelease. The regression suites and live-client checks were skipped for this release.
