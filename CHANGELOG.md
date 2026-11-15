@@ -2,6 +2,31 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.19.0-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
+
+### Added
+- **Reputation history** (Characters > Reputation): every faction's standing and progress, and the date each standing was first reached. A Journal line is written at Friendly and above.
+- **Currencies** (Characters > Currencies): every currency per character with the account total. The highest amount ever held is kept as a record.
+- **Item log** (Characters > Item log): every green-or-better item with its time, zone, level, item level and source (boss by name, quest reward, vendor, crafted, mail, trade, auction, gathered, fishing, looted). It holds up to 1,000 per character. Epic items after your first get a Journal line naming their source.
+- **Gathering** (Characters > Gathering): herbs, ore, skins and fish by zone, items gathered by zone, and the best gathering sessions per hour.
+- **Mail & trades** (Characters > Mail & trades): who you mailed and traded with, gold each way, and items given and received.
+- **Goals**: a target for any statistic, set with `/lts goal <words> <target>` and listed with `/lts goal list`. They show as progress bars under Characters > Goals, are checked every 15 seconds, and write a Journal and chat line when reached.
+- **Trends** (Characters > Trends): the last 7 days against the 7 before, and this month against last month, for 15 measures.
+- **Session summary**: a window at login after a session of 10+ minutes. `/lts summary` shows the current session at any time. The existing session-recap setting turns both off.
+- 34 catalog entries, bringing the total to 937:
+  - item counts by quality and the highest item level found;
+  - items gathered and best gathering per hour;
+  - gold mailed and traded, items traded, and mail and trade partners;
+  - factions met, standings reached (Honored, Revered, Exalted) and lost;
+  - goals reached;
+  - lists of items by source, epic sources by boss, items gathered by zone, mail and trade partners, and gold per partner.
+- Full backups (LTS3) include reputation history, the item log and goals. Older full backups still restore.
+
+### Changed
+- The Characters page has a grid of section buttons under the character cards: All characters, People, Farming, Reputation, Currencies, Item log, Gathering, Mail & trades, Goals and Trends.
+
 ## [1.18.2-forever] - 2026-11-15
 
 From in-game screenshots of 1.18.1.

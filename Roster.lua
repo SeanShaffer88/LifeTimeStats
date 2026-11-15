@@ -301,6 +301,7 @@ function ns.LogSessionFarming(e, c)
     e.mi = math.floor(c.money_in or 0)
     e.lv = math.floor(c.loot_value or 0)
     e.it = math.floor(c.items_looted or 0)
+    e.gh = math.floor((c.gather_herb or 0) + (c.gather_mine or 0) + (c.gather_skin or 0) + (c.fish or 0))
     local r = ns.SessionRates(e)
     if (r.active or 0) >= 600 then -- only sessions with 10+ active minutes set rate records
         local when = date("%b %d", e.s or time())
@@ -308,5 +309,6 @@ function ns.LogSessionFarming(e, c)
         if (r.xp or 0) > 0 then Max("max_xp_per_hour", r.xp, when) end
         if (r.kills or 0) > 0 then Max("max_kills_per_hour", r.kills, when) end
         if (r.value or 0) > 0 then Max("max_value_per_hour", r.value, when) end
+        if (e.gh or 0) > 0 then Max("max_gather_per_hour", e.gh / (r.active / 3600), when) end
     end
 end

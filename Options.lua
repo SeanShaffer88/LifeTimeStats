@@ -226,8 +226,8 @@ function ns.CreateOptions()
     b = cd.body
     Track(Toggle(b, 0, 0, cd.bw, "Session column", "Show how much each value grew this session.",
         function() return S.showSession end, function(v) S.showSession = v; ns.RefreshWindow() end))
-    Track(Toggle(b, 0, 34, cd.bw, "Last-session recap at login", "One chat line with your last session's highlights.",
-        function() return S.recap end, function(v) S.recap = v end))
+    Track(Toggle(b, 0, 34, cd.bw, "Last-session recap at login", "A chat line with your last session's highlights, and a summary window after sessions of 10+ minutes (/lts summary shows it any time).",
+        function() return S.recap end, function(v) S.recap = v; S.recapWindow = v end))
     Track(Toggle(b, 0, 68, cd.bw, "Level-up line", "How long the level took and your time online.",
         function() return S.levelMsg end, function(v) S.levelMsg = v end))
     Track(Toggle(b, 0, 102, cd.bw, "Kill counts on tooltips", "How often you killed, fought and were hurt by a creature.",

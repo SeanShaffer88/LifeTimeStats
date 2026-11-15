@@ -7,7 +7,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 903 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
+- **Tracks:** 937 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
 ![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.18.2 prerelease archive, `LifeTimeStats-1.18.2-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.19.0 prerelease archive, `LifeTimeStats-1.19.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -132,6 +132,20 @@ Every character on this account in one place, kept on this computer only, laid o
 
 New statistics: vendor value of your loot (by quality), the most valuable single loot, best gold, loot value, XP and kills per hour, and players grouped with.
 
+### More on the Characters page (1.19)
+
+Buttons under the character cards open:
+
+- **Reputation**: every faction you have met, its standing and progress, and the date each standing from Friendly to Exalted was first reached. Reaching Friendly or better also writes a Journal line.
+- **Currencies**: every currency per character, with the account total.
+- **Item log**: every green-or-better item you got, newest first. Each entry has the time, zone, your level, its item level and where it came from: a boss (by name), a quest reward, a vendor, crafting, mail, a trade, the auction house, gathering, fishing or plain loot. It holds up to 1,000 items per character.
+- **Gathering**: herbs, ore, skins and fish by zone, items gathered, and your best gathering sessions per hour.
+- **Mail & trades**: who you mailed and traded with, and how much gold went each way.
+- **Goals**: a target for any statistic, with a progress bar. `/lts goal steps 1000000` adds one, `/lts goal list` lists them, `/lts goal remove 2` removes one. Reaching a goal writes a Journal line and a chat line.
+- **Trends**: this week against last week, and this month against last month, for steps, kills, deaths, quests, XP, gold, loot, time, damage, jumps, boss kills, gathering and fishing.
+
+After a session of 10 minutes or more, a summary window opens at your next login (turn it off with the session-recap setting). `/lts summary` shows the current session at any time.
+
 ## Export everything
 
 `/lts export` opens every statistic, fastest time, unique count, first and top list for every character, plus the account total, as CSV. Values are raw numbers: times in seconds, money in copper, distances in yards, firsts as Unix time. The Timeline page has a **Days / Months** switch; Months shows the last 12 months from the monthly totals.
@@ -156,7 +170,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.18.2-forever.zip`.
+1. Download `LifeTimeStats-1.19.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -229,8 +243,8 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 LifeTimeStats/
   LifeTimeStats.toc
   Core.lua  Themes.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Life.lua  Story.lua
-  Meter.lua  Chronicle.lua  Dungeons.lua  Guide.lua  Roster.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
-  UI.lua  GuideUI.lua  RosterUI.lua  Options.lua  Expanded.lua
+  Meter.lua  Chronicle.lua  Dungeons.lua  Guide.lua  Roster.lua  Collections.lua  Goals.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
+  UI.lua  GuideUI.lua  RosterUI.lua  CollectionsUI.lua  Options.lua  Expanded.lua
   Media/icon.tga  Media/dot.tga  Media/icons/*.tga  icon.png  logo.png
   README.md  CHANGELOG.md  DESCRIPTION.md  AUDIT.md  CREDITS.md  LICENSE
 ```
