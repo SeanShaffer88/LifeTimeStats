@@ -41,6 +41,8 @@ jobs:
         run: python tests/minimap.py
       - name: Verify reputation, currencies, items, gathering, mail, goals and trends
         run: python tests/compendium_collections.py
+      - name: Verify history, snapshots, size and exports
+        run: python tests/history.py
       - name: Verify release packaging
         run: python tests/package_release.py
 

@@ -230,8 +230,8 @@ function ns.CreateOptions()
         function() return S.recap end, function(v) S.recap = v; S.recapWindow = v end))
     Track(Toggle(b, 0, 68, cd.bw, "Level-up line", "How long the level took and your time online.",
         function() return S.levelMsg end, function(v) S.levelMsg = v end))
-    Track(Toggle(b, 0, 102, cd.bw, "Kill counts on tooltips", "How often you killed, fought and were hurt by a creature.",
-        function() return S.tooltipKills end, function(v) S.tooltipKills = v end))
+    Track(Toggle(b, 0, 102, cd.bw, "Kill counts and item sources on tooltips", "How often you killed, fought and were hurt by a creature, and where you got an item (boss, quest, vendor...).",
+        function() return S.tooltipKills end, function(v) S.tooltipKills = v; S.itemTooltips = v end))
     Track(Toggle(b, 0, 136, cd.bw, "Milestones in chat", "A line when counters pass 100, 1,000, 10,000...",
         function() return S.milestones end, function(v) S.milestones = v end))
     Track(Toggle(b, 0, 170, cd.bw, "Record new highs in the journal", "Add meaningful new records to your local adventure chronicle; no live chat spam.",
@@ -279,8 +279,7 @@ function ns.CreateOptions()
     Btn("Erase character", "Erase every lifetime value for this character. Asks first.", function() StaticPopup_Show("LIFETIMESTATS_RESET_CHAR", ns.charKey) end, true)
 
     panel:SetScript("OnShow", function()
-        local ok, str = pcall(ns.Serialize, ns.char)
-        local kb = ok and (#str / 1024) or 0
+        local kb = (ns.RecordSize and ns.RecordSize(ns.char) or 0) / 1024
         local days = 0
         for _ in pairs(ns.char.days) do days = days + 1 end
         info:SetText(string.format("%s%d|r statistics  ·  %s%d|r character%s  ·  %s%.0f KB|r for this character  ·  %s%d|r day%s of history",

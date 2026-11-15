@@ -29,6 +29,8 @@ local DEFAULTS = {
     classColor   = true,
     recap        = true,
     recapWindow  = true,
+    deathPins    = true,
+    itemTooltips = true,
     achAnnounce  = "off", -- off | chat | toast | both
     countPet     = true,
     milestones   = false,
@@ -150,7 +152,7 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary", "people", "reps", "items", "goals" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
@@ -862,8 +864,22 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.ShowText("Session history (CSV)", "One line per play session. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.SessionCSV())
     elseif cmd == "goal" or cmd == "goals" then
         ns.GoalCommand(msg:match("^%S+%s*(.-)$"))
+    elseif cmd == "size" then
+        local lines = ns.SizeReport()
+        if ns.ShowText then ns.ShowText("Saved data size", "Estimated size of each character's saved data.", table.concat(lines, "\n")) end
+    elseif cmd == "snapshot" or cmd == "snapshots" then
+        ns.SnapshotCommand(msg:match("^%S+%s*(.-)$"))
+    elseif cmd == "deathpins" then
+        ns.settings.deathPins = ns.settings.deathPins == false
+        if ns.RefreshDeathPins then pcall(ns.RefreshDeathPins) end
+        ns.Print("Death skulls on the world map " .. (ns.settings.deathPins and "shown" or "hidden") .. ".")
     elseif cmd == "summary" then
         ns.ShowSessionSummary(true)
+    elseif cmd == "export" and msg:match("^%S+%s+(%S+)") then
+        local kind = msg:match("^%S+%s+(%S+)")
+        local title, text = ns.ExportCSV(kind)
+        if title then ns.ShowText(title .. " (CSV)", "Ctrl+A, Ctrl+C and paste into a spreadsheet.", text)
+        else ns.Print("/lts export, or /lts export items | quests | runs | deaths") end
     elseif cmd == "export" then
         ns.ShowText("Compendium (CSV)", "Every statistic for every character, plus the account total. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.CompendiumCSV())
     elseif cmd == "recap" then
@@ -875,12 +891,9 @@ SlashCmdList.LIFETIMESTATS = function(msg)
             if #ns.errors == 0 then ns.Print("No errors recorded.") end
             for _, e in ipairs(ns.errors) do ns.Print(e) end
         end)
-    elseif cmd == "summary" then
-        ns.PrintSummary()
     else
         ns.Print("Commands:")
         ns.Print("/lts - open or close the window")
-        ns.Print("/lts summary - print a few headline stats")
         ns.Print("/lts settings - open settings")
         ns.Print("/lts minimap - show/hide minimap button · /lts minimap reset · /lts minimap square|round")
         ns.Print("/lts session - reset session counters")
@@ -895,6 +908,8 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("/lts export - every statistic for every character as CSV")
         ns.Print("/lts goal <words> <target> - set a goal · /lts goal list · /lts goal remove <n>")
         ns.Print("/lts summary - this session at a glance")
+        ns.Print("/lts export items|quests|runs|deaths - one log as CSV · /lts size - saved data size")
+        ns.Print("/lts snapshot - the last 3 daily snapshots (show / restore) · /lts deathpins - map skulls on/off")
     end
 end
 

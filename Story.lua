@@ -128,6 +128,7 @@ function ns.LevelSnapshot(level)
     ch.lvlsnap = ch.lvlsnap or {}
     local s = { t = time() }
     for _, k in ipairs(SNAP_KEYS) do s[k] = ch.c[k] or 0 end
+    if ns.LevelSnapshotExtra then pcall(ns.LevelSnapshotExtra, s) end
     ch.lvlsnap[tostring(level)] = s
     local zone = ns.GetJournalZone()
     ns.Journal("Reached level " .. tostring(level) .. " in " .. (zone or "?"), nil, zone or false)

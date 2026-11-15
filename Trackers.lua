@@ -490,6 +490,7 @@ On("QUEST_TURNED_IN", function(_, qid, xp, money)
         ns.Unique("quests", qid)
         ns.First("quest", title)
         local t0 = ns.char.qa[qid]
+        ns.lastQuestTurnIn = { id = qid, title = title, dur = t0 and (time() - t0) or nil }
         if t0 then
             local dur = time() - t0
             ns.Min("quest_fast", math.max(dur, 1), title)

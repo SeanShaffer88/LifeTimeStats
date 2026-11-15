@@ -152,7 +152,12 @@ local function UpdateDashboardKpis(page, view, base, sess)
         end
         local tile = page.kpis[nextSlot]
         tile:Configure(stat.label, pin.icon, tip)
-        tile:SetFormatted(unavailable and "n/a" or ns.FormatStat(stat, value), "Pinned · " .. pin.category)
+        local sub = "Pinned · " .. pin.category
+        local goal = ns.GoalFor and ns.GoalFor(id)
+        if goal and type(value) == "number" then
+            sub = goal.done and ("Goal reached · " .. ns.FormatStat(stat, goal.target)) or string.format("Goal %.0f%% of %s", math.min(99.9, value * 100 / goal.target), ns.FormatStat(stat, goal.target))
+        end
+        tile:SetFormatted(unavailable and "n/a" or ns.FormatStat(stat, value), sub)
         used[id], nextSlot = true, nextSlot + 1
     end
     for _, def in ipairs(page.kpiDefs) do

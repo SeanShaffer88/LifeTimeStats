@@ -53,6 +53,18 @@ function ns.AddGoal(text, target)
     return g, e
 end
 
+-- The first open (or else reached) goal set on a catalog statistic, for the Dashboard pins.
+function ns.GoalFor(id)
+    local found
+    for _, g in ipairs((ns.char and ns.char.goals) or {}) do
+        if g.id == id then
+            if not g.done then return g end
+            found = found or g
+        end
+    end
+    return found
+end
+
 function ns.RemoveGoal(index)
     local goals = ns.char and ns.char.goals
     index = tonumber(index)
