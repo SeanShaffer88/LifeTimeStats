@@ -173,7 +173,7 @@ eq(p ~= nil, true, "guide page built")
 for _, s in ipairs(ns.GUIDE_SECTIONS) do p.state.section = s.id; p.state.boss = nil; ns.RefreshWindow() end
 p.state.section, p.state.dkey, p.state.boss = "dungeon", "rfc", "Taragaman the Hungerer"
 ns.RefreshWindow()
-eq(p.title.text, "TARAGAMAN THE HUNGERER", "boss page title")
+eq(p.title.text, ns.CardTitle("Taragaman the Hungerer"), "boss page title")
 
 -- ------------------------------------------------------------ full backup keeps runs and bestiary
 local text = assert(ns.SerializeFullBackup())

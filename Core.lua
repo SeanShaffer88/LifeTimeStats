@@ -582,6 +582,34 @@ function ns.MonthTotal(view, key, month)
     return total
 end
 
+-- Every counter for one month: the folded total plus the days still kept.
+function ns.MonthRecord(view, month)
+    local out = {}
+    local folded = view and view.months and view.months[month]
+    if type(folded) == "table" then
+        for k, n in pairs(folded) do if type(n) == "number" then out[k] = n end end
+    end
+    for d, day in pairs((view and view.days) or {}) do
+        if type(d) == "string" and d:sub(1, 6) == month and type(day) == "table" then
+            for k, n in pairs(day) do if type(n) == "number" then out[k] = (out[k] or 0) + n end end
+        end
+    end
+    return out
+end
+
+-- The last n months as { m = "YYYYMM", v = record } (oldest first, current month last).
+function ns.MonthRecords(view, n)
+    local out = {}
+    local y, m = tonumber(date("%Y")), tonumber(date("%m"))
+    for i = n - 1, 0, -1 do
+        local mm, yy = m - i, y
+        while mm < 1 do mm = mm + 12; yy = yy - 1 end
+        local k = string.format("%04d%02d", yy, mm)
+        out[#out + 1] = { m = k, v = ns.MonthRecord(view, k) }
+    end
+    return out
+end
+
 -- Monthly series for the last n months (oldest first), including the current month.
 function ns.MonthSeries(view, key, n)
     local out = {}
@@ -814,6 +842,8 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.ShowText("Adventurer score", "How your score is made. Ctrl+A, Ctrl+C to copy.", ns.ScoreText())
     elseif cmd == "csv" or cmd == "sessions" then
         ns.ShowText("Session history (CSV)", "One line per play session. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.SessionCSV())
+    elseif cmd == "export" then
+        ns.ShowText("Compendium (CSV)", "Every statistic for every character, plus the account total. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.CompendiumCSV())
     elseif cmd == "recap" then
         ns.Print("This session: " .. RecapText(ns.session.c, GetTime() - ns.session.start, SessionTopSpell()))
     elseif cmd == "debug" then
@@ -840,6 +870,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("/lts sheet - character sheet you can copy · /lts title - cycle earned titles")
         ns.Print("/lts score - your Adventurer score and how it is made")
         ns.Print("/lts csv - your play sessions as CSV for a spreadsheet")
+        ns.Print("/lts export - every statistic for every character as CSV")
     end
 end
 

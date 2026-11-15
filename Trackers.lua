@@ -40,6 +40,7 @@ local function SpellName(id)
     end
     if GetSpellInfo then return (GetSpellInfo(id)) end
 end
+ns.SpellName = SpellName
 
 -- Converts a Blizzard format string (e.g. "You receive loot: %sx%d.") into a
 -- Lua pattern plus the argument order (supports %1$s style positions).
@@ -199,7 +200,8 @@ local function BossKilled(name, eventZone)
     if ns.Journal then ns.Journal("Boss killed: " .. name, "boss", eventZone) end
 end
 
-On("ENCOUNTER_END", function(_, _, name, _, _, success)
+On("ENCOUNTER_END", function(_, id, name, _, _, success)
+    if ns.EncounterName then name = ns.EncounterName(id, name) end
     if success ~= 1 and success ~= true then return end
     lastEncounterEnd = GetTime()
     BossKilled(name)

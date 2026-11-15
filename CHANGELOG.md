@@ -2,6 +2,27 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.16.0-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
+
+### Added
+- `/lts export`: every statistic, fastest time, unique count, first and top list for every character plus the account total, as CSV with raw numbers.
+- Timeline **Days / Months** switch. Months shows the last 12 months, built from the monthly totals added in 1.14.1.
+- Addon compartment entry: click to open, right-click for settings.
+- `scripts/api_scan.py` lists calls the Forever client does not have, using the captured Forever API surface from Thunderz96/forever-addon-kit (not bundled).
+
+### Changed
+- Boss rosters for the nine Forever dungeons were checked against DBM-Dungeons' Forever encounter scaffolds (build 1.60.1.70840; names and encounter IDs only, no code). Hall of Thanes gains Infurnus. Ruins of Lordaeron gains The Butcher. City of Dalaran gains Mana Elemental, Mana Wraith and Unstable Sentinel. The Drowned City gains Deathless Guardians, Min'loth the Serpent and Primeval Elemental. Krol'Dok Stronghold, Alcaz Island Prison, Blackmaw Hold and Shaper's Terrace now have full rosters (5, 5, 7 and 11). Older guide names are kept as optional so earlier kills still count.
+- Boss fights use the Forever encounter ID to get the listed boss name.
+- The four dungeons where optional bosses are unknown show progress as found / total with a * and still do not count full clears.
+
+### Fixed
+- Reputation standings (Friendly to Exalted counts) were never read on Forever: `GetNumFactions`/`GetFactionInfo` do not exist on this Retail-based client. They now use `C_Reputation`.
+- Time in each form showed "Form 1" instead of the form name, because only `GetSpellInfo` was used. It now uses `C_Spell`.
+- Toy hearthstones were recorded without a name, because only `GetItemInfo` was used. It now uses `C_Item.GetItemNameByID`.
+- Card titles follow the Forever Journal skin's casing on the Adventure Guide and Timeline pages.
+
 ## [1.15.0-forever] - 2026-11-15
 
 Prerelease. Offline regression suites pass; the Adventure Guide has not been checked in the live client yet.

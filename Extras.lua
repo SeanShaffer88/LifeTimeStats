@@ -366,7 +366,7 @@ watch:SetScript("OnUpdate", ns.Guard("watcher", function(_, elapsed)
             local i = GetShapeshiftForm()
             if i and i > 0 and GetShapeshiftFormInfo then
                 local _, _, _, spellID = GetShapeshiftFormInfo(i)
-                local name = spellID and (GetSpellInfo and GetSpellInfo(spellID)) or ("Form " .. i)
+                local name = spellID and ns.SpellName and ns.SpellName(spellID) or ("Form " .. i)
                 Tally("formtime", name, dt)
             end
         end
