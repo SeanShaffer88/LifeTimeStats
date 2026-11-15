@@ -149,13 +149,13 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
     for _, k in ipairs(SECTIONS) do rec[k] = {} end
     -- c counters · r records (max) · t tallies · u unique sets · un unique counts
-    -- f fastest (min) · fw/fd label/date · first/firstd firsts · days daily counters · qa quest accept times · rh record history
+    -- f fastest (min) · fw/fd label/date · first/firstd firsts · days daily counters · months monthly totals of pruned days · qa quest accept times · rh record history
     return rec
 end
 ns.NewCharRecord = NewCharRecord
@@ -534,6 +534,66 @@ end
 
 -- Keep tally tables and day history bounded (performance + SavedVariables size).
 local TALLY_CAP, DAY_KEEP = 400, 40
+ns.DAY_KEEP = DAY_KEEP
+
+-- Days older than the newest DAY_KEEP are folded into monthly totals instead of being
+-- deleted, so long-term history survives. meta.monthsThrough remembers the newest day
+-- already folded: a day that comes back later (from a backup) is dropped, not counted twice.
+function ns.RollUpDays(rec)
+    if type(rec.days) ~= "table" then rec.days = {} end
+    if type(rec.months) ~= "table" then rec.months = {} end
+    rec.meta = type(rec.meta) == "table" and rec.meta or {}
+    local through = type(rec.meta.monthsThrough) == "string" and rec.meta.monthsThrough or ""
+    local keys = {}
+    for k, day in pairs(rec.days) do
+        if type(k) ~= "string" or not k:match("^%d%d%d%d%d%d%d%d$") or type(day) ~= "table" then
+            rec.days[k] = nil
+        elseif k <= through then
+            rec.days[k] = nil -- already part of a monthly total
+        else
+            keys[#keys + 1] = k
+        end
+    end
+    if #keys <= DAY_KEEP then return 0 end
+    table.sort(keys)
+    local folded = #keys - DAY_KEEP
+    for i = 1, folded do
+        local k = keys[i]
+        local m = k:sub(1, 6)
+        local month = rec.months[m]
+        if type(month) ~= "table" then month = {}; rec.months[m] = month end
+        for stat, n in pairs(rec.days[k]) do
+            if type(n) == "number" and not Bad(n) then month[stat] = (month[stat] or 0) + n end
+        end
+        rec.days[k] = nil
+    end
+    rec.meta.monthsThrough = keys[folded]
+    return folded
+end
+
+-- Total of a counter for one month ("YYYYMM"): folded monthly total plus the days still kept.
+function ns.MonthTotal(view, key, month)
+    local total = 0
+    local folded = view and view.months and view.months[month]
+    if folded and type(folded[key]) == "number" then total = folded[key] end
+    for d, day in pairs((view and view.days) or {}) do
+        if type(d) == "string" and d:sub(1, 6) == month and type(day[key]) == "number" then total = total + day[key] end
+    end
+    return total
+end
+
+-- Monthly series for the last n months (oldest first), including the current month.
+function ns.MonthSeries(view, key, n)
+    local out = {}
+    local y, m = tonumber(date("%Y")), tonumber(date("%m"))
+    for i = n - 1, 0, -1 do
+        local mm, yy = m - i, y
+        while mm < 1 do mm = mm + 12; yy = yy - 1 end
+        local k = string.format("%04d%02d", yy, mm)
+        out[#out + 1] = { m = k, v = ns.MonthTotal(view, key, k) }
+    end
+    return out
+end
 function ns.PruneTallies(rec)
     for _, t in pairs(rec.t) do
         if type(t) == "table" then
@@ -545,12 +605,7 @@ function ns.PruneTallies(rec)
             end
         end
     end
-    local keys = {}
-    for k in pairs(rec.days) do keys[#keys + 1] = k end
-    if #keys > DAY_KEEP then
-        table.sort(keys)
-        for i = 1, #keys - DAY_KEEP do rec.days[keys[i]] = nil end
-    end
+    ns.RollUpDays(rec)
     rec.qa = rec.qa or {}
     local cutoff = time() - 30 * 86400
     for q, t in pairs(rec.qa) do if Bad(t) or t < cutoff then rec.qa[q] = nil end end
@@ -560,7 +615,7 @@ end
 local EMPTY = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {} }
 
 local function MergeAccount()
-    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, ach = {}, achr = {}, meta = {}, rh = {} }
+    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {}, ach = {}, achr = {}, meta = {}, rh = {} }
     for _, rec in pairs(ns.db.chars) do
         if Valid(rec) then
             Ensure(rec)
@@ -603,6 +658,11 @@ local function MergeAccount()
                 v.days[d] = dst
                 for k, n in pairs(day) do dst[k] = (dst[k] or 0) + n end
             end
+            for m, month in pairs(rec.months) do
+                local dst = v.months[m] or {}
+                v.months[m] = dst
+                for k, n in pairs(month) do if type(n) == "number" then dst[k] = (dst[k] or 0) + n end end
+            end
             for _, entry in ipairs(rec.rh or {}) do
                 if type(entry) == "table" then
                     v.rh[#v.rh + 1] = {
@@ -634,7 +694,7 @@ function ns.GetView(scope, range)
     end
     if range == "today" then
         local day = base.days[ns.Today()] or {}
-        return { c = day, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, rh = base.rh, today = true }
+        return { c = day, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, months = base.months, rh = base.rh, today = true }
     end
     if range == "week" or range == "month" then
         -- sum of the daily buckets: last 7 or 30 days including today
@@ -644,7 +704,7 @@ function ns.GetView(scope, range)
             local day = base.days[date("%Y%m%d", now - i * 86400)]
             if day then for k, v in pairs(day) do sum[k] = (sum[k] or 0) + v end end
         end
-        return { c = sum, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, rh = base.rh, today = true, span = n }
+        return { c = sum, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, months = base.months, rh = base.rh, today = true, span = n }
     end
     return base
 end

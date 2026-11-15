@@ -295,6 +295,8 @@ for d = 1, 60 do ns.char.days[string.format("2026%02d%02d", 1 + math.floor(d / 2
 fire("PLAYER_LOGOUT")
 local daysN = 0 for _ in pairs(ns.char.days) do daysN = daysN + 1 end
 eq(daysN <= 40, true, "day history pruned to 40")
+local monthsN = 0 for _ in pairs(ns.char.months) do monthsN = monthsN + 1 end
+eq(monthsN > 0, true, "pruned days kept as monthly totals")
 local creaturesN = 0 for _ in pairs(ns.char.t.creatures) do creaturesN = creaturesN + 1 end
 eq(creaturesN <= 400, true, "tallies pruned to 400")
 local sz = #ns.Serialize(ns.char)
@@ -1270,6 +1272,7 @@ do
 
   NOW, wall = NOW + 25, wall + 25
   timers = {} -- Reload discards timers from the previous UI.
+  ChatFrame1:RegisterEvent("TIME_PLAYED_MSG") -- ...and rebuilds the chat frames with their events.
   local reloaded = {}
   for _, chunk in ipairs(addonChunks) do chunk("LifeTimeStats", reloaded) end
   local newFrame = reloaded.frame
@@ -1312,15 +1315,88 @@ do
   while #ns.errors > errCount do table.remove(ns.errors) end
 end
 
--- /played stays hidden only until the login reply, or 10 s without one
+-- /played: chat frames stop listening only until the login reply, or 10 s without one.
+-- Blizzard's display function itself is never replaced (that would taint it).
 do
-  local before = #printed
+  local display = ChatFrame_DisplayTimePlayed
+  NOW = NOW + 11; RunTimers() -- let earlier test logins finish their 10 s timeout
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true, "chat frame listens before login")
+  eq(ChatFrame2:IsEventRegistered("TIME_PLAYED_MSG"), false, "frame that never listened")
   fire("PLAYER_ENTERING_WORLD", true, false)
-  ChatFrame_DisplayTimePlayed()
-  eq(#printed, before, "login /played reply is hidden")
+  eq(ChatFrame_DisplayTimePlayed, display, "Blizzard /played display is not replaced")
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), false, "login /played reply is hidden")
+  fire("TIME_PLAYED_MSG", 6000, 10)
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), false, "reply itself is not delivered to chat")
+  NOW = NOW + 0.01; RunTimers()
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true, "chat listens again after the reply")
+  eq(ChatFrame2:IsEventRegistered("TIME_PLAYED_MSG"), false, "frames that never listened stay off")
+  eq(ns.char.c.played_server, 6000, "played total from the login reply")
   NOW = NOW + 11; RunTimers()
-  ChatFrame_DisplayTimePlayed()
-  eq(printed[#printed], "PLAYED", "/played shows again when the login reply never came")
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true, "late timeout does not mute again")
+
+  fire("PLAYER_ENTERING_WORLD", true, false)
+  eq(ns.PlayedMuted(), true, "muted while waiting for the reply")
+  NOW = NOW + 11; RunTimers()
+  eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true, "/played shows again when the login reply never came")
+  eq(ns.PlayedMuted(), false, "nothing left muted after the timeout")
+end
+
+-- A long gap between frames (loading screen, hitch) still counts as time online,
+-- capped at ns.TICK_MAX_GAP, and is never turned into distance.
+do
+  local online, played, foot = ns.char.c.time_online or 0, ns.char.c.played_server or 0, ns.char.c.dist_foot or 0
+  state.speed = 7
+  NOW = NOW + 5; ticker.scripts.OnUpdate(ticker, 5)
+  eq(math.floor((ns.char.c.time_online - online) + 0.5), 5, "5 s hitch counted as online time")
+  eq(math.floor((ns.char.c.played_server - played) + 0.5), 5, "5 s hitch counted as played time")
+  eq(ns.char.c.dist_foot or 0, foot, "no distance across a hitch")
+  online = ns.char.c.time_online
+  NOW = NOW + 3600; ticker.scripts.OnUpdate(ticker, 3600)
+  eq(math.floor((ns.char.c.time_online - online) + 0.5), ns.TICK_MAX_GAP, "huge gap capped")
+  state.speed = 0
+end
+
+-- Days beyond the newest 40 fold into monthly totals instead of being lost.
+do
+  local rec = ns.NewCharRecord()
+  for d = 1, 31 do rec.days[string.format("202601%02d", d)] = { jumps = 1, kills_npc = 2 } end
+  for d = 1, 28 do rec.days[string.format("202602%02d", d)] = { jumps = 10 } end
+  eq(ns.RollUpDays(rec), 19, "19 oldest days folded")
+  local kept = 0 for _ in pairs(rec.days) do kept = kept + 1 end
+  eq(kept, 40, "40 days kept")
+  eq(rec.months["202601"].jumps, 19, "January total folded")
+  eq(rec.months["202601"].kills_npc, 38, "second counter folded")
+  eq(rec.meta.monthsThrough, "20260119", "newest folded day remembered")
+  eq(ns.MonthTotal(rec, "jumps", "202601"), 31, "month total = folded + kept days")
+  eq(ns.MonthTotal(rec, "jumps", "202602"), 280, "month with only kept days")
+  rec.days["20260105"] = { jumps = 99 } -- an old day restored from a backup
+  eq(ns.RollUpDays(rec), 0, "nothing new to fold")
+  eq(rec.days["20260105"], nil, "already-folded day dropped, not re-added")
+  eq(rec.months["202601"].jumps, 19, "no double count")
+  rec.days["2026xx01"] = { jumps = 1 }
+  ns.RollUpDays(rec)
+  eq(rec.days["2026xx01"], nil, "malformed day key removed")
+  local series = ns.MonthSeries(rec, "jumps", 3)
+  eq(#series, 3, "month series length")
+  eq(series[3].m, os.date("%Y%m"), "series ends at current month")
+end
+
+-- Monthly totals and the fold marker survive a full (LTS3) backup round trip.
+do
+  ns.char.months = { ["202501"] = { jumps = 7, dist_foot = 12.5 } }
+  ns.char.meta.monthsThrough = "20250131"
+  local text, err = ns.SerializeFullBackup()
+  eq(type(text), "string", "full backup with months serializes " .. tostring(err))
+  local snap, err2 = ns.DeserializeFullBackup(text)
+  eq(type(snap), "table", "full backup with months parses " .. tostring(err2))
+  eq(snap and snap.record.months["202501"].jumps, 7, "months in full backup")
+  eq(snap and snap.record.meta.monthsThrough, "20250131", "fold marker in full backup")
+  ns.char.months = {}
+  ns.char.meta.monthsThrough = nil
+  local ok, rerr = ns.RestoreFullBackup(snap)
+  eq(ok, true, "full restore with months " .. tostring(rerr))
+  eq(ns.char.months["202501"] and ns.char.months["202501"].dist_foot, 12.5, "months restored")
+  eq(ns.char.meta.monthsThrough, "20250131", "fold marker restored")
 end
 
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))

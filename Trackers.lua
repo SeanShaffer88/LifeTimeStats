@@ -727,28 +727,42 @@ local function InstallHooks()
 end
 
 -- ------------------------------------------------------------ played time
-local suppressPlayed = false
 -- Hides the automatic /played chat lines that our login request would print.
--- A /played typed by the player is shown as normal (the flag clears after 1 s).
-local function Wrap(orig)
-    return function(...)
-        if suppressPlayed then return end
-        return orig(...)
+-- Blizzard's display function is never replaced (that would taint it): the chat
+-- frames simply stop listening for TIME_PLAYED_MSG until our reply has arrived.
+-- A /played typed by the player afterwards is shown as normal.
+local mutedFrames -- chat frames we unregistered, or nil when nothing is muted
+local function ChatFrames()
+    local list, seen, n = {}, {}, tonumber(NUM_CHAT_WINDOWS) or 10
+    local function AddFrame(f)
+        if type(f) == "table" and not seen[f] then seen[f] = true; list[#list + 1] = f end
+    end
+    for i = 1, n do AddFrame(_G["ChatFrame" .. i]) end
+    AddFrame(DEFAULT_CHAT_FRAME)
+    return list
+end
+local function MutePlayed()
+    -- Scan again even if already muted: a frame that re-registered meanwhile is muted too.
+    mutedFrames = mutedFrames or {}
+    for _, f in ipairs(ChatFrames()) do
+        if f.IsEventRegistered and f.UnregisterEvent and f:IsEventRegistered("TIME_PLAYED_MSG") then
+            if pcall(f.UnregisterEvent, f, "TIME_PLAYED_MSG") then mutedFrames[#mutedFrames + 1] = f end
+        end
     end
 end
-local function HookPlayedDisplay()
-    if type(ChatFrame_DisplayTimePlayed) == "function" then
-        ChatFrame_DisplayTimePlayed = Wrap(ChatFrame_DisplayTimePlayed)
-    end
-    if ChatFrameUtil and type(ChatFrameUtil.DisplayTimePlayed) == "function" then
-        ChatFrameUtil.DisplayTimePlayed = Wrap(ChatFrameUtil.DisplayTimePlayed)
-    end
+local function UnmutePlayed()
+    local list = mutedFrames
+    mutedFrames = nil
+    for _, f in ipairs(list or {}) do pcall(f.RegisterEvent, f, "TIME_PLAYED_MSG") end
 end
+ns.PlayedMuted = function() return mutedFrames ~= nil end
+local function HookPlayedDisplay() end -- kept for the init list; nothing is hooked any more
 On("TIME_PLAYED_MSG", function(_, total)
     if type(total) == "number" and ns.char then
         ns.char.c.played_server = total
     end
-    C_Timer.After(1, function() suppressPlayed = false end)
+    -- Re-register on the next frame so this reply is not delivered to the chat frames.
+    if mutedFrames then C_Timer.After(0, UnmutePlayed) end
 end)
 
 -- ------------------------------------------------------------ movement
@@ -785,12 +799,18 @@ end
 -- ------------------------------------------------------------ ticker
 local ticker = CreateFrame("Frame")
 local acc, slow = 0, 0
+local MAX_TICK, MAX_GAP = 2, 120 -- seconds: normal tick limit, longest gap still counted
+ns.TICK_MAX_GAP = MAX_GAP
 ticker:SetScript("OnUpdate", ns.Guard("ticker", function(_, elapsed)
     acc = acc + elapsed
     if acc < 0.25 then return end
     local dt = acc
     acc = 0
-    if dt > 2 or not ns.char then return end -- loading hitch or not ready
+    if not ns.char then return end
+    -- A long gap (loading screen, hitch, minimised client) still counts as time played,
+    -- capped so a suspended PC cannot add hours. Movement over such a gap is not sampled.
+    local hitch = dt > MAX_TICK
+    if hitch then dt = math.min(dt, MAX_GAP) end
 
     if isDead and not B(UnitIsDeadOrGhost("player")) then isDead = false end
     local c = ns.char.c
@@ -812,8 +832,13 @@ ticker:SetScript("OnUpdate", ns.Guard("ticker", function(_, elapsed)
     elseif mounted then Add("time_mounted", dt) end
     if swimming then Add("time_swim", dt) end
 
-    local d, speed = MoveTick(dt)
-    if ns.TrackExpandedSample then ns.TrackExpandedSample(dt, d, speed) end
+    local d, speed
+    if hitch then
+        lastX, lastY, lastInst = nil, nil, nil -- never measure distance across the gap
+    else
+        d, speed = MoveTick(dt)
+        if ns.TrackExpandedSample then ns.TrackExpandedSample(dt, d, speed) end
+    end
     if d and d > 0 then
         Add("dist_total", d)
         if taxi then Add("dist_taxi", d)
@@ -855,11 +880,11 @@ On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
         wasMounted = B(IsMounted())
         wasAFK = B(UnitIsAFK("player")) and true or false
         if RequestTimePlayed then
-            suppressPlayed = true
+            MutePlayed()
             RequestTimePlayed()
             -- If the reply never arrives (throttled, or taken by another addon),
             -- stop hiding /played so the player's own requests still show.
-            C_Timer.After(10, function() suppressPlayed = false end)
+            C_Timer.After(10, UnmutePlayed)
         end
     elseif isReload then
         Add("reloads")

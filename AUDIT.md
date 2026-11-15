@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.12.2-forever
+# Audit - LifeTimeStats 1.14.1-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,10 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.14.1
+- Verified (offline, Python 3.14 + lupa 2.8): run, expanded, journal and package suites pass. New checks cover `/played` muting and unmuting of the chat frames, Blizzard's display function left in place, the 10 s fallback, hitch time counted and capped with no distance, monthly fold totals, no double count of a re-imported day, and the LTS3 round trip of monthly totals.
+- Unverified (in client): that `UnregisterEvent`/`RegisterEvent` on ChatFrame1-N for TIME_PLAYED_MSG hides only the login reply on Forever; whether other chat addons keep their own TIME_PLAYED_MSG listeners.
 
 ## 1.12.2
 - In game (1.12.1, 16 screenshots, every page): all pages render; defects seen and fixed here: LOGINEFFECT and Attack in Most cast spells, Fatigue blamed for a death (pre-1.5 data), empty per-level tables at the install level, outdated How it works texts.

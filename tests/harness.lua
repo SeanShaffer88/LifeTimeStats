@@ -26,6 +26,8 @@ Widget.__index = function(t, k)
     if k == "GetID" then return function() return 1 end end
     if k == "Text" or k == "Low" or k == "High" or k == "text" then return nil end
     if k:match("^Create") then return function() return NewWidget() end end
+    if k == "UnregisterEvent" then return function(self, ev) local e = rawget(self, "evs"); if e then e[ev] = nil end end end
+    if k == "IsEventRegistered" then return function(self, ev) local e = rawget(self, "evs"); return e ~= nil and e[ev] == true end end
     if k:match("^Register") then return function(self, ev) local e = rawget(self, "evs") or {}; rawset(self, "evs", e); e[ev or 1] = true end end
     return noop
 end
@@ -110,6 +112,9 @@ end
 function GetPlayerInfoByGUID() return "Mage", "MAGE" end
 function RequestTimePlayed() end
 function ChatFrame_DisplayTimePlayed() printed[#printed + 1] = "PLAYED" end
+NUM_CHAT_WINDOWS = 2
+ChatFrame1, ChatFrame2 = DEFAULT_CHAT_FRAME, NewWidget()
+ChatFrame1:RegisterEvent("TIME_PLAYED_MSG")
 
 LOOT_ITEM_SELF = "You receive loot: %s."
 LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
