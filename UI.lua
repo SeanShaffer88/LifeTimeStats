@@ -1947,6 +1947,7 @@ local function CreateWindow()
     BuildAchievements()
     BuildCompare()
     BuildJournal()
+    if ns.BuildGuidePage then ns.BuildGuidePage({ NewPage = NewPage, Panel = Panel, CW = CW, CH = CH, GAP = GAP }) end
 
     -- keyboard: only while the mouse is over the window and out of combat
     local keyMap = {}

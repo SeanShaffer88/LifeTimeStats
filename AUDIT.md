@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.14.1-forever
+# Audit - LifeTimeStats 1.15.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,10 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.15.0
+- Verified (offline, Python 3.14 + lupa 2.8): new `tests/guide.py` (159 assertions) covers a full dungeon run with members, a wipe, a death in the fight, a kill with fastest time and first-kill group, boss loot inside and outside the 3-minute window, world bosses, bestiary type, classification and level, zone atlas, suggestions, chapters, every section and every dungeon and boss page in character and account scope, the page refresh, and the LTS3 round trip of run history and bestiary. The existing suites pass with the catalog at 888 entries. No new globals.
+- Unverified (in client): ENCOUNTER_START names on Forever (wipes and pulls depend on it), group member names during instances, UnitCreatureType and UnitClassification values for the bestiary, loot attribution timing, layout of the Adventure Guide page and the shorter Today box below the 17-entry sidebar.
 
 ## 1.14.1
 - Verified (offline, Python 3.14 + lupa 2.8): run, expanded, journal and package suites pass. New checks cover `/played` muting and unmuting of the chat frames, Blizzard's display function left in place, the 10 s fallback, hitch time counted and capped with no distance, monthly fold totals, no double count of a re-imported day, and the LTS3 round trip of monthly totals.

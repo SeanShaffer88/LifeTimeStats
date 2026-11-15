@@ -7,7 +7,7 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 839 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
+- **Tracks:** 888 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
 ![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
 
@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.14.1 prerelease archive, `LifeTimeStats-1.14.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.15.0 prerelease archive, `LifeTimeStats-1.15.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -102,6 +102,23 @@ Times drunk (tipsy, drunk, completely smashed) and sobered up · campfires lit a
 
 The Journal writes itself as you explore. Dated entries collect firsts, level-ups, new zones, first inn visits, boss kills, deaths, achievements and personal bests. Choose an entry type and optionally enter part of a zone name in **Zone**. The search ignores case. Leave **Zone** blank for all zones, including older entries without a known location. Browse matches with **Newer** and **Older**. Click an entry to read it or add, edit or remove a personal note of up to 500 characters. Notes stay in that character's local Journal and are included when you copy a full character backup. Chat shares, character sheets and stats-only backups exclude notes. **Life per level** compares what happened at each level, and **Travel log** lists each zone with its first-visit date and level.
 
+## Adventure Guide (key G)
+
+A Dungeon Journal-style compendium of everything your characters have seen. In **Account** scope it reads every character, and runs, bestiary entries and chronicle chapters are tagged with the character's name.
+
+- **Suggestions**: dungeons in your level range you have never entered, bosses never killed, missing full clears and bosses that beat you.
+- **Progress book**: every dungeon and raid as a chapter, with bosses seen (pulled), bosses killed and runs. Click a dungeon for its bosses.
+- **Boss pages**: kills, pulls, wipes, kill rate, deaths in the fight, time fighting, fastest kill, first pull and first kill (with your level, item level and group), what killed you there and the loot you got.
+- **Run history**: the last 200 dungeon and raid runs, with length, bosses, deaths, wipes, group size, who was with you, items looted and full clears.
+- **Death codex**: deaths by boss fight, dungeon, zone (with the usual killer), killing ability and level.
+- **Bestiary**: every creature you kill, with creature type, classification (elite and rare entries are highlighted), first zone, level range and first and last kill dates. It holds up to 3,000 creatures.
+- **Zone atlas**: time, distance, quests, kills, deaths, items looted, new creatures, level-ups, visits and first and last visit for each zone.
+- **Chronicle chapters**: your Journal grouped into ten-level chapters. Click one to copy it as text.
+- **Group memories**: who you ran instances with, killed bosses with and who was there for your first kills.
+- **Boss loot**: your own loot within 3 minutes of each boss kill. It is what you got, not a full loot table.
+
+Everything here is also counted as statistics and top lists (boss wipes, kills by group size, boss loot by quality, kills by creature type and classification, deaths by hour and by level, and more). Tracking starts with 1.15.0, so nothing earlier is backfilled.
+
 ## Titles and character sheet
 
 Achievements unlock titles ("the Barfly", "the Wanderer", "of Many Hearths", …). Pick one with `/lts title` or in settings; it shows by your name. `/lts sheet` (or **Sheet** in the footer) gives a copyable character sheet.
@@ -120,7 +137,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.14.1-forever.zip`.
+1. Download `LifeTimeStats-1.15.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -183,7 +200,7 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. A stats-only restore merges records and keeps the newest 200 personal bests. See [Back up and restore](#back-up-and-restore) for the full character option.
 - The **How it works** page in the window explains every measurement.
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
-- Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days.
+- Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days, and older days are kept as monthly totals.
 - Nothing is ever sent anywhere unless you press Send in the Share dialog or type `/lts share` with a channel. No chat spam unless you turn on milestones.
 - Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested).
 
@@ -193,8 +210,8 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 LifeTimeStats/
   LifeTimeStats.toc
   Core.lua  Themes.lua  Stats.lua  Widgets.lua  Trackers.lua  Extras.lua  Fallback.lua  Life.lua  Story.lua
-  Meter.lua  Chronicle.lua  Dungeons.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
-  UI.lua  Options.lua  Expanded.lua
+  Meter.lua  Chronicle.lua  Dungeons.lua  Guide.lua  Character.lua  Social.lua  Achievements.lua  Share.lua  Backup.lua
+  UI.lua  GuideUI.lua  Options.lua  Expanded.lua
   Media/icon.tga  Media/dot.tga  Media/icons/*.tga  icon.png  logo.png
   README.md  CHANGELOG.md  DESCRIPTION.md  AUDIT.md  CREDITS.md  LICENSE
 ```
