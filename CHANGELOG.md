@@ -2,6 +2,14 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.18.1-forever] - 2026-11-15
+
+From an in-game screenshot of 1.18.0. The 3D model and the class crests (`GetClassAtlas`) work on Forever.
+
+### Fixed
+- Characters page: the realm, last-seen line, fact values and the zone line on each card were centered instead of left-aligned.
+- Characters page: the details table had an empty header row. Its columns are now labelled Entry, Value and Detail.
+
 ## [1.18.0-forever] - 2026-11-15
 
 From in-game screenshots of 1.17.1.
