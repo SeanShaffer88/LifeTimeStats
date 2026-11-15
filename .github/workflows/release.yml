@@ -37,6 +37,8 @@ jobs:
         run: python tests/compendium.py
       - name: Verify the Characters page
         run: python tests/roster.py
+      - name: Verify the minimap button and record repair
+        run: python tests/minimap.py
       - name: Verify release packaging
         run: python tests/package_release.py
 

@@ -58,6 +58,6 @@ LifeTimeStats stores data locally in account and character SavedVariables. Stats
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip `LifeTimeStats-1.18.1-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
+Unzip `LifeTimeStats-1.18.2-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.

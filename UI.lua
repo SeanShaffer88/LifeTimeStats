@@ -2081,26 +2081,61 @@ end
 
 -- ------------------------------------------------------------ minimap button
 local mmb
-local function PositionMinimapButton()
-    local a = math.rad(Settings().minimap.angle or 215)
-    local r = (Minimap:GetWidth() / 2) + 5
-    mmb:ClearAllPoints()
-    mmb:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
+-- Minimap shapes as minimap addons report them through GetMinimapShape(); which quadrants
+-- are round. A square minimap keeps the button on its edge instead of over the map.
+local SHAPES = {
+    ROUND = { true, true, true, true }, SQUARE = { false, false, false, false },
+    ["CORNER-TOPLEFT"] = { false, false, false, true }, ["CORNER-TOPRIGHT"] = { false, false, true, false },
+    ["CORNER-BOTTOMLEFT"] = { false, true, false, false }, ["CORNER-BOTTOMRIGHT"] = { true, false, false, false },
+    ["SIDE-LEFT"] = { false, true, false, true }, ["SIDE-RIGHT"] = { true, false, true, false },
+    ["SIDE-TOP"] = { false, false, true, true }, ["SIDE-BOTTOM"] = { true, true, false, false },
+    ["TRICORNER-TOPLEFT"] = { false, true, true, true }, ["TRICORNER-TOPRIGHT"] = { true, false, true, true },
+    ["TRICORNER-BOTTOMLEFT"] = { true, true, false, true }, ["TRICORNER-BOTTOMRIGHT"] = { true, true, true, false },
+}
+function ns.MinimapButtonOffset(angleDeg, w, h, shape)
+    local a = math.rad(angleDeg or 215)
+    local x, y = math.cos(a), math.sin(a)
+    local q = 1
+    if x < 0 then q = q + 1 end
+    if y > 0 then q = q + 2 end
+    local quad = (SHAPES[shape or "ROUND"] or SHAPES.ROUND)[q]
+    local hw, hh = w / 2 + 5, h / 2 + 5
+    if quad then return x * hw, y * hh end
+    -- square edge: push the round position out to the frame's border, then clamp
+    local dw, dh = math.sqrt(2 * hw * hw) - 10, math.sqrt(2 * hh * hh) - 10
+    return math.max(-hw, math.min(x * dw, hw)), math.max(-hh, math.min(y * dh, hh))
 end
+local function MinimapShape()
+    if type(GetMinimapShape) == "function" then
+        local ok, shape = pcall(GetMinimapShape)
+        if ok and type(shape) == "string" then return shape end
+    end
+    return Settings().minimap.square and "SQUARE" or "ROUND"
+end
+local function PositionMinimapButton()
+    local x, y = ns.MinimapButtonOffset(Settings().minimap.angle or 215, Minimap:GetWidth() or 140, Minimap:GetHeight() or 140, MinimapShape())
+    mmb:ClearAllPoints()
+    mmb:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+ns.PositionMinimapButton = function() if mmb then PositionMinimapButton() end end
+function ns.MinimapButton() return mmb end
 
 local function CreateMinimapButton()
     mmb = CreateFrame("Button", "LifeTimeStatsMinimapButton", Minimap)
     mmb:SetSize(31, 31)
     mmb:SetFrameStrata("MEDIUM")
     mmb:SetFrameLevel(8)
+    mmb:SetClampedToScreen(true)
     mmb:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     mmb:RegisterForDrag("LeftButton")
     local bg = mmb:CreateTexture(nil, "BACKGROUND")
     bg:SetSize(22, 22); bg:SetPoint("CENTER")
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
     local icon = mmb:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(20, 20); icon:SetPoint("CENTER", 0, 0)
+    icon:SetSize(22, 22); icon:SetPoint("CENTER", 0, 0)
     icon:SetTexture(W.MEDIA .. "icon")
+    if icon.SetMask then pcall(icon.SetMask, icon, "Interface\\CharacterFrame\\TempPortraitAlphaMask") end
+    mmb.icon = icon
     local border = mmb:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53); border:SetPoint("TOPLEFT")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
@@ -2144,9 +2179,62 @@ local function CreateMinimapButton()
     PositionMinimapButton()
 end
 
+-- With LibDataBroker and LibDBIcon loaded (Leatrix Plus, ElvUI, minimap button bags...),
+-- LifeTimeStats registers a launcher there instead, so those addons can place, hide or
+-- collect it like any other minimap button. Neither library is bundled.
+local ldbIcon
+local function BrokerIcon()
+    if ldbIcon ~= nil then return ldbIcon or nil end
+    ldbIcon = false
+    local stub = LibStub
+    if type(stub) ~= "table" and type(stub) ~= "function" then return nil end
+    local okL, ldb = pcall(stub, "LibDataBroker-1.1", true)
+    local okI, dbi = pcall(stub, "LibDBIcon-1.0", true)
+    if not (okL and ldb and okI and dbi and ldb.NewDataObject and dbi.Register) then return nil end
+    local obj = ldb:NewDataObject("LifeTimeStats", {
+        type = "launcher", text = "LifeTimeStats", icon = W.MEDIA .. "icon",
+        OnClick = function(_, btn) if btn == "RightButton" then ns.OpenOptions() else ns.ToggleWindow() end end,
+        OnTooltipShow = function(tt)
+            if not tt or not tt.AddLine then return end
+            tt:AddLine("LifeTimeStats", T.amber[1], T.amber[2], T.amber[3])
+            local v = ns.char
+            if v then
+                tt:AddDoubleLine("Steps", Int(ns.Steps(v)), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
+                tt:AddDoubleLine("Kills", Int(ns.Kills(v)), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
+                tt:AddDoubleLine("Deaths", Int(c(v, "deaths")), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
+            end
+            tt:AddLine("Left-click: open window   Right-click: settings", T.dim[1], T.dim[2], T.dim[3])
+        end,
+    })
+    local s = Settings().minimap
+    s.ldb = s.ldb or { hide = s.hide, minimapPos = s.angle }
+    local ok = obj and pcall(dbi.Register, dbi, "LifeTimeStats", obj, s.ldb)
+    if not ok then return nil end
+    ldbIcon = dbi
+    ns.src.minimapBroker = true
+    return dbi
+end
+
 function ns.UpdateMinimapButton()
+    local s = Settings().minimap
+    local dbi = BrokerIcon()
+    if dbi then
+        if mmb then mmb:Hide() end
+        s.ldb.hide = s.hide and true or false
+        if s.hide then pcall(dbi.Hide, dbi, "LifeTimeStats") else pcall(dbi.Show, dbi, "LifeTimeStats") end
+        return
+    end
     if not mmb then CreateMinimapButton() end
-    mmb:SetShown(not Settings().minimap.hide)
+    PositionMinimapButton()
+    mmb:SetShown(not s.hide)
+end
+
+-- /lts minimap reset: back to the bottom-left of the minimap and shown.
+function ns.ResetMinimapButton()
+    local s = Settings().minimap
+    s.hide, s.angle = false, 215
+    if s.ldb then s.ldb.hide, s.ldb.minimapPos = false, 215 end
+    ns.UpdateMinimapButton()
 end
 
 -- ------------------------------------------------------------ backup dialog
