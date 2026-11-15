@@ -321,14 +321,14 @@ function ns.BuildGuidePage(env)
     ns.guidePage = p
     local lc = env.Panel(p, "Adventure Guide", "tower", 0, 0, lw, CH,
         "A compendium of everything your characters have seen. Account scope shows every character.")
-    p.nav = W.Table(lc.body, lc.bw, lc.bh, { { "CHAPTER", 190, kind = "text" }, { "", 0, kind = "dim" } }, function(d)
+    p.nav = W.Table(lc.body, lc.bw, lc.bh, { { "CHAPTER", 172, kind = "text" }, { "", 0, kind = "dim" } }, function(d)
         state.section, state.dkey, state.boss = d.section, d.dkey, nil
         ns.RefreshWindow()
     end)
     local rc = env.Panel(p, "Suggestions", "scroll", lw + GAP, 0, CW - lw - GAP, CH)
     p.title = rc.title
     p.list = W.Table(rc.body, rc.bw, rc.bh, {
-        { "#", 36, kind = "dim" }, { "ENTRY", 290, kind = "text" }, { "", 120, kind = "bar" }, { "VALUE", 110, kind = "num" }, { "DETAIL", 0, kind = "dim" },
+        { "#", 32, kind = "dim" }, { "ENTRY", 250, kind = "text" }, { "", 80, kind = "bar" }, { "VALUE", 100, kind = "num" }, { "DETAIL", 0, kind = "dim" },
     }, function(d)
         if d.back then
             if d.back == "dungeon" then state.boss = nil else state.section, state.boss = d.back, nil end

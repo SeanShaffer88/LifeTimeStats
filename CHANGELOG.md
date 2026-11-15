@@ -2,6 +2,17 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.17.1-forever] - 2026-11-15
+
+From in-game screenshots of 1.17.0 (Druid level 10, three characters, no Lua errors).
+
+### Fixed
+- Characters list: a two-digit level showed as "…". The level column is wider now.
+- Characters that have not logged in since 1.17 showed 0c gold and a class written like "MAGE". They now show "—" with "log in to update", the class reads "Mage", and the account total's tooltip says how many characters it leaves out.
+- The Detail column on the Characters and Adventure Guide pages was cut off. The columns are rebalanced.
+- Header: "Druid · Level 10 · 2,108 pts" ran under the Settings button. It now reads "Level 10 · 2,108 pts", capped to fit.
+- The sidebar Today box had dropped to 4 rows with 18 pages. Page buttons are 2 px shorter, so all 7 rows fit again.
+
 ## [1.17.0-forever] - 2026-11-15
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.
