@@ -857,6 +857,9 @@ On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
         if RequestTimePlayed then
             suppressPlayed = true
             RequestTimePlayed()
+            -- If the reply never arrives (throttled, or taken by another addon),
+            -- stop hiding /played so the player's own requests still show.
+            C_Timer.After(10, function() suppressPlayed = false end)
         end
     elseif isReload then
         Add("reloads")

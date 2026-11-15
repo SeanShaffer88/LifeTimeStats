@@ -157,10 +157,27 @@ table.remove(ns.char.journal, 1)
 table.insert(ns.char.journal, { stamp + 1, "New arrival", 21 })
 ns.RefreshWindow()
 eq(feed.rows[1].entry, anchor, "refresh preserves the older page's first entry even at retention cap")
-local detail
-ns.ShowText = function(_, _, text) detail = text end
-click(feed.rows[1])
-eq(detail, anchor[2], "click opens the full original entry")
+-- A click opens the personal-note editor showing the full original entry.
+local widget = getmetatable(frames[1])
+local baseIndex, shownTexts = widget.__index, {}
+widget.__index = function(t, k)
+    if k == "SetText" then
+        return function(self, v) self.text = v; shownTexts[#shownTexts + 1] = v end
+    end
+    return baseIndex(t, k)
+end
+local beforeClick = #frames
+local ok, err = pcall(click, feed.rows[1])
+widget.__index = baseIndex
+assert(ok, err)
+local opened = false
+for i = beforeClick + 1, #frames do
+    if frames[i]:IsShown() then opened = true end
+end
+eq(opened, true, "click opens the journal note editor")
+local found = false
+for _, v in ipairs(shownTexts) do if v == anchor[2] then found = true end end
+eq(found, true, "note editor shows the full original entry")
 eq(#ns.errors, 0, "no handler or rendering errors")
 print("JOURNAL PASS: " .. checks .. " assertions")
 ''')

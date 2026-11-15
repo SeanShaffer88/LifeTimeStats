@@ -4,9 +4,9 @@ from lupa import lua51
 
 ROOT = Path(__file__).resolve().parent.parent
 lua = lua51.LuaRuntime(unpack_returned_tuples=True)
-lua.execute((ROOT / "tests/harness.lua").read_text())
+lua.execute((ROOT / "tests/harness.lua").read_text(encoding="utf-8"))
 lua.execute("ns = {}; baseCounts = {}; beforeExpandedFrames = 0")
-for name in (ROOT / "LifeTimeStats.toc").read_text().splitlines():
+for name in (ROOT / "LifeTimeStats.toc").read_text(encoding="utf-8").splitlines():
     name = name.strip()
     if not name.endswith(".lua"):
         continue
@@ -19,7 +19,7 @@ for name in (ROOT / "LifeTimeStats.toc").read_text().splitlines():
             end
         """)
     chunk = lua.eval("function(s,n) local f,e=loadstring(s,n); assert(f,e); return f end")(
-        (ROOT / name).read_text(), name
+        (ROOT / name).read_text(encoding="utf-8"), name
     )
     chunk("LifeTimeStats", lua.globals().ns)
     if name == "Expanded.lua":
