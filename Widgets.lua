@@ -226,7 +226,7 @@ end
 
 -- ------------------------------------------------------------ odometer KPI
 local DIGITS = 8
-function W.Odometer(parent, x, y, w, h, label, icon, tip)
+function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
     local f = W.Panel(parent, T.tile)
     f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
     f:SetSize(w, h)
@@ -257,6 +257,19 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip)
             f.cells[i] = cell
         end
     end
+    local formatted = number
+    if allowFormatted then
+        f.label:SetWidth(w - 24)
+        f.label:SetJustifyH("LEFT")
+        if not formatted then
+            formatted = W.Text(f, 22, T.amber, W.NUM, "LEFT")
+            formatted:SetPoint("TOPLEFT", 12, -24)
+            formatted:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
+            formatted:Hide()
+        end
+    end
+    local formattedMode = false
+    local configuredLabel, configuredIcon
     f.sub = W.Text(f, 10, ns.THEME.text); f.sub:SetPoint("BOTTOMLEFT", 12, 7); f.sub:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
     f:EnableMouse(true)
     f.tipTitle, f.tipBody = label, tip
@@ -269,14 +282,17 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip)
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     function f:Configure(lbl, ic, tp)
-        self.label:SetText(lbl:upper()); self.tipTitle = lbl; self.tipBody = tp
-        self.icon:SetTexture(W.MEDIA .. "icons\\" .. ic)
+        if configuredLabel ~= lbl then self.label:SetText(lbl:upper()); configuredLabel = lbl end
+        if configuredIcon ~= ic then self.icon:SetTexture(W.MEDIA .. "icons\\" .. ic); configuredIcon = ic end
+        self.tipTitle, self.tipBody = lbl, tp
     end
     function f:SetValue(v, sub, exact)
         v = math.max(0, math.floor((v or 0) + 0.5))
         if number then
+            if formattedMode then number:SetFont(W.NUM, 23, "") end
             number:SetText(ns.FormatInt(v))
         else
+            if formattedMode then formatted:Hide() end
             local s = tostring(v)
             if #s > DIGITS then s = string.rep("9", DIGITS) end
             s = string.rep("0", DIGITS - #s) .. s
@@ -285,13 +301,31 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip)
                 local ch = s:sub(i, i)
                 if ch ~= "0" or i == DIGITS then leading = false end
                 local cell = self.cells[i]
+                if formattedMode then cell:Show() end
                 cell.d:SetText(ch)
                 if leading then cell.d:SetTextColor(T.dim[1], T.dim[2], T.dim[3], 0.12)
                 else cell.d:SetTextColor(T.amber[1], T.amber[2], T.amber[3], 1) end
             end
         end
+        formattedMode = false
         self.sub:SetText(sub or "")
         self.exact = exact
+    end
+    if allowFormatted then
+        function f:SetFormatted(text, sub)
+            if not number and not formattedMode then
+                for _, cell in ipairs(self.cells) do cell:Hide() end
+            end
+            if not formattedMode or self.exact ~= text then
+                formatted:SetFont(W.NUM, 22, "")
+                formatted:SetText(text)
+                if formatted:GetStringWidth() > w - 60 then formatted:SetFont(W.NUM, 16, "") end
+                formatted:Show()
+            end
+            formattedMode = true
+            self.sub:SetText(sub or "")
+            self.exact = text
+        end
     end
     f:Configure(label, icon or "star", tip)
     return f
@@ -590,7 +624,7 @@ end
 
 -- ------------------------------------------------------------ grid table
 -- cols = { {title, width, kind = "text"|"num"|"dim"|"bar"} }; last column takes the rest.
-function W.Table(body, bw, bh, cols, onClick)
+function W.Table(body, bw, bh, cols, onClick, emptyText)
     local RH, HH = 22, 22
     local visible = math.floor((bh - HH) / RH)
     local f = CreateFrame("Frame", nil, body)
@@ -664,7 +698,7 @@ function W.Table(body, bw, bh, cols, onClick)
     end
     local sb = W.Fill(f, T.bg, "BORDER"); sb:SetPoint("TOPRIGHT", 0, -HH); sb:SetSize(sbW, visible * RH)
     local thumb = W.Fill(f, T.amber, "ARTWORK"); thumb:SetWidth(sbW)
-    local empty = W.Text(f, 11, T.dim); empty:SetPoint("TOP", 0, -HH - 12); empty:SetText("Nothing recorded yet")
+    local empty = W.Text(f, 11, T.dim); empty:SetPoint("TOP", 0, -HH - 12); empty:SetText(emptyText or "Nothing recorded yet")
     f.offset = 0
     f.data = {}
     function f:Render()

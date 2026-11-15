@@ -261,8 +261,8 @@ end)
 
 -- ------------------------------------------------------------ deaths (called from Trackers)
 local aliveSince
-function ns.OnPlayerDeath(cause)
-    if ns.OnStoryDeath then ns.OnStoryDeath(cause) end
+function ns.OnPlayerDeath(cause, eventZone)
+    if ns.OnStoryDeath then ns.OnStoryDeath(cause, eventZone) end
     Tally("zonedeaths", Zone())
     Tally("banddeaths", Band())
     local s = ns.session

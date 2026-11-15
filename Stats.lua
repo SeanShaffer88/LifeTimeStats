@@ -822,6 +822,85 @@ function ns.FormatStat(stat, value)
     return f(value)
 end
 
+ns.DASHBOARD_PIN_LIMIT = 4
+local dashboardCatalog, dashboardByID
+
+-- The catalog is built on first use after the addon loads, including rows
+-- appended by Expanded.lua. Consumers treat the definitions as read-only.
+function ns.DashboardPinCatalog()
+    if dashboardCatalog then return dashboardCatalog, dashboardByID end
+    if not ns.settings then return {}, {} end
+    local catalog, byID = {}, {}
+    local function AddCandidate(id, stat, category)
+        if byID[id] then return end
+        local entry = { id = id, stat = stat, icon = category.icon, category = category.name }
+        catalog[#catalog + 1] = entry
+        byID[id] = entry
+    end
+    for _, category in ipairs(ns.CATEGORIES) do
+        if category.id == "combat" then
+            AddCandidate("computed:kills", {
+                label = "Enemies killed (creatures and players)", fmt = "int", get = Kills,
+                tip = "Creatures and hostile players that died after you damaged them.",
+            }, category)
+        end
+        for _, stat in ipairs(ns.STATS[category.id] or {}) do
+            if stat.get == Steps then
+                AddCandidate("computed:steps", stat, category)
+            elseif type(stat.key) == "string" and stat.key ~= "" and FMT[stat.fmt]
+                and not stat.get and not stat.rec and not stat.label2 then
+                AddCandidate("counter:" .. stat.key, stat, category)
+            end
+        end
+    end
+    dashboardCatalog, dashboardByID = catalog, byID
+    return dashboardCatalog, dashboardByID
+end
+
+function ns.DashboardPins()
+    local saved = ns.settings and ns.settings.dashboardPins
+    local pins = {}
+    if type(saved) ~= "table" then return pins end
+    local _, byID = ns.DashboardPinCatalog()
+    local slots, seen = {}, {}
+    for slot, id in pairs(saved) do
+        if type(slot) == "number" and slot > 0 and slot % 1 == 0 and type(id) == "string" and byID[id] then
+            slots[#slots + 1] = slot
+        end
+    end
+    table.sort(slots)
+    for _, slot in ipairs(slots) do
+        local id = saved[slot]
+        if not seen[id] then
+            seen[id] = true
+            pins[#pins + 1] = id
+            if #pins == ns.DASHBOARD_PIN_LIMIT then break end
+        end
+    end
+    return pins
+end
+
+function ns.ToggleDashboardPin(id)
+    if not ns.settings then return false, "Dashboard settings are unavailable." end
+    local _, byID = ns.DashboardPinCatalog()
+    if type(id) ~= "string" or not byID[id] then return false, "This statistic cannot be pinned." end
+
+    local pins = ns.DashboardPins()
+    for i, pinnedID in ipairs(pins) do
+        if pinnedID == id then
+            table.remove(pins, i)
+            ns.settings.dashboardPins = pins
+            return true
+        end
+    end
+    if #pins >= ns.DASHBOARD_PIN_LIMIT then
+        return false, "All pin slots are in use. Unpin a statistic before adding another."
+    end
+    pins[#pins + 1] = id
+    ns.settings.dashboardPins = pins
+    return true
+end
+
 function ns.TopList(view, id, n)
     local t = view.t and view.t[id]
     local out = {}

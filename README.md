@@ -29,7 +29,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the latest `LifeTimeStats-X.Y.Z-forever.zip` from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.14.0 prerelease archive, `LifeTimeStats-1.14.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -45,6 +45,8 @@ A Warcraft-style adventurer's journal (`/lts`) with gold trim, warm page panels,
 
 ### Dashboard
 Steps, jumps, kills and deaths counters · kills vs deaths in your five deadliest zones · net gold per day for 30 days · deaths by cause · quests/kills/deaths per level band · where your gold came from · jumps by hour of day · steps per day · crit rate, quest completion and dungeon runs with a boss kill · **Your legend**: signature spell, nemesis, most hunted creature, best fight and homeland.
+
+Use **Manage pins** at the bottom of the Dashboard to search by statistic or category and pin up to four counters. Pins come first, and the original counters fill the remaining spaces. The same pins are available on each character, and their values follow the selected Character or Account scope and date range.
 
 ## What it counts (highlights)
 
@@ -98,7 +100,7 @@ Times drunk (tipsy, drunk, completely smashed) and sobered up · campfires lit a
 
 ## Journal (key L)
 
-The Journal writes itself as you explore. Dated entries collect firsts, level-ups, new zones, first inn visits, deaths, achievements and personal bests. Browse from the newest group with **Newer** and **Older**. **Life per level** compares what happened at each level, and **Travel log** lists each zone with its first-visit date and level.
+The Journal writes itself as you explore. Dated entries collect firsts, level-ups, new zones, first inn visits, boss kills, deaths, achievements and personal bests. Choose an entry type and optionally enter part of a zone name in **Zone**. The search ignores case. Leave **Zone** blank for all zones, including older entries without a known location. Browse matches with **Newer** and **Older**. Click an entry to read it or add, edit or remove a personal note of up to 500 characters. Notes stay in that character's local Journal and are included when you copy a full character backup. Chat shares, character sheets and stats-only backups exclude notes. **Life per level** compares what happened at each level, and **Travel log** lists each zone with its first-visit date and level.
 
 ## Titles and character sheet
 
@@ -118,11 +120,20 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.13.0-forever.zip`.
+1. Download `LifeTimeStats-1.14.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
 Upgrading from any earlier version keeps all your existing stats.
+
+## Back up and restore
+
+Open **Backup** or run `/lts export` and copy the text for safekeeping.
+
+- **Stats only** is the default. It copies character statistics and personal-best history. **Restore** or `/lts import` accepts LTS1 and LTS2 backups and merges those records with your current data.
+- **Full character** includes saved statistics, Journal entries and personal notes, level and travel history, and saved session history. Keep this text private if it contains personal notes. A full restore previews the snapshot and asks you to confirm replacing the saved record for the same character.
+
+Full character backups cover one character's saved record. Account settings, other characters, Dashboard pins, the active session, and in-progress tracking are outside that snapshot.
 
 ## Commands
 
@@ -135,8 +146,8 @@ Upgrading from any earlier version keeps all your existing stats.
 | `/lts session` | Reset the session counters |
 | `/lts share [s\|p\|r\|g\|i] [topic]` | Share a stat line (no channel = preview first) |
 | `/lts compare` | Open the Compare page |
-| `/lts export` | Show a text backup of this character |
-| `/lts import` | Restore from a text backup |
+| `/lts export` | Open the character backup dialog |
+| `/lts import` | Paste and restore a character backup |
 | `/lts errors` | Recent Lua errors (Forever hides them), in a copyable window |
 | `/lts dm` | What Forever's damage meter and death recap give addons, in a copyable window (for the developer) |
 | `/lts sheet` | Copyable character sheet |
@@ -169,7 +180,7 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Falls:** "survived" means you were still alive 1.5 s after the fall damage. Airtime is measured from leaving the ground to landing.
 - **Corpse runs** go from releasing your spirit to getting your body back (or using the spirit healer).
 - **Session** is since you logged in; a /reload keeps it. **Today** resets at local midnight. 40 days of daily history are kept for the charts.
-- **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. **Backup** copies character statistics and personal-best history into text. Restore merges those records and keeps the newest 200 personal bests. Journal entries and play-session history stay in SavedVariables.
+- **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. A stats-only restore merges records and keeps the newest 200 personal bests. See [Back up and restore](#back-up-and-restore) for the full character option.
 - The **How it works** page in the window explains every measurement.
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
 - Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days.

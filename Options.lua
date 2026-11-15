@@ -265,14 +265,14 @@ function ns.CreateOptions()
     b = da.body
     local info = W.Text(b, 12, T.text); info:SetPoint("TOPLEFT", 6, -2)
     local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -20); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)
-    note:SetText("Stored twice (account file and character file), so one lost SavedVariables file does not wipe your totals. Backups are plain numbers and can never run code.")
+    note:SetText("Stored twice (account file and character file), so one lost SavedVariables file does not wipe your totals. Backups are plain text.")
     local bw2, bx = (da.bw - 5 * 8) / 6, 0
     local function Btn(label, tip, fn, danger)
         local x = Button(b, label, bw2, tip, fn, danger)
         x:SetPoint("BOTTOMLEFT", bx, 4); bx = bx + bw2 + 8
     end
     Btn("Backup", "Copyable text backup of this character.", function() ns.ShowExport() end)
-    Btn("Restore", "Paste a backup. Values only go up.", function() ns.ShowImport() end)
+    Btn("Restore", "Merge a stats-only backup or preview a full character restore.", function() ns.ShowImport() end)
     Btn("Character sheet", "A text summary to paste anywhere.", function() ns.ShowSheet() end)
     Btn("Reset session", "Zero the session column. Lifetime values stay.", function() ns.ResetSession(); ns.Print("Session counters reset.") end)
     Btn("Reset window", "Centre the window and fit it to your screen.", function() ns.ResetWindow(); sl:Sync() end)
