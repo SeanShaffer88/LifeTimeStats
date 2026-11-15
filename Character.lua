@@ -95,6 +95,7 @@ local function AvgItemLevel()
     if n == 0 then return nil end
     return math.floor(sum / n * 10 + 0.5) / 10, n
 end
+ns.AvgItemLevel = AvgItemLevel
 
 local pending = false
 local function ScanStats()

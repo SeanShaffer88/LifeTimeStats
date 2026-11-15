@@ -149,7 +149,7 @@ local function CopyDefaults(src, dst)
     end
 end
 
-local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh" }
+local SECTIONS = { "c", "r", "t", "u", "un", "f", "fw", "fd", "first", "firstd", "days", "months", "qa", "ach", "achr", "journal", "lvlsnap", "zonelog", "rh", "runlog", "bestiary" }
 
 local function NewCharRecord()
     local rec = { meta = { rev = 0, created = time() }, run = nil }
@@ -615,7 +615,7 @@ end
 local EMPTY = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {} }
 
 local function MergeAccount()
-    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {}, ach = {}, achr = {}, meta = {}, rh = {} }
+    local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {}, ach = {}, achr = {}, meta = {}, rh = {}, bestiary = {} }
     for _, rec in pairs(ns.db.chars) do
         if Valid(rec) then
             Ensure(rec)
@@ -657,6 +657,19 @@ local function MergeAccount()
                 local dst = v.days[d] or {}
                 v.days[d] = dst
                 for k, n in pairs(day) do dst[k] = (dst[k] or 0) + n end
+            end
+            for name, e in pairs(rec.bestiary) do
+                if type(e) == "table" and type(e.k) == "number" then
+                    local dst = v.bestiary[name]
+                    if not dst then
+                        v.bestiary[name] = { k = e.k, f = e.f, l = e.l, z = e.z, ty = e.ty, cl = e.cl, who = rec.meta.name }
+                    else
+                        dst.k = dst.k + e.k
+                        if (e.f or 0) < (dst.f or math.huge) then dst.f, dst.z, dst.who = e.f, e.z or dst.z, rec.meta.name end
+                        if (e.l or 0) > (dst.l or 0) then dst.l = e.l end
+                        dst.ty, dst.cl = dst.ty or e.ty, dst.cl or e.cl
+                    end
+                end
             end
             for m, month in pairs(rec.months) do
                 local dst = v.months[m] or {}

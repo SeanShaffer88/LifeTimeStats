@@ -147,6 +147,7 @@ local function UpdateInstance()
     ns.FinalizeRun(run)
     ch.run = { name = name, mapID = mapID, type = itype, start = now, bosses = 0 }
     if ns.DungeonRunStart then pcall(ns.DungeonRunStart, ch.run) end
+    if ns.GuideRunStart then pcall(ns.GuideRunStart, ch.run) end
     if itype == "party" then ns.First("dungeon", name) elseif itype == "raid" then ns.First("raid", name) end
     ns.Unique("instances", name)
     if itype == "party" or itype == "raid" or itype == "pvp" then
@@ -269,6 +270,7 @@ local function OnKill(guid, name, flags)
         local npcID = guid:match("^%a+%-%d+%-%d+%-%d+%-%d+%-(%d+)")
         ns.Unique("creatures", npcID or name)
         ns.First("kill", name)
+        if ns.OnCreatureKill then pcall(ns.OnCreatureKill, name, npcID) end
     end
     streak = streak + 1
     Max("max_streak", streak)
@@ -614,6 +616,7 @@ On("CHAT_MSG_LOOT", function(_, msg)
             Add("loot_q" .. q, qty)
             if q >= 4 then Tally("epics", link:match("%[(.-)%]") or link, qty) end
         end
+        if ns.OnLootItem then pcall(ns.OnLootItem, link, qty, q) end
         return
     end
     c = Match(P.createMulti, msg)

@@ -2,6 +2,26 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.15.0-forever] - 2026-11-15
+
+Prerelease. Offline regression suites pass; the Adventure Guide has not been checked in the live client yet.
+
+### Added
+- **Adventure Guide** page (key G), a Dungeon Journal-style compendium of every character in Account scope:
+  - boss pages with kills, pulls, wipes, kill rate, deaths in the fight, fight time, fastest kill, first pull, first kill with level, item level and group, killing abilities and loot;
+  - a dungeon progress book with bosses seen and killed;
+  - run history for the last 200 dungeon and raid runs;
+  - a death codex by boss, dungeon, zone, killing ability and level;
+  - a bestiary of up to 3,000 creatures with type, classification, zone, level range and first and last kill;
+  - a zone atlas;
+  - Chronicle chapters of ten levels, copyable as text;
+  - group memories;
+  - boss loot from your own loot messages;
+  - suggestions for what to do next.
+- 29 statistics: boss pulls, wipes, fight time, longest won and lost fight, deaths in boss fights and instances, first boss kills, boss kills and instance runs by group size, boss loot by quality, different boss items, groupmates, bestiary entries and creature types.
+- 20 top lists: kills, pulls, wipes, deaths, time and loot per boss, deaths by dungeon, world bosses, runs and boss kills together, first-kill groupmates, kills by creature type and classification, zones by new creatures, quests, visits and loot, where you levelled up, deaths by level and by hour.
+- Full text backups (LTS3) include run history and the bestiary. Older full backups still restore.
+
 ## [1.14.1-forever] - 2026-11-15
 
 Prerelease. Offline regression suites pass; the changes below have not been checked in the live client yet.

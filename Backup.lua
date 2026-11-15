@@ -304,7 +304,7 @@ local FULL_META = {
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "meta",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "meta",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -324,7 +324,14 @@ local LEVEL_ROW = {
     kills_pvp = Nonnegative, deaths = Nonnegative, quests_done = Nonnegative, money_in = Nonnegative,
     time_online = Nonnegative, critter_kills = Nonnegative, times_drunk = Nonnegative,
 }
-local ZONE_ROW = { [1] = Timestamp, [2] = Level }
+local ZONE_ROW = { [1] = Timestamp, [2] = Level, [3] = Timestamp }
+local RUN_ROW = {
+    s = Timestamp, e = Timestamp, n = Text, k = Key, l = Level, b = Nonnegative, de = Nonnegative,
+    w = Nonnegative, g = Nonnegative, m = Text, c = Boolean, loot = Nonnegative,
+}
+local BESTIARY_ROW = {
+    k = Nonnegative, f = Timestamp, l = Timestamp, z = Text, ty = Text, cl = Text, lo = Level, hi = Level,
+}
 local SESSION_ROW = {
     id = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
     s = Timestamp, d = Timestamp, afk = Timestamp, l = Level, steps = Nonnegative,
@@ -457,6 +464,13 @@ local function StageFullSnapshot(snapshot, exportLegacy)
         return Key(key) and key:match("^%d+$") and Level(tonumber(key))
     end, function(row) return Row(row, LEVEL_ROW, { "t" }) end)
     section = "travel log"; record.zonelog = Map(source.zonelog, Key, function(row) return Row(row, ZONE_ROW, { 1, 2 }) end)
+    -- Run history and bestiary arrived in 1.15; older full backups have neither.
+    section = "dungeon run history"; record.runlog = Sequence(source.runlog == nil and {} or source.runlog, ns.RUNLOG_CAP or 200, function(row)
+        return Row(row, RUN_ROW, { "s" })
+    end)
+    section = "bestiary"; record.bestiary = Map(source.bestiary == nil and {} or source.bestiary, Key, function(row)
+        return Row(row, BESTIARY_ROW, { "k" })
+    end)
     local sessionIDs = {}
     section = "session history"; record.sessionlog = Sequence(source.sessionlog, 300, function(row)
         local result = Row(row, SESSION_ROW, { "s", "d" })

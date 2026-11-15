@@ -65,6 +65,8 @@ end
 
 -- Most recent info about a creature by name (watched units, then your target).
 local recentInfo = {}
+-- What the unit watch last saw of a creature by name (level, classification, creature type).
+function ns.RecentUnitInfo(name) return name and recentInfo[name] end
 local function InfoFor(name, guid)
     local now = GetTime()
     local r = name and recentInfo[name]
@@ -178,7 +180,11 @@ local function Engage(unit)
         local ok, cls = pcall(UnitClassification, unit)
         if ok and not S(cls) then e.class = cls end
     end
-    if name then recentInfo[name] = { level = e.level, myLevel = e.myLevel, class = e.class, isPlayer = e.isPlayer, t = GetTime() } end
+    if UnitCreatureType then
+        local ok, ctype = pcall(UnitCreatureType, unit)
+        if ok and type(ctype) == "string" and not S(ctype) then e.ctype = ctype end
+    end
+    if name then recentInfo[name] = { level = e.level, myLevel = e.myLevel, class = e.class, ctype = e.ctype, isPlayer = e.isPlayer, t = GetTime() } end
 end
 
 local function CheckDead(unit)

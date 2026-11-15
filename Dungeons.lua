@@ -116,6 +116,17 @@ local function Resolve(run, bossName)
 end
 ns.ResolveDungeon = Resolve
 
+-- The dungeon and boss label for a boss name in a run (nil label when it is not on the list).
+function ns.DungeonBossLabel(run, name)
+    local d = Resolve(run, name)
+    if not d then return nil, nil end
+    local idx = BossIndex(d, name)
+    if idx then return d, d.bosses[idx].name end
+    if d.learn and type(name) == "string" and not S(name) and name ~= "" and name ~= "?" then return d, name end
+    return d, nil
+end
+ns.DungeonNorm = Norm
+
 -- Progress lives in the standard sections so backups and the account view carry it:
 -- u["djboss_<key>"] = bosses found, u["djlearn_<key>"] = bosses learned in partial dungeons,
 -- t.dungeonruns / t.dungeonclears (by name), t.djlevel (first level), f["clear:<key>"] (fastest).
