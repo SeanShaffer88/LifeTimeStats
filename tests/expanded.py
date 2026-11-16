@@ -59,7 +59,7 @@ ns.ToggleWindow()
 eq(expandedFrameDelta, 0, "module adds no polling frame")
 eq(baseCount, 720, "baseline catalog measured")
 eq(ns.EXPANDED_STAT_COUNT, 222, "222 new catalog entries")
-eq(ns.CountStats(), 943 + ns.CONTROL_STAT_COUNT, "complete catalog")
+eq(ns.CountStats(), 943 + ns.CONTROL_STAT_COUNT + ns.SATCHEL_STAT_COUNT, "complete catalog")
 
 local function tick(n, distance, speed)
     for i = 1, n do

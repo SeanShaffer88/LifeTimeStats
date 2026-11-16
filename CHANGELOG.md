@@ -10,8 +10,9 @@ From in-game screenshots of 1.23.1.
 - **Crowd control suffered** (Combat page): times stunned, feared, rooted, silenced, locked out, pacified, charmed, incapacitated and disarmed, with time spent in each, total time controlled, the longest effect (a record) and two top lists: by spell and time by spell.
 - **Cinematics** (Adventurer's Life): cinematics and movies watched, watched to the end, skipped, time watching and the longest scene.
 - **Talents** (Adventurer's Life): respecs, gold spent on respecs, the most expensive respec, talent loadouts loaded and specialization changes.
-- **Achievements:** Seeing Stars, Puppet on a String, Front Row Seat, No Spoilers and Change of Heart.
-- 36 new catalog entries (979 in total) and a "How it works" section on where these come from.
+- **Your bags** (Adventurer's Life and Records): items used from your bags (with a top list by item), quest items used, different items ever carried, and records for the most bag space and most slots filled.
+- **Achievements:** Pack Rat, Bottoms Up, Seeing Stars, Puppet on a String, Front Row Seat, No Spoilers and Change of Heart.
+- 42 new catalog entries (985 in total) and a "How it works" section on where these come from.
 
 ### Fixed
 - **Options panel** (Options > AddOns > LifeTimeStats) in the Adventurer's Notebook: it now sits on its own parchment sheet, so the dark ink is readable on the dark Options window.
