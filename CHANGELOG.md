@@ -2,9 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.26.1-forever] - 2026-11-17
 
-From in-game screenshots of 1.26.0.
+Prerelease. Offline regression suites pass; not yet checked in the live client. From in-game screenshots of 1.26.0.
 
 ### Fixed
 - **Adventure Journal:** menu names were cut off ("Adventurer's...", "Adventure Gui..."). They now use the room of the hidden shortcut badge.
