@@ -44,3 +44,4 @@ CollectionsUI.lua
 HistoryUI.lua
 Options.lua
 Expanded.lua
+Control.lua
