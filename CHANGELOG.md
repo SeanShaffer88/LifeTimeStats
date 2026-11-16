@@ -2,9 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.25.0-forever] - 2026-11-16
 
-From in-game screenshots of 1.24.0.
+Prerelease. Offline regression suites pass; not yet checked in the live client. The readability changes come from in-game screenshots of 1.24.0, and the two new skins from the user's mock-ups.
 
 ### Added
 - **Two new skins built from your mock-ups** (Settings > Appearance > Theme; a change applies after a reload):

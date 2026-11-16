@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.24.0-forever
+# Audit - LifeTimeStats 1.25.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,22 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.25.0
+- In game (1.24.0, 4 screenshots):
+  - The Hero overview, Characters, Play habits and the Options panel render.
+  - Defects fixed here: faint gold headings and grey details on paper, light class colours, clipped Today values, "..." in # columns, truncated Options descriptions, and dark tooltip text.
+- Verified (offline): new suites
+  - `tests/fillscreen.py`: every page at 1920×1080 and 2560×1440;
+  - `tests/statdetail.py` (63 assertions): every one of the 992 statistics opens on the detail card;
+  - `tests/framed.py` (76 assertions): textures, both new skins, both overview pages and their data, and Fill screen in a framed skin.
+
+  The notebook suite adds ink, type-size and tooltip-colour checks. All 18 suites pass. Every client call is in the captured Forever API dump (`SetPortraitTexture`, `UnitFactionGroup`, `C_LossOfControl` and the others).
+- Unverified (in client):
+  - how the Lifetime Stats and Stats Explorer frames look: rails, corners, plaque, dropdowns, menu and both overview pages;
+  - `CreateLine` for the activity line;
+  - the game icons used for milestones and highlights;
+  - the size of the window and its tabs with Fill screen.
 
 ## 1.24.0
 - In game (1.23.1, 3 screenshots):
