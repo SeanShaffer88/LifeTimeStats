@@ -152,6 +152,8 @@ function ns.BuildStyledSkin(win, side, head, dim)
         for _, b in ipairs(navs) do
             local fill = W.Box(b, BTN_FILL, GOLD_EDGE)
             b.jfill = fill
+            b.text:SetWidth(dim.SIDEBAR_W - 56) -- the shortcut badge is hidden, so names get its room
+            b.text:SetText(b.text:GetText())
             b.text:SetTextColor(T.amber[1], T.amber[2], T.amber[3])
         end
     end
