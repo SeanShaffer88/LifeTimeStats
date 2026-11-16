@@ -8,7 +8,9 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 
 # textures: present, power-of-two, with alpha
-for name in ("paper", "wood", "ring", "tab", "tag", "tagline", "crease", "seal"):
+SKETCHES = ("backpack", "swords", "skull", "boot", "quill", "compass", "hero", "scales", "mugs", "mapscroll",
+            "tower", "campfire", "crown", "hourglass", "medal", "scroll", "sunmoon", "book", "magnifier")
+for name in ("paper", "wood", "ring", "tab", "tag", "tagline", "crease", "seal") + tuple("sketches/" + s for s in SKETCHES):
     path = ROOT / "Media" / "notebook" / (name + ".tga")
     assert path.exists(), path
     im = Image.open(path)
@@ -87,6 +89,39 @@ deeds.scripts.OnClick(deeds)
 eq(nb.current, "travel", "tab reopens the last page read in that chapter")
 eq(ns.NotebookStack("Hero"), "H\nE\nR\nO", "stacked tab letters")
 for _, cat in ipairs(ns.CATEGORIES) do ns.ShowPage(cat.id) end
+
+-- ink sketches: one per page, shown in the margin
+for _, cat in ipairs(ns.CATEGORIES) do eq(type(ns.NOTEBOOK_SKETCHES[cat.id]), "string", "sketch for " .. cat.id) end
+ns.ShowPage("deaths")
+eq(nb.sketchName, "skull", "Deaths page has the skull sketch")
+eq(nb.sketch.shown, true, "sketch shown")
+ns.ShowPage("wealth")
+eq(nb.sketchName, "backpack", "Purse & Pack has the backpack")
+
+-- wax seals: earned achievements are sealed with their tier, unearned are not
+ns.char.c.jumps = 5000
+ns.ShowPage("achievements")
+local ap = ns.Page("achievements")
+local sealed = 0
+for _, tile in ipairs(ap.tiles) do
+    if tile.def and tile.seal and tile.shown then
+        eq(tile.seal.shown, tile.st.tier > 0, "seal follows tier for " .. tile.def.name)
+        if tile.st.tier > 0 then
+            sealed = sealed + 1
+            eq(tile.seal.text.text, ns.TIER_NAMES[tile.st.tier], "seal shows the tier numeral")
+        end
+    end
+end
+eq(sealed > 0, true, "at least one sealed achievement")
+
+-- a pinned statistic whose goal is reached is sealed on the Dashboard
+local g = ns.AddGoal("times jumped", 10)
+ns.CheckGoals()
+ns.settings.dashboardPins = { g.id }
+ns.ShowPage("dashboard")
+local dp = ns.Page("dashboard")
+local seal = rawget(dp.kpis[1], "goalSeal")
+eq(seal ~= nil and seal.shown, true, "reached goal sealed on its pin")
 
 -- switching back to Forever Journal restores its colours
 ns.settings.theme = "forever"
