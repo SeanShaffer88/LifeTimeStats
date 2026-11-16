@@ -70,13 +70,13 @@ ns.STAT_SECTIONS = {
         },
     },
     deaths = {
-        order = { "Deaths", "Falls & the elements", "Recovering" },
+        order = { "Deaths", "Falls & elements", "Recovering" },
         default = "Deaths",
         rules = {
             { "Recovering", "key", "^ex_" }, { "Recovering", "key", "releases" }, { "Recovering", "key", "corpse" },
             { "Recovering", "key", "^rez" }, { "Recovering", "key", "time_dead" }, { "Recovering", "label", "recover" },
             { "Recovering", "label", "time alive" },
-            { "Falls & the elements", "key", "^falls" }, { "Falls & the elements", "key", "^dmg_" },
+            { "Falls & elements", "key", "^falls" }, { "Falls & elements", "key", "^dmg_" },
         },
     },
     adventure = {

@@ -2,6 +2,23 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Two more skins** (Settings > Appearance > Theme; a change applies after a reload). Both use LifeTimeStats' own artwork, drawn by `scripts/make_styled_textures.py`; neither is affiliated with the addon it is styled after.
+  - **Stone & Gold (in the style of Altoholic).**
+    - Dark stone inside steel rails with a gold bevel and gold corner plates.
+    - Your portrait in a gold ring on the top-left corner, and a gold title line with the version and author.
+    - A menu of the book's chapters with gold headers and their pages indented beneath; the open page gets a gold highlight bar.
+    - The chapters again as tabs along the bottom of the window. Each reopens the page you last read in it.
+  - **Adventure Journal (in the style of Dungeon Journal).**
+    - Dark brown leather in a darker frame with a thin gold line.
+    - "LifeTimeStats Journal" in gold in the middle of the top bar, with search on the left and the character and time-range dropdowns on the right.
+    - Gold-edged dark buttons for the pages, and journal-style cards with gold titles.
+
+### Changed
+- "Falls & the elements" on the Deaths page is now "Falls & elements", so its tab is not cut off.
+
 ## [1.25.2-forever] - 2026-11-17
 
 Prerelease. Offline regression suites pass; not yet checked in the live client. Fixes come from in-game screenshots of 1.25.1.
