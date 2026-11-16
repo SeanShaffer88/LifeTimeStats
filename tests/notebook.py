@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # textures: present, power-of-two, with alpha
 SKETCHES = ("backpack", "swords", "skull", "boot", "quill", "compass", "hero", "scales", "mugs", "mapscroll",
             "tower", "campfire", "crown", "hourglass", "medal", "scroll", "sunmoon", "book", "magnifier")
-for name in ("paper", "wood", "ring", "tab", "tag", "tagline", "crease", "seal") + tuple("sketches/" + s for s in SKETCHES):
+for name in ("paper", "age", "wood", "ring", "tab", "tag", "tagline", "crease", "seal") + tuple("sketches/" + s for s in SKETCHES):
     path = ROOT / "Media" / "notebook" / (name + ".tga")
     assert path.exists(), path
     im = Image.open(path)
@@ -49,13 +49,15 @@ eq(ns.themeId, "notebook", "notebook applied")
 eq(ns.Notebook(), true, "ns.Notebook")
 eq(ns.JournalSkin(), true, "notebook draws as a journal-style skin")
 eq(ns.CardTitle("Last 30 days"), "Last 30 days", "mixed-case card titles")
-eq(math.floor(ns.W.JOURNAL.base[1] * 255 + 0.5), 0xe4, "paper palette swapped in")
+eq(math.floor(ns.W.JOURNAL.base[1] * 255 + 0.5), 0xc9, "aged paper palette swapped in")
+eq(ns.FormatMoney(12345):find("|cff55555fs", 1, true) ~= nil, true, "silver letter inked darker on paper")
 
 local win = LifeTimeStatsWindow
 local nb = rawget(win, "notebook")
 eq(nb ~= nil, true, "notebook frame built")
 eq(#nb.tabs, 6, "six chapter tabs")
 eq(#nb.rings > 10, true, "spiral rings drawn")
+eq(nb.age ~= nil, true, "edge wear drawn over the page")
 for _, b in ipairs(win.navButtons) do eq(b.shown, false, "sidebar buttons hidden") end
 
 -- every page belongs to exactly one chapter (search is the exception)

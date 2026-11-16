@@ -28,6 +28,11 @@ local function Time(s)
 end
 ns.FormatTime = Time
 
+-- Coin letter colours: the game's gold/silver/copper, inked darker on the notebook's paper.
+local function Paper() return ns.Notebook and ns.Notebook() end
+local function MG() return Paper() and "|cff7a5c00" or "|cffffd100" end
+local function MS() return Paper() and "|cff55555f" or "|cffc7c7cf" end
+local function MC() return Paper() and "|cff8a4416" or "|cffeda55f" end
 local function Money(c)
     c = floor(c or 0)
     local neg = c < 0
@@ -37,11 +42,11 @@ local function Money(c)
     local cp = c % 100
     local out
     if g > 0 then
-        out = string.format("%s|cffffd100g|r %d|cffc7c7cfs|r %d|cffeda55fc|r", Int(g), s, cp)
+        out = string.format("%s" .. MG() .. "g|r %d" .. MS() .. "s|r %d" .. MC() .. "c|r", Int(g), s, cp)
     elseif s > 0 then
-        out = string.format("%d|cffc7c7cfs|r %d|cffeda55fc|r", s, cp)
+        out = string.format("%d" .. MS() .. "s|r %d" .. MC() .. "c|r", s, cp)
     else
-        out = string.format("%d|cffeda55fc|r", cp)
+        out = string.format("%d" .. MC() .. "c|r", cp)
     end
     return neg and ("-" .. out) or out
 end

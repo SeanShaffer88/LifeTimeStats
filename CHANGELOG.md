@@ -2,6 +2,20 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.22.1-forever] - 2026-11-16
+
+From in-game screenshots of 1.22.0, where the skin rendered as designed.
+
+### Changed
+- **Aged parchment** in the Adventurer's Notebook:
+  - **Paper:** darker tan, mottled with blotches, faint water stains, specks and paper fibres.
+  - **Edges:** a new edge-wear overlay browns and frays the edges and corners of the page.
+  - **Cards and tables:** a darker, more transparent wash, so the old paper shows through.
+- **Coin letters:** the gold, silver and copper letters (g, s, c) are inked darker on paper. The light silver "s" was nearly invisible.
+
+### Fixed
+- The margin's Today box ran labels into values ("Online23m 33s"). It is a little wider, with smaller values.
+
 ## [1.22.0-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.
