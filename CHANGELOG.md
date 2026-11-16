@@ -13,7 +13,15 @@ From in-game screenshots of 1.23.1.
 - **Your bags** (Adventurer's Life and Records): items used from your bags (with a top list by item), quest items used, different items ever carried, and records for the most bag space and most slots filled.
 - **Interface habits** (Social & Silly): map pins placed and removed, /who searches, players unignored, bags sorted, sell-all-junk clicks, minimap tracking changes, macros created, walk/run toggles, camera and minimap zoom steps, and how often you open the game menu, calendar, collections, achievements, guild, chat channels and customer support windows.
 - **Achievements:** Restless Wheel, A Place for Everything, Are We There Yet?, Pack Rat, Bottoms Up, Seeing Stars, Puppet on a String, Front Row Seat, No Spoilers and Change of Heart.
-- 64 new catalog entries (1,007 in total) and a "How it works" section on where these come from.
+- 63 new catalog entries; with 14 duplicate rows removed the catalog has 992 entries and a "How it works" section on where these come from.
+
+### Changed
+- **Easier to find your way around:**
+  - Every stat page is split into named sections, each with a heading in its table. For example, Battles has Damage dealt, Damage taken, Healing, Kills, Fights, Spells & auras, Crowd control, PvP & duels, and Health & movement.
+  - **Section tabs down the right side of the window** jump straight to a section, and the tab for the section you are reading stays highlighted as you scroll.
+  - Records, How it works (one tab per topic), Top Lists (grouped into Combat, Bosses & dungeons, Places, Wealth & items, People & chat, Life & habits and Time) and Achievements (its categories) have the same tabs.
+  - Search results show the page and section (Battles › Crowd control). Clicking one opens the page scrolled to that statistic and highlights it.
+- **No more duplicate rows:** food, drink and bandages appeared on two pages, as did gear changes, gathering, hearthstone uses, critters loved and sitting down. "Items taken from mail" was listed twice on one page. Each now has one home. The bag-space record added earlier in this release now feeds the existing "Most bag slots" record instead of being a second one.
 
 ### Fixed
 - **Options panel** (Options > AddOns > LifeTimeStats) in the Adventurer's Notebook: it now sits on its own parchment sheet, so the dark ink is readable on the dark Options window.

@@ -75,21 +75,21 @@ eq(c.quest_items_used, 1, "quest item used")
 
 -- ------------------------------------------------------------ what you carry
 ns.ScanSatchel(true)
-eq(ch.r.bag_slots_max, 22, "bag space across bags")
+eq(ch.r.max_bag_slots, 22, "bag space across bags")
 eq(ch.r.bag_filled_max, 5, "slots filled")
 eq(ch.un.itemsheld, 4, "different items carried, by item ID")
 local history = #(ch.rh or {})
 bagSize[1] = 10
 NOW = NOW + 1; fire("BAG_UPDATE_DELAYED")
-eq(ch.r.bag_slots_max, 22, "scans are throttled to one per 2 s")
+eq(ch.r.max_bag_slots, 22, "scans are throttled to one per 2 s")
 NOW = NOW + 3; fire("BAG_UPDATE_DELAYED")
-eq(ch.r.bag_slots_max, 26, "a bigger bag raises the record")
+eq(ch.r.max_bag_slots, 26, "a bigger bag raises the record")
 eq(#(ch.rh or {}), history, "bag records stay out of the Journal and history")
 
 -- ------------------------------------------------------------ catalog and achievements
 local found = {}
 for _, rows in pairs(ns.STATS) do for _, row in ipairs(rows) do found[row.key or row.rec or ""] = true end end
-for _, key in ipairs({ "items_used", "quest_items_used", "bag_slots_max", "bag_filled_max" }) do
+for _, key in ipairs({ "items_used", "quest_items_used", "bag_filled_max" }) do
     eq(found[key], true, "catalog row " .. key)
 end
 local uniq = false

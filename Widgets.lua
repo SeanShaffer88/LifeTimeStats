@@ -714,9 +714,14 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
                 row.cells[i] = fs
             end
         end
+        -- section heading: a rule under ink-coloured capitals, spanning the row
+        row.rule = W.Fill(row, T.amber, "ARTWORK", 0.55); row.rule:SetPoint("BOTTOMLEFT", 4, 2); row.rule:SetPoint("BOTTOMRIGHT", -4, 2); row.rule:SetHeight(1); row.rule:Hide()
+        row.heading = W.Text(row, 11, T.amber, nil, "LEFT"); row.heading:SetPoint("LEFT", 8, 0); row.heading:SetWidth(width - 16); row.heading:Hide()
+        if book then W.Bold(row.heading, T.amber) end
         row:SetScript("OnEnter", function(self)
-            self.hl:Show()
             local d = self.data
+            if d and d.header then return end
+            self.hl:Show()
             if not d or not (d.tip or d.what or d.tipTitle) then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(d.tipTitle or d[1], T.amber[1], T.amber[2], T.amber[3])
@@ -725,7 +730,7 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function(self) self.hl:Hide(); GameTooltip:Hide() end)
-        row:SetScript("OnClick", function(self) if onClick and self.data then onClick(self.data) end end)
+        row:SetScript("OnClick", function(self) if onClick and self.data and not self.data.header then onClick(self.data) end end)
         f.rows[r] = row
     end
     local sb = W.Fill(f, T.bg, "BORDER"); sb:SetPoint("TOPRIGHT", 0, -HH); sb:SetSize(sbW, visible * RH)
@@ -740,10 +745,16 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
             local row = self.rows[r]
             local d = self.data[r + self.offset]
             row.data = d
-            row.zebra:SetShown(((r + self.offset) % 2) == 0)
+            local head = d and d.header
+            row.zebra:SetShown(not head and ((r + self.offset) % 2) == 0)
+            row.rule:SetShown(head and true or false)
+            row.heading:SetShown(head and true or false)
+            if head then row.heading:SetText((W.SmallCaps or string.upper)(d[1])) end
             for i, c in ipairs(cols) do
                 local cell = row.cells[i]
-                if c.kind == "bar" then
+                if head then
+                    if c.kind == "bar" then cell.track:Hide(); cell.bar:Hide() else cell:SetText("") end
+                elseif c.kind == "bar" then
                     local v = d and d[i] or nil
                     cell.track:SetShown(v ~= nil); cell.bar:SetShown(v ~= nil)
                     if v then cell.bar:SetWidth(math.max(1, cell.w * math.max(0, math.min(1, v)))) end
@@ -764,7 +775,20 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
         else
             sb:Hide(); thumb:Hide()
         end
+        if self.onScroll then pcall(self.onScroll, self) end
     end
+    -- Scroll so data row i is at the top (section tabs use this).
+    function f:ScrollTo(i)
+        self.offset = math.max(0, (i or 1) - 1)
+        self:Render()
+    end
+    -- Scroll so data row i is visible, a little below the top.
+    function f:Reveal(i)
+        if not i then return end
+        if i <= self.offset or i > self.offset + visible then self.offset = math.max(0, i - 3) end
+        self:Render()
+    end
+    f.visible = visible
     function f:SetData(data, keepOffset)
         self.data = data
         if not keepOffset then self.offset = 0 end
