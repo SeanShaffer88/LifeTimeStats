@@ -2,7 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.23.0-forever] - 2026-11-16
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
 
 ### Changed
 - **Hand-made parchment:** the Adventurer's Notebook window is now one sheet, drawn by `scripts/make_parchment_sheet.py`.
