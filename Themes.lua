@@ -13,6 +13,16 @@ local ARIALN, FRIZ = "Fonts\\ARIALN.TTF", "Fonts\\FRIZQT__.TTF"
 
 -- Each theme: palette, fonts and a short description for the settings button.
 ns.THEMES = {
+    { id = "ledger", name = "Lifetime Stats", desc = "A framed tome: dark wood and gold around clean parchment, a menu of pages down the left, highlights and recent activity on the overview.",
+      bg = hex("dccbaa"), tile = hex("eadcbd", 0.55), tileHi = hex("d2bf98"), edge = hex("6b5233", 0.75),
+      text = hex("24190f"), dim = hex("4c3c29"), amber = hex("2c5a48"),
+      cream2 = hex("7a6a4c"), rust = hex("9c3a24"), teal = hex("3d7563"), font = FRIZ, num = FRIZ,
+      journal = { gold = hex("33281c"), trim = hex("6b5233"), top = hex("e8dab9"), base = hex("dccbaa"), tab = hex("cdb88f"), page = hex("e4d5b3") } },
+    { id = "explorer", name = "Stats Explorer", desc = "The framed tome with a dark wooden menu, a lifetime score with its motto, a card for each part of your adventure and your pinned statistics along the bottom.",
+      bg = hex("dccbaa"), tile = hex("eadcbd", 0.55), tileHi = hex("d2bf98"), edge = hex("6b5233", 0.75),
+      text = hex("24190f"), dim = hex("4c3c29"), amber = hex("2c5a48"),
+      cream2 = hex("7a6a4c"), rust = hex("9c3a24"), teal = hex("3d7563"), font = FRIZ, num = FRIZ,
+      journal = { gold = hex("33281c"), trim = hex("6b5233"), top = hex("e8dab9"), base = hex("dccbaa"), tab = hex("cdb88f"), page = hex("e4d5b3") } },
     { id = "notebook", name = "Adventurer's Notebook", desc = "An adventurer's notebook: parchment pages, ink, a spiral binding and tabs down the side. Made for roleplayers and RPG fans.",
       bg = hex("d6c095"), tile = hex("e2cfa3", 0.30), tileHi = hex("cdb487"), edge = hex("33281c", 0.85),
       text = hex("1f150c"), dim = hex("3e3020"), amber = hex("6e2610"),
@@ -59,7 +69,7 @@ function ns.DetectUI()
     if Loaded("EllesmereUI") or type(_G.EllesmereUI) == "table" and _G.EllesmereUI.ELLESMERE_GREEN then return "ellesmere" end
     if Loaded("ElvUI") then return "elvui" end
     if Loaded("Tukui") then return "tukui" end
-    return "notebook"
+    return "ledger"
 end
 
 -- Live colours / font from the UI addon itself, if loaded. Every read is guarded.
@@ -161,12 +171,18 @@ function ns.ThemeName(id)
     if id == "auto" then return "Auto (" .. (ns.THEME_BY_ID[ns.DetectUI()] or {}).name .. ")" end
     return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.notebook).name
 end
-ns.THEME_ORDER = { "auto", "notebook", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
+ns.THEME_ORDER = { "auto", "ledger", "explorer", "notebook", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
 
 -- Skins drawn as a journal (mixed-case titles, inked numbers, banner shading): Forever Journal
 -- and the Adventurer's Notebook. ns.Notebook() is the notebook alone (its own window frame).
-function ns.JournalSkin() return ns.themeId == "forever" or ns.themeId == "notebook" end
+function ns.JournalSkin() return ns.themeId == "forever" or ns.Paper() end
 function ns.Notebook() return ns.themeId == "notebook" end
+-- The two framed tomes (Lifetime Stats and Stats Explorer) share a window frame.
+function ns.Framed() return ns.themeId == "ledger" or ns.themeId == "explorer" end
+function ns.Ledger() return ns.themeId == "ledger" end
+function ns.Explorer() return ns.themeId == "explorer" end
+-- Parchment skins: dark ink on paper, so text sizes, ink and tooltips follow the paper rules.
+function ns.Paper() return ns.themeId == "notebook" or ns.themeId == "ledger" or ns.themeId == "explorer" end
 
 -- EllesmereUI skinning API: register once; the getters feed the EllesmereUI theme.
 if type(_G.EllesmereUI) == "table" and type(_G.EllesmereUI.RegisterSkin) == "function" then

@@ -101,7 +101,7 @@ local heads = 0
 for _, d in ipairs(p.table.data) do if d.header then heads = heads + 1 end end
 eq(heads, #groups, "a heading row per section")
 eq(p.table.data[1].header, true, "the table starts with a heading")
-eq(bar.tabs[1].text:GetText(), ns.W.SmallCaps(groups[1].name), "first tab names the first section")
+eq(bar.tabs[1].text:GetText(), ns.Notebook() and ns.W.SmallCaps(groups[1].name) or groups[1].name, "first tab names the first section")
 eq(bar.tabs[1].def.active, true, "first section active at the top")
 eq(bar.tabs[#groups + 1]:IsShown(), false, "spare tabs hidden")
 

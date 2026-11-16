@@ -47,7 +47,7 @@ fire("ADDON_LOADED", "LifeTimeStats")
 fire("PLAYER_LOGIN")
 fire("PLAYER_ENTERING_WORLD", true, false)
 eq(ns.settings.theme, "auto", "new installs use Auto")
-eq(ns.DetectUI(), "notebook", "Auto uses the Adventurer's Notebook without a UI replacement")
+eq(ns.DetectUI(), "ledger", "Auto uses Lifetime Stats without a UI replacement")
 local loaded = { Tukui = true, ElvUI = true, EllesmereUI = true }
 C_AddOns = { IsAddOnLoaded = function(name) return loaded[name] end }
 eq(ns.DetectUI(), "ellesmere", "Auto keeps EllesmereUI precedence")

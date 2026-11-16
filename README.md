@@ -33,7 +33,18 @@ Get the 1.24.0 prerelease archive, `LifeTimeStats-1.24.0-forever.zip`, from the 
 
 ## The window
 
-**Adventurer's Notebook** (default from 1.21) turns the window into an adventurer's tome: a single hand-made sheet of aged parchment with torn edges and an inked frame. Six chapter tabs run down the side: **Hero** (Overview, Characters, Compare), **Deeds** (Travels, Battles, Deaths, Purse & Pack, Company), **Quests** (Adventures, Dungeon Tome, Life on the Road), **Legends** (Records, Feats & Firsts, Honours, Rolls of Note), **Chronicle** (Journal, Days) and **Lore** (How it works). The margin of each page lists that chapter's pages as tags, with Today below them. Each tab reopens the page you last read in it. Values are inked in your class colour. Every page has its own ink sketch in the margin (a compass on the Overview, a skull for Deaths, a backpack for Purse & Pack, crossed swords for Battles, and more). Earned achievements are stamped with a wax seal showing their tier, and a pinned Dashboard statistic is sealed once its goal is reached. The other skins (Forever Journal, Odometer, Blizzard, ElvUI, Tukui, EllesmereUI) are still in Settings; changing skin needs a /reload.
+**Lifetime Stats** (the default from 1.25) frames the window as a tome:
+- **The frame:** a dark wooden frame with gold corners and a title plaque around clean parchment.
+- **Navigation:** a menu of pages down the left, a search box, and dropdowns for the character (this one or all of them) and the time range.
+- **The overview:** your character, four headline counters (kills, quests, achievement points, gold), a lifetime activity line, recent milestones from your Journal, highlights (your biggest hit, best boss DPS, best gold and quest days, longest kill streak) and recent activity, a page at a time.
+
+**Stats Explorer** is the same frame with a dark wooden menu and a Session / Daily / Weekly / Monthly / Lifetime bar. Its overview shows:
+- your lifetime score with its motto;
+- recent activity as a timeline;
+- a card each for Combat, Exploration, Progression and Collections, which open their pages;
+- your pinned statistics along the bottom.
+
+**Adventurer's Notebook** (the default from 1.21 to 1.24) turns the window into an adventurer's tome: a single hand-made sheet of aged parchment with torn edges and an inked frame. Six chapter tabs run down the side: **Hero** (Overview, Characters, Compare), **Deeds** (Travels, Battles, Deaths, Purse & Pack, Company), **Quests** (Adventures, Dungeon Tome, Life on the Road), **Legends** (Records, Feats & Firsts, Honours, Rolls of Note), **Chronicle** (Journal, Days) and **Lore** (How it works). The margin of each page lists that chapter's pages as tags, with Today below them. Each tab reopens the page you last read in it. Values are inked in your class colour. Every page has its own ink sketch in the margin (a compass on the Overview, a skull for Deaths, a backpack for Purse & Pack, crossed swords for Battles, and more). Earned achievements are stamped with a wax seal showing their tier, and a pinned Dashboard statistic is sealed once its goal is reached. The other skins (Stats Explorer, Adventurer's Notebook, Forever Journal, Odometer, Blizzard, ElvUI, Tukui, EllesmereUI) are in Settings; changing skin needs a /reload.
 
 
 A Warcraft-style adventurer's journal (`/lts`) with gold trim, warm page panels, chapter accents and ledger counters. The accent colour can follow your **class colour**.

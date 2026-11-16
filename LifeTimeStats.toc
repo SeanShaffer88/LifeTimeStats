@@ -37,6 +37,8 @@ Achievements.lua
 Share.lua
 Backup.lua
 Notebook.lua
+Framed.lua
+Overview.lua
 UI.lua
 GuideUI.lua
 RosterUI.lua

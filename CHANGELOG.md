@@ -7,6 +7,26 @@ All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepach
 From in-game screenshots of 1.24.0.
 
 ### Added
+- **Two new skins built from your mock-ups** (Settings > Appearance > Theme; a change applies after a reload):
+  - **Lifetime Stats, the new default.**
+    - A dark wooden frame with gold corners and a "Lifetime Stats" plaque, around clean parchment.
+    - A menu of pages down the left, with the open page in green.
+    - A search box, and dropdowns for the character (this one or all characters) and the time range (all time, this session, today, last 7 or 30 days).
+    - The overview page:
+      - your character with level, class, faction and Adventurer score;
+      - four counters (total kills, quests completed, achievement points, gold earned) that open their statistic when clicked;
+      - a lifetime activity line of your total kills over the last 30 days;
+      - recent milestones from your Journal;
+      - highlights of your best moments with their dates (biggest hit, best boss DPS, most gold and most quests in a day, most kills in one fight, longest kill streak, longest life);
+      - recent activity (quests, good items, levels and Journal moments), five at a time with page buttons.
+  - **Stats Explorer.**
+    - The same frame, with a dark wooden menu and a Session / Daily / Weekly / Monthly / Lifetime bar.
+    - The overview page:
+      - your lifetime score with a motto that changes as it grows;
+      - recent activity as a timeline;
+      - a crest card each for Combat, Exploration, Progression and Collections, which open their pages;
+      - your pinned statistics along the bottom, or four headline statistics until you pin some.
+  - **Shared with the notebook:** both skins follow its paper rules, so text is darkened for parchment and sized for reading. The Adventurer's Notebook and the other skins stay in Settings.
 - **Every statistic has its own story:** click any row on a stat page or on Records to open a card for that statistic.
   - **What it is:** its name, where it lives (Battles › Crowd control) and how it is measured.
   - **Counters:** lifetime, this session, today, the last 7 and 30 days, the best day ever with its date, how many days you did it at all, and the total across all your characters. A chart shows the last 30 days.

@@ -166,7 +166,7 @@ function ns.CreateOptions()
 
     -- The notebook palette is dark ink meant for paper; the Options window is dark, so the
     -- panel gets its own parchment sheet behind it.
-    if ns.Notebook and ns.Notebook() then
+    if ns.Paper and ns.Paper() then
         local sheet = panel:CreateTexture(nil, "BACKGROUND", nil, -7)
         sheet:SetPoint("TOPLEFT", -6, 6); sheet:SetPoint("BOTTOMRIGHT", 6, -6)
         sheet:SetTexture(W.MEDIA .. "notebook\\sheet")
