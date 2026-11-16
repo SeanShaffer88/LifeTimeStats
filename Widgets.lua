@@ -67,14 +67,14 @@ function W.SmallCaps(text) return tostring(text or ""):upper() end
 -- names all pass through here. On the dark skins colours are left alone.
 local INK_MAX = 0.34 -- brightest luminance allowed on paper
 function W.InkRGB(r, g, b)
-    if not (ns.Notebook and ns.Notebook()) or type(r) ~= "number" then return r, g, b end
+    if not (ns.Paper and ns.Paper()) or type(r) ~= "number" then return r, g, b end
     local lum = 0.299 * r + 0.587 * (g or 0) + 0.114 * (b or 0)
     if lum <= INK_MAX then return r, g, b end
     local k = INK_MAX / lum
     return r * k, (g or 0) * k, (b or 0) * k
 end
 function W.InkCodes(text)
-    if type(text) ~= "string" or not (ns.Notebook and ns.Notebook()) or not text:find("|c", 1, true) then return text end
+    if type(text) ~= "string" or not (ns.Paper and ns.Paper()) or not text:find("|c", 1, true) then return text end
     return (text:gsub("|c(%x%x)(%x%x)(%x%x)(%x%x)", function(a, rr, gg, bb)
         local r, g, b = W.InkRGB(tonumber(rr, 16) / 255, tonumber(gg, 16) / 255, tonumber(bb, 16) / 255)
         return string.format("|c%s%02x%02x%02x", a, math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
@@ -85,6 +85,7 @@ local function InkFontString(fs)
     local setText, setColor = fs.SetText, fs.SetTextColor
     if type(setText) == "function" then
         fs.SetText = function(self, t)
+            if rawget(self, "noInk") then return setText(self, t) end
             setText(self, W.InkCodes(t))
             -- single-line text that is too long shrinks a little instead of ending in "..."
             local canWrap = self.CanWordWrap or self.GetWordWrap
@@ -97,7 +98,7 @@ local function InkFontString(fs)
     end
     if type(setColor) == "function" then
         fs.SetTextColor = function(self, r, g, b, a)
-            r, g, b = W.InkRGB(r, g, b)
+            if not rawget(self, "noInk") then r, g, b = W.InkRGB(r, g, b) end
             return setColor(self, r, g, b, a)
         end
     end
@@ -114,7 +115,7 @@ end
 function W.Text(parent, size, c, font, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     size = size or 12
-    if ns.Notebook and ns.Notebook() then
+    if ns.Paper and ns.Paper() then
         size = W.PaperSize(size)
         if fs.SetShadowOffset then fs:SetShadowOffset(0, 0) end
         InkFontString(fs)
@@ -145,7 +146,7 @@ end
 -- dark ink for paper) tooltips use light parchment colours instead.
 local TIP_LIGHT = { amber = { 1, 0.82, 0.38 }, text = { 0.96, 0.92, 0.84 }, dim = { 0.78, 0.72, 0.62 } }
 function ns.TipColor(name, wrap)
-    local c = (ns.Notebook and ns.Notebook()) and TIP_LIGHT[name] or T[name] or TIP_LIGHT.text
+    local c = (ns.Paper and ns.Paper()) and TIP_LIGHT[name] or T[name] or TIP_LIGHT.text
     return c[1], c[2], c[3], wrap
 end
 
@@ -246,7 +247,8 @@ end
 -- ------------------------------------------------------------ card
 -- Card titles are upper case, except in the Forever Journal skin.
 function ns.CardTitle(s)
-    if ns.Notebook and ns.Notebook() then return W.SmallCaps(s) end
+    if ns.Framed and ns.Framed() then return tostring(s or "") end -- the framed tomes use title case
+    if ns.Paper and ns.Paper() then return W.SmallCaps(s) end
     return ns.JournalSkin() and s or tostring(s):upper()
 end
 
@@ -265,7 +267,7 @@ function W.Card(parent, title, icon, x, y, w, h, tip)
     local rule = W.Line(head); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
     local ic = W.Icon(head, icon or "star", 14, journal and W.JOURNAL.gold or nil)
     ic:SetPoint("LEFT", 9, 0)
-    local book = ns.Notebook and ns.Notebook()
+    local book = ns.Paper and ns.Paper()
     f.title = W.Text(head, book and 12 or (journal and 13 or 12), journal and W.JOURNAL.gold or T.text)
     f.title:SetPoint("LEFT", ic, "RIGHT", 8, 0)
     f.title:SetText(ns.CardTitle(title))
@@ -326,7 +328,7 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
         wash:SetPoint("TOPLEFT", 1, -2); wash:SetPoint("BOTTOMRIGHT", -1, 1)
         W.Shade(wash, W.JOURNAL.base, W.JOURNAL.top)
         number = W.Text(f, 23, T.amber, W.NUM, "LEFT")
-        if ns.Notebook() then W.Bold(number, T.amber) end
+        if ns.Paper() then W.Bold(number, T.amber) end
         number:SetPoint("TOPLEFT", 12, -23)
         number:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
     else
@@ -727,7 +729,7 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
         c.w = (i == #cols) and (width - x) or c[2]
         x = x + c.w
     end
-    local book = ns.Notebook and ns.Notebook()
+    local book = ns.Paper and ns.Paper()
     local head = W.Fill(f, book and W.JOURNAL.base or { 0x1d / 255, 0x1f / 255, 0x23 / 255, 1 }, "BACKGROUND", book and 0.55 or nil)
     head:SetPoint("TOPLEFT"); head:SetSize(width, HH)
     f.heads = {}

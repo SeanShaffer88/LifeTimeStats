@@ -38,7 +38,9 @@ function ns.WindowSizeFor(mode, uiW, uiH, scale, book)
 end
 local function ComputeLayout()
     local s = ns.settings and ns.settings.window or {}
-    local book = ns.Notebook and ns.Notebook()
+    -- the framed skins put their title on a plaque over the top rail, so the header row sits lower
+    HEADER_H = (ns.Framed and ns.Framed()) and 62 or 44
+    local book = (ns.Notebook and ns.Notebook()) or (ns.Framed and ns.Framed())
     WIN_W, WIN_H = ns.WindowSizeFor(s.size, UIParent:GetWidth(), UIParent:GetHeight(), s.scale or 1, book)
     Derive()
 end
@@ -400,12 +402,12 @@ local function CreateStatDetail()
     local banner = W.Fill(dlg, T.tile)
     banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(52)
     if ink then W.Shade(banner, ink.base, ink.top) end
-    if ns.Notebook() then banner:SetAlpha(0.35) end
+    if ns.Paper() then banner:SetAlpha(0.35) end
     local rule = W.Line(dlg, ink and ink.trim or nil)
     rule:SetPoint("TOPLEFT", 1, -53); rule:SetPoint("TOPRIGHT", -1, -53); rule:SetHeight(1)
     layer.title = W.Text(dlg, 16, ink and ink.gold or T.amber)
     layer.title:SetPoint("TOPLEFT", 14, -10); layer.title:SetPoint("RIGHT", -44, 0); layer.title:SetJustifyH("LEFT")
-    if ns.Notebook() then W.Bold(layer.title, T.amber) end
+    if ns.Paper() then W.Bold(layer.title, T.amber) end
     layer.home = W.Text(dlg, 11, T.dim)
     layer.home:SetPoint("TOPLEFT", 14, -32); layer.home:SetPoint("RIGHT", -44, 0); layer.home:SetJustifyH("LEFT")
 
@@ -432,7 +434,7 @@ local function CreateStatDetail()
         lab:SetPoint("TOPLEFT", 14 + col * fw, -112 - row * 44); lab:SetWidth(fw - 10); lab:SetJustifyH("LEFT")
         local val = W.Text(dlg, 15, T.amber, W.NUM)
         val:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -3); val:SetWidth(fw - 10); val:SetJustifyH("LEFT"); val:SetWordWrap(false)
-        if ns.Notebook() then W.Bold(val, T.amber) end
+        if ns.Paper() then W.Bold(val, T.amber) end
         layer.facts[i] = { lab = lab, val = val }
     end
 
@@ -490,13 +492,13 @@ function ns.ShowStatDetail(st)
     end
     for i, f in ipairs(L.facts) do
         local d = facts[i] or { "", "" }
-        f.lab:SetText(ns.Notebook() and W.SmallCaps(d[1]) or d[1]:upper())
+        f.lab:SetText(ns.Paper() and W.SmallCaps(d[1]) or d[1]:upper())
         f.val:SetText(d[2])
     end
 
     -- the 30-day chart (counters only)
     if h.series then
-        L.chartTitle:SetText(ns.Notebook() and W.SmallCaps("Last 30 days") or "LAST 30 DAYS")
+        L.chartTitle:SetText(ns.Paper() and W.SmallCaps("Last 30 days") or "LAST 30 DAYS")
         local vals, labels = {}, {}
         for i, e in ipairs(h.series) do vals[i] = { e.v or 0 }; labels[i] = DayLabel(e.d) end
         L.chart:Set(vals, { C.amber }, labels, { labels[1], labels[15], "Today" }, F, { st.label }, true)
@@ -540,6 +542,16 @@ local function OpenDashboardPinPicker()
 end
 
 local function BuildDashboard()
+    -- the framed skins draw their own overview (Overview.lua)
+    if ns.Framed() and ns.BuildFramedOverview then
+        return ns.BuildFramedOverview({
+            NewPage = NewPage, Panel = Panel, CW = CW, CH = CH, GAP = GAP, DayLabel = DayLabel,
+            OpenPins = OpenDashboardPinPicker,
+            RangeName = function()
+                return ({ today = "Today", session = "This session", week = "Last 7 days", month = "Last 30 days" })[Settings().range] or "Lifetime"
+            end,
+        })
+    end
     local p = NewPage("dashboard")
     KpiRow(p, {
         { id = "computed:steps", label = "Steps taken", icon = "steps", value = ns.Steps, tip = "Distance on foot divided by a 0.75 m stride.",
@@ -1275,10 +1287,11 @@ local function AchTile(parent, w, h)
         local ic = lit and T.amber or T.dim
         self.icon:SetVertexColor(ic[1], ic[2], ic[3], lit and 1 or 0.6)
         self.name:SetText(def.name .. (lit and (" " .. ns.TIER_NAMES[st.tier]) or ""))
-        if self.seal then
-            self.seal.text:SetText(lit and ns.TIER_NAMES[st.tier] or "")
-            self.seal:SetShown(lit)
-            self.seal:SetAlpha(done and 1 or 0.8)
+        local seal = rawget(self, "seal")
+        if seal then
+            seal.text:SetText(lit and ns.TIER_NAMES[st.tier] or "")
+            seal:SetShown(lit)
+            seal:SetAlpha(done and 1 or 0.8)
         end
         local nc = done and T.amber or T.text
         self.name:SetTextColor(nc[1], nc[2], nc[3])
@@ -2063,6 +2076,7 @@ function ns.ShowPage(id)
         local col = sel and (ink and ink.gold or T.amber) or T.text
         b.text:SetTextColor(col[1], col[2], col[3])
         b.icon:SetVertexColor(sel and T.amber[1] or T.dim[1], sel and T.amber[2] or T.dim[2], sel and T.amber[3] or T.dim[3])
+        if ns.Framed() and ns.StyleFramedNav then ns.StyleFramedNav(b, sel) end
     end
     ns.RefreshWindow()
 end
@@ -2116,7 +2130,8 @@ local function BuildSectionBar()
     local book = ns.Notebook()
     local bar = CreateFrame("Frame", nil, win)
     bar:SetSize(SECTION_TAB_W, SECTION_TABS * (SECTION_TAB_H + SECTION_GAP))
-    bar:SetPoint("TOPLEFT", win, "TOPRIGHT", book and 34 or 2, -(HEADER_H + PAD))
+    local outside = book and 34 or (ns.Framed() and 30 or 2) -- past the parchment or the wooden frame
+    bar:SetPoint("TOPLEFT", win, "TOPRIGHT", outside, -(HEADER_H + PAD))
     bar:SetFrameLevel((win:GetFrameLevel() or 1) + 1)
     bar.tabs = {}
     for i = 1, SECTION_TABS do
@@ -2150,7 +2165,7 @@ local function BuildSectionBar()
     end
     bar.book = book
     -- keep the tabs on screen when the window is dragged against the right edge
-    if win.SetClampRectInsets then pcall(win.SetClampRectInsets, win, 0, -((book and 34 or 2) + SECTION_TAB_W), 0, 0) end
+    if win.SetClampRectInsets then pcall(win.SetClampRectInsets, win, 0, -(outside + SECTION_TAB_W), 0, 0) end
     bar:Hide()
     win.sectionBar = bar
 end
@@ -2228,7 +2243,7 @@ local function CreateWindow()
     end)
     local hbg = W.Fill(head, T.tile); hbg:SetAllPoints()
     if ink then W.Shade(hbg, ink.base, ink.top) end
-    if ns.Notebook() then hbg:SetAlpha(0) end -- the parchment sheet shows through
+    if ns.Paper() then hbg:SetAlpha(0) end -- the parchment shows through
     local rule = W.Fill(head, trim, "ARTWORK"); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(2)
     local logo = head:CreateTexture(nil, "ARTWORK"); logo:SetSize(28, 28); logo:SetPoint("LEFT", 10, 0); logo:SetTexture(W.MEDIA .. "icon")
     local t1 = W.Text(head, 18, ink and ink.gold or T.amber); t1:SetPoint("LEFT", logo, "RIGHT", 8, 0); t1:SetText("LifeTime")
@@ -2297,12 +2312,13 @@ local function CreateWindow()
         { id = "account", label = "Account", tip = "Every character on this account that has logged in with LifeTimeStats. Hover a value to see each character's part." },
     }, function(id) Settings().scope = id; ns.InvalidateAccount(); ns.RefreshWindow() end)
     win.scopeSeg:SetPoint("RIGHT", win.rangeSeg, "LEFT", -8, 0)
+    win.headParts = { logo = logo, t1 = t1, t2 = t2, rule = rule, sb = sb, close = close, portrait = portrait, ring = ring, gear = gear }
 
     -- sidebar ---------------------------------------------------------
     local side = CreateFrame("Frame", nil, win)
     side:SetPoint("TOPLEFT", 1, -HEADER_H - 1); side:SetPoint("BOTTOMLEFT", 1, FOOTER_H)
     side:SetWidth(SIDEBAR_W - 1)
-    if ink and not ns.Notebook() then
+    if ink and not ns.Paper() then
         local spine = W.Fill(side, ink.base); spine:SetAllPoints()
         W.Shade(spine, ink.base, ink.top)
     end
@@ -2326,6 +2342,7 @@ local function CreateWindow()
         local kb = W.Panel(b, T.bg)
         kb:SetSize(16, 16); kb:SetPoint("RIGHT", -10, 0)
         local kt = W.Text(kb, 9, T.dim); kt:SetPoint("CENTER"); kt:SetText(cat.key)
+        b.kb = kb
         b.badgeBg = W.Fill(b, T.amber, "OVERLAY"); b.badgeBg:SetSize(14, 12); b.badgeBg:SetPoint("CENTER", b.icon, "TOPRIGHT", 2, -1); b.badgeBg:Hide()
         b.badge = W.Text(b, 9, T.bg, W.NUM); b.badge:SetPoint("CENTER", b.badgeBg, "CENTER", 0, 0); b.badge:SetDrawLayer("OVERLAY", 7)
         b.id = cat.id
@@ -2367,6 +2384,7 @@ local function CreateWindow()
     end
 
     if ns.Notebook() and ns.BuildNotebookFrame then ns.BuildNotebookFrame(win, side, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
+    if ns.Framed() and ns.BuildFramedSkin then ns.BuildFramedSkin(win, side, head, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
 
     -- section tabs down the right side ---------------------------------
     BuildSectionBar()
@@ -2382,7 +2400,7 @@ local function CreateWindow()
     foot:SetPoint("BOTTOMLEFT", 1, 1); foot:SetPoint("BOTTOMRIGHT", -1, 1); foot:SetHeight(FOOTER_H)
     local fbg = W.Fill(foot, T.tile); fbg:SetAllPoints()
     if ink then W.Shade(fbg, ink.base, ink.top) end
-    if ns.Notebook() then fbg:SetAlpha(0) end
+    if ns.Paper() then fbg:SetAlpha(0) end
     local ftop = W.Line(foot); ftop:SetPoint("TOPLEFT"); ftop:SetPoint("TOPRIGHT"); ftop:SetHeight(1)
     win.footer = W.Text(foot, 10, T.dim); win.footer:SetPoint("LEFT", 10, 0)
     local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Merge a stats backup or preview a full character restore.")

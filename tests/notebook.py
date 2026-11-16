@@ -43,7 +43,8 @@ fire("PLAYER_ENTERING_WORLD", true, false)
 NOW = NOW + 11; RunTimers()
 
 eq(ns.settings.theme, "auto", "new installs use Auto")
-eq(ns.DetectUI(), "notebook", "Auto picks the notebook without a UI addon")
+eq(ns.DetectUI(), "ledger", "Auto picks Lifetime Stats without a UI addon")
+ns.settings.theme = "notebook" -- this suite checks the notebook, which is chosen in Settings
 ns.ToggleWindow()
 eq(ns.themeId, "notebook", "notebook applied")
 eq(ns.Notebook(), true, "ns.Notebook")
@@ -143,7 +144,7 @@ local W = ns.W
 local function lum(r, g, b) return 0.299 * r + 0.587 * g + 0.114 * b end
 local r, g, b = W.InkRGB(1, 0.7, 0.22)
 eq(r, 1, "dark skins keep bright colours")
-ns.settings.theme = "auto"
+ns.settings.theme = "notebook"
 ns.ApplyTheme()
 eq(ns.Notebook(), true, "back on the notebook")
 r, g, b = W.InkRGB(1, 0.7, 0.22)

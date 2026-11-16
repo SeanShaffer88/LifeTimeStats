@@ -57,7 +57,7 @@ eq(h.best.v, 40, "best charted day")
 eq(h.bestEver.v, 99, "best day on file, beyond the chart")
 eq(h.bestEver.d, day(35), "best day's date")
 eq(h.daysOnFile, 5, "days on file with any")
-eq(h.home, "Travels › Getting around", "where the statistic lives")
+eq(h.home, "Travel › Getting around", "where the statistic lives")
 
 -- ------------------------------------------------------------ every character
 ns.db.chars["Hex-Forever"] = { c = { jumps = 800 }, r = {}, t = {}, un = {}, days = {}, meta = { name = "Hex", class = "WARLOCK" } }
@@ -157,13 +157,24 @@ eq(ns.FindStat("nonsense"), nil, "unknown ids find nothing")
 ns.ShowPage("dashboard")
 local dash = ns.Page("dashboard")
 layer:Hide()
-local jumpTile
-for _, t in ipairs(dash.kpis) do if rawget(t, "stat") == st then jumpTile = t end end
-eq(jumpTile ~= nil, true, "the jumps tile knows its statistic")
-jumpTile.scripts.OnMouseUp(jumpTile, "LeftButton")
-eq(layer:IsShown() and layer.stat == st, true, "clicking a tile opens its card")
+-- the overview of the default skin (Lifetime Stats): its counters open their statistic
+local killTile
+for _, t in ipairs(dash.tiles) do if rawget(t, "stat") and t.stat.label == "Enemies killed" then killTile = t end end
+eq(killTile ~= nil, true, "the kills tile knows its statistic")
+killTile.scripts.OnClick(killTile)
+eq(layer:IsShown() and layer.stat == killTile.stat, true, "clicking a tile opens its card")
 layer:Hide()
-jumpTile.scripts.OnMouseUp(jumpTile, "RightButton")
+
+-- the page tiles of the other skins open theirs too (left-click only)
+ns.ShowPage("combat")
+local combat = ns.Page("combat")
+local hitTile
+for _, t in ipairs(combat.kpis) do if rawget(t, "stat") then hitTile = t end end
+eq(hitTile ~= nil, true, "a page tile knows its statistic")
+hitTile.scripts.OnMouseUp(hitTile, "LeftButton")
+eq(layer:IsShown() and layer.stat == hitTile.stat, true, "clicking a page tile opens its card")
+layer:Hide()
+hitTile.scripts.OnMouseUp(hitTile, "RightButton")
 eq(layer:IsShown(), false, "right-click does not open it")
 
 -- every statistic on every page opens without an error

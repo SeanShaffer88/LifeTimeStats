@@ -29,7 +29,7 @@ end
 ns.FormatTime = Time
 
 -- Coin letter colours: the game's gold/silver/copper, inked darker on the notebook's paper.
-local function Paper() return ns.Notebook and ns.Notebook() end
+local function Paper() return ns.Paper and ns.Paper() end
 local function MG() return Paper() and "|cff7a5c00" or "|cffffd100" end
 local function MS() return Paper() and "|cff55555f" or "|cffc7c7cf" end
 local function MC() return Paper() and "|cff8a4416" or "|cffeda55f" end
