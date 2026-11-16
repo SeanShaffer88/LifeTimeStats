@@ -8,7 +8,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 
-for name in ("parchment", "wood", "edge_h", "edge_v", "corner", "plaque", "emblem", "crest", "crest_rim", "navsel", "divider"):
+for name in ("parchment", "wood", "edge_h", "edge_v", "corner", "plaque", "emblem", "crest", "crest_rim", "navsel", "divider", "arrow"):
     path = ROOT / "Media" / "framed" / (name + ".tga")
     assert path.exists(), path
     im = Image.open(path)
@@ -124,6 +124,10 @@ scope.rows[2].scripts.OnClick(scope.rows[2])
 eq(ns.settings.scope, "account", "all characters")
 eq(scope.text:GetText(), "All characters", "dropdown shows all characters")
 scope.rows[1].scripts.OnClick(scope.rows[1]); range.rows[1].scripts.OnClick(range.rows[1])
+-- achievements: categories are the right-hand tabs, so the bar that covered Sort is hidden
+ns.ShowPage("achievements")
+eq(ns.Page("achievements").seg:IsShown(), false, "category bar hidden in the card")
+eq(rawget(win, "sectionBar"):IsShown(), true, "categories shown as tabs")
 -- menu
 ns.ShowPage("combat")
 local selCount = 0

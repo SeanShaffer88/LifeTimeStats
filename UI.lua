@@ -1359,6 +1359,7 @@ local function BuildAchievements()
     for _, b in ipairs(p.seg.buttons) do b:ClearAllPoints(); b:SetPoint("LEFT", x, 0); x = x + b:GetWidth() end
     p.seg:SetWidth(x + 1)
     p.seg:SetPoint("TOPRIGHT", -6, -2)
+    p.seg:Hide() -- the categories are the tabs down the right edge of the window
     p.sort = "default"
     local sortB = W.FlatButton(card, "Sort: list", 92, 20, "Sort", "Switch between the normal order and closest to the next tier first.")
     sortB:SetPoint("TOPLEFT", 140, -4)
@@ -2183,7 +2184,7 @@ function ns.UpdateSectionTabs()
         if d then
             local text = book and W.SmallCaps(d.name) or d.name
             b.text:SetText(text)
-            local col = d.active and T.amber or (book and T.text or T.dim)
+            local col = d.active and T.amber or ((book or ns.Paper()) and T.text or T.dim)
             b.text:SetTextColor(col[1], col[2], col[3])
             if book then
                 if d.active then W.Bold(b.text, T.amber) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
@@ -2191,7 +2192,8 @@ function ns.UpdateSectionTabs()
                 b.bg:SetVertexColor(c[1], c[2], c[3], 1)
                 b:SetPoint("TOPLEFT", d.active and 6 or 0, -(i - 1) * (SECTION_TAB_H + SECTION_GAP))
             else
-                W.Color(b.bg, d.active and T.tileHi or T.tile)
+                -- opaque, so the tabs read cleanly over the game world
+                W.Color(b.bg, d.active and T.tileHi or T.tile, ns.Framed() and 0.97 or nil)
                 b.edge:SetShown(d.active)
             end
             b:Show()

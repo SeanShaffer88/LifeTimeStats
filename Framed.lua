@@ -28,7 +28,7 @@ local function Dropdown(parent, w, items, onPick, opts)
     opts = opts or {}
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(w, 28)
-    local bg = W.Panel(b, T.tile, T.edge); bg:SetAllPoints(); bg:SetFrameLevel(b:GetFrameLevel())
+    W.Box(b, T.tile, T.edge)
     local x = 10
     if opts.portrait then
         b.portrait = b:CreateTexture(nil, "ARTWORK")
@@ -41,8 +41,9 @@ local function Dropdown(parent, w, items, onPick, opts)
     end
     b.text = W.Text(b, 12, T.text); b.text:SetPoint("LEFT", x, 0); b.text:SetPoint("RIGHT", -26, 0); b.text:SetJustifyH("LEFT")
     b.arrow = b:CreateTexture(nil, "ARTWORK")
-    b.arrow:SetSize(18, 18); b.arrow:SetPoint("RIGHT", -5, 0)
-    b.arrow:SetTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+    b.arrow:SetSize(12, 12); b.arrow:SetPoint("RIGHT", -9, 0)
+    b.arrow:SetTexture(W.MEDIA .. "framed\\arrow")
+    b.arrow:SetVertexColor(T.dim[1], T.dim[2], T.dim[3])
     local menu = W.Panel(b, T.bg, T.edge)
     menu:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -2)
     menu:SetSize(w, #items * 24 + 6)
@@ -226,6 +227,8 @@ function ns.BuildFramedSkin(win, side, head, dim)
         b.sel:Hide()
         b.text.noInk = true
         b.text:SetFont(W.FONT, 13, "")
+        b.text:SetWidth(dim.SIDEBAR_W - 56) -- the shortcut badge is hidden, so names get its room
+        b.text:SetText(b.text:GetText()) -- refit at the new size
         if explorer then b.text:SetTextColor(LIGHT[1], LIGHT[2], LIGHT[3]) end
     end
     if explorer and win.todayBox then win.todayBox:Hide() end -- its pinned statistics sit along the bottom instead
