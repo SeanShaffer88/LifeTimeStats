@@ -214,7 +214,8 @@ eq(ns.char.t.continenttime ~= nil and ns.char.t.continenttime.Kalimdor ~= nil, t
 eq(ns.char.days[os.date("%Y%m%d")].jumps, 1, "daily bucket")
 local today = ns.GetView("char", "today"); eq(today.c.jumps, 1, "today view")
 -- class colour applied (druid orange)
-eq(ns.THEME.amber[1], 1, "class color r"); eq(math.floor(ns.THEME.amber[2] * 100), 49, "class color g")
+-- the default notebook skin inks class colours at 62%
+eq(math.floor(ns.THEME.amber[1] * 100 + 0.5), 62, "class color r"); eq(math.floor(ns.THEME.amber[2] * 100), 30, "class color g")
 -- backup with new sections
 local s2 = ns.Serialize(ns.char)
 local d2 = ns.Deserialize(s2)

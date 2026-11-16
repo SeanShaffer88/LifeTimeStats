@@ -185,7 +185,7 @@ local function CreateDashboardPinPicker()
     dlg:SetSize(width, height)
     dlg:SetPoint("CENTER")
     dlg:EnableMouse(true)
-    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
     local banner = W.Fill(dlg, T.tile)
     banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(37)
     if ink then W.Shade(banner, ink.base, ink.top) end
@@ -1287,7 +1287,7 @@ local function CreateJournalNoteEditor()
     dlg:SetSize(width, 372)
     dlg:SetPoint("CENTER")
     dlg:EnableMouse(true)
-    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
     local banner = W.Fill(dlg, T.tile)
     banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(38)
     if ink then W.Shade(banner, ink.base, ink.top) end
@@ -1460,7 +1460,7 @@ local function JournalFilters(parent, width)
 end
 
 local function JournalFeed(parent, width, height)
-    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
     local f = W.Panel(parent, ink and ink.page or T.bg)
     f:SetAllPoints()
     f.offset, f.entries, f.rows = 0, {}, {}
@@ -1726,7 +1726,9 @@ function ns.ShowPage(id)
     if current and current ~= pages[id] then current:Hide() end
     current = pages[id]
     current:Show()
-    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local nb = rawget(win, "notebook")
+    if nb then pcall(nb.Select, nb, id) end
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
     for _, b in ipairs(win.navButtons) do
         local sel = b.id == id
         b.bar:SetShown(sel)
@@ -1784,7 +1786,7 @@ local function CreateWindow()
     if ns.ApplyTheme then pcall(ns.ApplyTheme) end
     W.Init()
     C = W.C
-    local ink = ns.themeId == "forever" and W.JOURNAL or nil
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
     local trim = ink and ink.trim or T.amber
     win = W.Window(UIParent)
     win:SetSize(WIN_W, WIN_H)
@@ -1893,7 +1895,7 @@ local function CreateWindow()
     local side = CreateFrame("Frame", nil, win)
     side:SetPoint("TOPLEFT", 1, -HEADER_H - 1); side:SetPoint("BOTTOMLEFT", 1, FOOTER_H)
     side:SetWidth(SIDEBAR_W - 1)
-    if ink then
+    if ink and not ns.Notebook() then
         local spine = W.Fill(side, ink.base); spine:SetAllPoints()
         W.Shade(spine, ink.base, ink.top)
     end
@@ -1940,6 +1942,7 @@ local function CreateWindow()
     local todayH = CH + PAD * 2 - navBottom - 12
     if todayH >= 70 then
         local tb = CreateFrame("Frame", nil, side)
+        win.todayBox = tb
         tb:SetPoint("TOPLEFT", 10, -navBottom - 8); tb:SetSize(SIDEBAR_W - 22, todayH)
         local tl = W.Line(tb); tl:SetPoint("TOPLEFT"); tl:SetPoint("TOPRIGHT"); tl:SetHeight(1)
         local th = W.Text(tb, 10, T.dim); th:SetPoint("TOPLEFT", 4, -8); th:SetText("TODAY")
@@ -1955,6 +1958,8 @@ local function CreateWindow()
         tb:EnableMouse(true)
         W.Tip(tb, "Today", "Since local midnight, this character. The Timeline page has the last 30 days.")
     end
+
+    if ns.Notebook() and ns.BuildNotebookFrame then ns.BuildNotebookFrame(win, side, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
 
     -- content ---------------------------------------------------------
     local content = CreateFrame("Frame", nil, win)

@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.20.0-forever
+# Audit - LifeTimeStats 1.21.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,23 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.21.0
+- Verified (offline): new `tests/notebook.py` (116 assertions plus a texture check) covers:
+  - **textures:** present, power-of-two and RGBA;
+  - **theme:** Auto picks the notebook, the paper palette swaps into the journal colours and back to Forever Journal's when switching, and card titles are mixed case;
+  - **frame:** the frame, six tabs and spiral are built, and the sidebar buttons are hidden;
+  - **chapters:** every category is in exactly one chapter, with a tome name;
+  - **navigation:** tab and tag selection follow the page, tags open pages, tabs reopen the last page read, and stacked tab letters work;
+  - **rendering:** every page renders under the notebook.
+
+  The existing suites pass, with the default-skin expectations updated (Auto is the notebook; class colours are inked at 62%).
+- Unverified (in client):
+  - texture tiling with `SetHorizTile`/`SetVertTile` and how the paper grain and wood read at real scale;
+  - stacked tab letters (rotated FontStrings are not relied on);
+  - whether the header and footer paper bands sit cleanly over the wood;
+  - the gold dialog rim around the notebook;
+  - card readability at 62% class-colour ink for very light classes (Priest, Rogue).
 
 ## 1.20.0
 - In game (1.19.0 screenshots): every page renders, including the 10 section buttons. `C_Reputation` was read (factions met: 4). No item log entries yet (no green loot).
