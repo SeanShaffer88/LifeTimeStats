@@ -2,7 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.26.0-forever] - 2026-11-17
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
 
 ### Added
 - **Two more skins** (Settings > Appearance > Theme; a change applies after a reload). Both use LifeTimeStats' own artwork, drawn by `scripts/make_styled_textures.py`; neither is affiliated with the addon it is styled after.
