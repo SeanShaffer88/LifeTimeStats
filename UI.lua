@@ -158,12 +158,25 @@ local function UpdateDashboardKpis(page, view, base, sess)
             sub = goal.done and ("Goal reached · " .. ns.FormatStat(stat, goal.target)) or string.format("Goal %.0f%% of %s", math.min(99.9, value * 100 / goal.target), ns.FormatStat(stat, goal.target))
         end
         tile:SetFormatted(unavailable and "n/a" or ns.FormatStat(stat, value), sub)
+        -- notebook: a pinned statistic whose goal is reached gets a wax seal
+        if ns.Notebook() and ns.MakeSeal then
+            local seal = rawget(tile, "goalSeal")
+            if not seal then
+                seal = ns.MakeSeal(tile, 30)
+                seal.text:SetText("")
+                seal:SetPoint("CENTER", tile, "TOPRIGHT", -8, -6)
+                rawset(tile, "goalSeal", seal)
+            end
+            seal:SetShown(goal and goal.done and true or false)
+        end
         used[id], nextSlot = true, nextSlot + 1
     end
     for _, def in ipairs(page.kpiDefs) do
         if nextSlot > #page.kpis then break end
         if not used[def.id] then
             local tile = page.kpis[nextSlot]
+            local seal = rawget(tile, "goalSeal")
+            if seal then seal:Hide() end
             tile:Configure(def.label, def.icon, def.tip)
             UpdateKpi(tile, def, view, base, sess)
             nextSlot = nextSlot + 1
@@ -955,6 +968,11 @@ local function AchTile(parent, w, h)
     t.track = W.Fill(t, T.bg, "BORDER"); t.track:SetPoint("BOTTOMLEFT", 10, 12); t.track:SetSize(w - 110, 6)
     t.bar = W.Fill(t, T.amber, "ARTWORK"); t.bar:SetPoint("LEFT", t.track, "LEFT"); t.bar:SetHeight(6)
     t.val = W.Text(t, 11, T.amber, W.NUM, "RIGHT"); t.val:SetPoint("BOTTOMRIGHT", -10, 8); t.val:SetWidth(90)
+    -- notebook: an earned achievement is stamped with a wax seal showing its tier
+    if ns.Notebook() and ns.MakeSeal then
+        t.seal = ns.MakeSeal(t, 34)
+        t.seal:SetPoint("CENTER", t, "TOPRIGHT", -6, -4)
+    end
     t:EnableMouse(true)
     t:SetScript("OnEnter", function(self)
         local def, st, ach = self.def, self.st, self.ach
@@ -985,6 +1003,11 @@ local function AchTile(parent, w, h)
         local ic = lit and T.amber or T.dim
         self.icon:SetVertexColor(ic[1], ic[2], ic[3], lit and 1 or 0.6)
         self.name:SetText(def.name .. (lit and (" " .. ns.TIER_NAMES[st.tier]) or ""))
+        if self.seal then
+            self.seal.text:SetText(lit and ns.TIER_NAMES[st.tier] or "")
+            self.seal:SetShown(lit)
+            self.seal:SetAlpha(done and 1 or 0.8)
+        end
         local nc = done and T.amber or T.text
         self.name:SetTextColor(nc[1], nc[2], nc[3])
         if not ns.AchAvailable(def) and st.tier == 0 then

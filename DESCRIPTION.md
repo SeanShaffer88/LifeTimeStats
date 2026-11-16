@@ -20,6 +20,8 @@ Version 1.20.0 adds quest, level and profession history, a death map with skulls
 
 Version 1.21.0 adds the Adventurer's Notebook skin, the new default: parchment pages, a spiral binding, a wooden frame and chapter tabs (Hero, Deeds, Quests, Legends, Chronicle, Lore), made for roleplayers and RPG fans.
 
+Version 1.22.0 adds an ink sketch for every page of the notebook and wax seals on earned achievements and reached goals.
+
 ## The useless ones
 Steps taken. Times jumped. Time spent in the air. Dances, hugs and chickens. Perfect /rolls. How often you sat down, opened your bags or toggled auto-run. Red error messages seen ("Not enough mana", we know). How many times you checked these stats.
 
@@ -64,6 +66,6 @@ LifeTimeStats stores data locally in account and character SavedVariables. Stats
 | `/lts errors` | Recent Lua errors |
 
 ## Installing manually
-Unzip `LifeTimeStats-1.21.0-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
+Unzip `LifeTimeStats-1.22.0-forever.zip` so the folder is `World of Warcraft\_forever_\Interface\AddOns\LifeTimeStats`.
 
 Open source under GPL-3.0-or-later. Made by Malikor.

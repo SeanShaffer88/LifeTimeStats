@@ -2,6 +2,38 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.22.0-forever] - 2026-11-16
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
+
+### Added
+- **Ink sketches** in the Adventurer's Notebook: 19 original line drawings, one per page, inked in the margin between the page index and Today.
+
+  | Page | Sketch |
+  |---|---|
+  | Overview | compass |
+  | Characters | hero |
+  | Compare | scales |
+  | Travels | boot |
+  | Battles | crossed swords |
+  | Deaths | skull |
+  | Purse & Pack | backpack |
+  | Company | tavern mugs |
+  | Adventures | map |
+  | Dungeon Tome | tower |
+  | Life on the Road | campfire |
+  | Records | crown |
+  | Feats & Firsts | hourglass |
+  | Honours | medal |
+  | Rolls of Note | scroll |
+  | Journal | quill and ink |
+  | Days | sun and moon |
+  | How it works | open book |
+  | Search | magnifier |
+
+  They are drawn by `scripts/make_notebook_sketches.py`.
+- **Wax seals:** an earned achievement on the Honours page is stamped with a red wax seal showing its tier numeral. It is fully opaque once every tier is earned. A pinned Dashboard statistic is sealed once its goal is reached.
+
 ## [1.21.0-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.

@@ -22,6 +22,33 @@ ns.NOTEBOOK_PAGE_NAMES = {
     journal = "Journal", timeline = "Days", help = "How it works",
 }
 
+-- The ink sketch drawn in the margin of each page (Media/notebook/sketches/<name>.tga).
+ns.NOTEBOOK_SKETCHES = {
+    dashboard = "compass", roster = "hero", compare = "scales",
+    travel = "boot", combat = "swords", deaths = "skull", wealth = "backpack", social = "mugs",
+    adventure = "mapscroll", guide = "tower", life = "campfire",
+    records = "crown", fastest = "hourglass", achievements = "medal", lists = "scroll",
+    journal = "quill", timeline = "sunmoon", help = "book", search = "magnifier",
+}
+
+-- Wax seal colour and the tint helper used by the Achievements page and the Dashboard.
+ns.WAX = { 0.58, 0.13, 0.11 }
+function ns.MakeSeal(parent, size, numeral)
+    local W = ns.W
+    local seal = CreateFrame("Frame", nil, parent)
+    seal:SetSize(size, size)
+    seal.tex = seal:CreateTexture(nil, "OVERLAY")
+    seal.tex:SetAllPoints()
+    seal.tex:SetTexture(W.MEDIA .. "notebook\\seal")
+    seal.tex:SetVertexColor(ns.WAX[1], ns.WAX[2], ns.WAX[3], 1)
+    seal.text = W.Text(seal, math.max(8, math.floor(size * 0.32)), { 0.98, 0.90, 0.80 }, nil, "CENTER")
+    seal.text:SetPoint("CENTER", 0, 0)
+    seal.text:SetText(numeral or "")
+    seal:SetFrameLevel((parent:GetFrameLevel() or 1) + 5)
+    seal:Hide()
+    return seal
+end
+
 function ns.NotebookTabFor(pageId)
     for _, tab in ipairs(ns.NOTEBOOK_TABS) do
         for _, p in ipairs(tab.pages) do if p == pageId then return tab end end
@@ -131,6 +158,12 @@ function ns.BuildNotebookFrame(win, side, dim)
         nb.tags[i] = b
     end
 
+    -- an ink sketch for the page, between the page index and Today
+    nb.sketch = side:CreateTexture(nil, "ARTWORK")
+    nb.sketch:SetSize(84, 84)
+    nb.sketch:SetPoint("TOP", side, "TOPLEFT", 130, -262)
+    nb.sketch:SetVertexColor(T.text[1], T.text[2], T.text[3], 0.85)
+
     -- the Today box moves to the bottom of the margin
     local tb = rawget(win, "todayBox")
     if tb then
@@ -156,6 +189,10 @@ function ns.BuildNotebookFrame(win, side, dim)
             local tc = on and T.amber or T.dim
             b.text:SetTextColor(tc[1], tc[2], tc[3])
         end
+        local sk = ns.NOTEBOOK_SKETCHES[pageId]
+        if sk then self.sketch:SetTexture(MEDIA .. "sketches\\" .. sk) end
+        self.sketch:SetShown(sk ~= nil)
+        self.sketchName = sk
         self.chapter:SetText(tab and ("CHAPTER " .. tab.chapter) or "")
         self.title:SetText(tab and tab.name or "Search")
         for i, b in ipairs(self.tags) do

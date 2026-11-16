@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.21.0-forever
+# Audit - LifeTimeStats 1.22.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,16 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.22.0
+- Verified (offline): `tests/notebook.py` (now 152 assertions) checks:
+  - the 19 sketch textures exist, are power-of-two and RGBA;
+  - every page has a sketch, and the margin sketch follows the page;
+  - the seal on each visible achievement tile follows its tier and shows the numeral;
+  - a reached goal's Dashboard pin is sealed.
+
+  All suites pass.
+- Unverified (in client): sketch sharpness at 84 px on the margin; seal overhang at the tile corners; seal numeral legibility.
 
 ## 1.21.0
 - Verified (offline): new `tests/notebook.py` (116 assertions plus a texture check) covers:
