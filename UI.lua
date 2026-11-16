@@ -1042,18 +1042,18 @@ local function AchTile(parent, w, h)
         local def, st, ach = self.def, self.st, self.ach
         if not def then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(def.name, T.amber[1], T.amber[2], T.amber[3])
-        GameTooltip:AddLine(def.cat, T.dim[1], T.dim[2], T.dim[3])
+        GameTooltip:AddLine(def.name, ns.TipColor("amber"))
+        GameTooltip:AddLine(def.cat, ns.TipColor("dim"))
         for i, target in ipairs(def.tiers) do
             local when = ach[ns.AchKey(def, i)]
             local line = string.format("%s  " .. def.desc, ns.TIER_NAMES[i], ns.FMT[def.fmt](target))
             local right = when and (self.retro[ns.AchKey(def, i)] and "before v1.3" or date("%b %d, %Y", when)) or (ns.TIER_POINTS[i] .. " pts")
             local col = when and T.amber or T.text
-            GameTooltip:AddDoubleLine(line, right, col[1], col[2], col[3], T.dim[1], T.dim[2], T.dim[3])
+            GameTooltip:AddDoubleLine(line, right, col[1], col[2], col[3], ns.TipColor("dim"))
         end
         if st.value then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Current: " .. ns.FMT[def.fmt](st.value), T.text[1], T.text[2], T.text[3])
+            GameTooltip:AddLine("Current: " .. ns.FMT[def.fmt](st.value), ns.TipColor("text"))
         end
         GameTooltip:Show()
     end)
@@ -1931,8 +1931,8 @@ local function BuildSectionBar()
         b:SetScript("OnEnter", function(self)
             if not self.def then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(self.def.name, T.amber[1], T.amber[2], T.amber[3])
-            GameTooltip:AddLine("Jump to this section of the page.", T.text[1], T.text[2], T.text[3], true)
+            GameTooltip:AddLine(self.def.name, ns.TipColor("amber"))
+            GameTooltip:AddLine("Jump to this section of the page.", ns.TipColor("text", true))
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2123,8 +2123,8 @@ local function CreateWindow()
         b:SetScript("OnEnter", function(self)
             if current ~= pages[self.id] then W.Color(self.bg, T.tile) end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(cat.name, T.amber[1], T.amber[2], T.amber[3])
-            GameTooltip:AddLine("Shortcut: " .. cat.key .. " (while the mouse is over this window, out of combat)", T.dim[1], T.dim[2], T.dim[3], true)
+            GameTooltip:AddLine(cat.name, ns.TipColor("amber"))
+            GameTooltip:AddLine("Shortcut: " .. cat.key .. " (while the mouse is over this window, out of combat)", ns.TipColor("dim", true))
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function(self)
@@ -2366,9 +2366,12 @@ local function CreateMinimapButton()
     mmb:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
     mmb:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("LifeTimeStats", T.amber[1], T.amber[2], T.amber[3])
+        GameTooltip:AddLine("LifeTimeStats", ns.TipColor("amber"))
         local v = ns.char
-        local function L(a, b) GameTooltip:AddDoubleLine(a, b, T.text[1], T.text[2], T.text[3], T.amber[1], T.amber[2], T.amber[3]) end
+        local function L(a, b)
+            local lr, lg, lb = ns.TipColor("text")
+            GameTooltip:AddDoubleLine(a, b, lr, lg, lb, ns.TipColor("amber"))
+        end
         L("Steps", Int(ns.Steps(v)))
         L("Jumps", Int(c(v, "jumps")))
         L("Kills", Int(ns.Kills(v)))
@@ -2376,14 +2379,14 @@ local function CreateMinimapButton()
         local d = v.days and v.days[ns.Today()]
         if d then
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Today", T.dim[1], T.dim[2], T.dim[3])
+            GameTooltip:AddLine("Today", ns.TipColor("dim"))
             L("Steps", Int((d.dist_foot or 0) * ns.YARDS_TO_STEPS))
             L("Kills", Int((d.kills_npc or 0) + (d.kills_pvp or 0)))
             L("Online", Time(d.time_online or 0))
         end
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Left-click: open window   Right-click: settings", T.dim[1], T.dim[2], T.dim[3])
-        GameTooltip:AddLine("Drag: move button", T.dim[1], T.dim[2], T.dim[3])
+        GameTooltip:AddLine("Left-click: open window   Right-click: settings", ns.TipColor("dim"))
+        GameTooltip:AddLine("Drag: move button", ns.TipColor("dim"))
         GameTooltip:Show()
     end)
     mmb:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2407,14 +2410,14 @@ local function BrokerIcon()
         OnClick = function(_, btn) if btn == "RightButton" then ns.OpenOptions() else ns.ToggleWindow() end end,
         OnTooltipShow = function(tt)
             if not tt or not tt.AddLine then return end
-            tt:AddLine("LifeTimeStats", T.amber[1], T.amber[2], T.amber[3])
+            tt:AddLine("LifeTimeStats", ns.TipColor("amber"))
             local v = ns.char
             if v then
-                tt:AddDoubleLine("Steps", Int(ns.Steps(v)), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
-                tt:AddDoubleLine("Kills", Int(ns.Kills(v)), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
-                tt:AddDoubleLine("Deaths", Int(c(v, "deaths")), 1, 1, 1, T.amber[1], T.amber[2], T.amber[3])
+                tt:AddDoubleLine("Steps", Int(ns.Steps(v)), 1, 1, 1, ns.TipColor("amber"))
+                tt:AddDoubleLine("Kills", Int(ns.Kills(v)), 1, 1, 1, ns.TipColor("amber"))
+                tt:AddDoubleLine("Deaths", Int(c(v, "deaths")), 1, 1, 1, ns.TipColor("amber"))
             end
-            tt:AddLine("Left-click: open window   Right-click: settings", T.dim[1], T.dim[2], T.dim[3])
+            tt:AddLine("Left-click: open window   Right-click: settings", ns.TipColor("dim"))
         end,
     })
     local s = Settings().minimap

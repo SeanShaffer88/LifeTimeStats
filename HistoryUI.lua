@@ -142,7 +142,7 @@ function R.habits()
         mostH = math.max(mostH, v)
     end
     for h = 0, 23 do
-        rows[#rows + 1] = { string.format("%02d", h), string.format("%02d:00 - %02d:59", h, h), mostH > 0 and byHour[h] / mostH or 0, Time(byHour[h]), "" }
+        rows[#rows + 1] = { "", string.format("%02d:00 - %02d:59", h, h), mostH > 0 and byHour[h] / mostH or 0, Time(byHour[h]), "" }
     end
     return rows
 end

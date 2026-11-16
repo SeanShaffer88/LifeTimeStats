@@ -97,6 +97,7 @@ function ns.BuildNotebookFrame(win, side, dim)
     crease:SetPoint("TOPLEFT", win, "TOPLEFT", mid - 24, -dim.HEADER_H)
     crease:SetPoint("BOTTOMRIGHT", win, "BOTTOMLEFT", mid + 24, dim.FOOTER_H)
     crease:SetTexture(MEDIA .. "crease")
+    crease:SetAlpha(0.45) -- a hint of the fold; at full strength it darkened the numbers it crossed
     nb.crease = crease
     -- an inked line between the margin and the page
     local margin = side:CreateTexture(nil, "BORDER")
@@ -125,10 +126,10 @@ function ns.BuildNotebookFrame(win, side, dim)
         end)
         b:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Chapter " .. self.tab.chapter .. ": " .. self.tab.name, T.amber[1], T.amber[2], T.amber[3])
+            GameTooltip:AddLine("Chapter " .. self.tab.chapter .. ": " .. self.tab.name, ns.TipColor("amber"))
             local names = {}
             for _, p in ipairs(self.tab.pages) do names[#names + 1] = ns.NOTEBOOK_PAGE_NAMES[p] or p end
-            GameTooltip:AddLine(table.concat(names, " · "), T.text[1], T.text[2], T.text[3], true)
+            GameTooltip:AddLine(table.concat(names, " · "), ns.TipColor("text", true))
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -167,11 +168,15 @@ function ns.BuildNotebookFrame(win, side, dim)
     if tb then
         tb:ClearAllPoints()
         -- ends at x 170, left of the inked margin rule at 174, so values are not clipped
-        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 72, 8)
-        tb:SetSize(98, 128)
-        -- smaller values so "Online 23m 33s" fits the margin
+        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 64, 8)
+        tb:SetSize(100, 132)
+        -- values sit 10 px inside the box, clear of the inked margin rule, and fit "23m 33s"
         for _, v in ipairs(rawget(win, "today") or {}) do
-            if v.SetFont then pcall(v.SetFont, v, W.NUM, 10, "") end
+            if v.SetFont then pcall(v.SetFont, v, W.FONT, 11, "") end
+            if v.ClearAllPoints and v.GetPoint then
+                local _, _, _, _, y = v:GetPoint()
+                v:ClearAllPoints(); v:SetPoint("TOPRIGHT", tb, "TOPRIGHT", -10, y or 0)
+            end
         end
     end
     for _, b in ipairs(win.navButtons or {}) do b:Hide() end

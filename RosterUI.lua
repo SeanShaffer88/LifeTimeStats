@@ -29,7 +29,10 @@ ns.RosterClassName = ClassName
 
 local function ClassColor(cls)
     local c = cls and RAID_CLASS_COLORS and RAID_CLASS_COLORS[cls]
-    if c and c.r then return { c.r, c.g, c.b, 1 } end
+    if c and c.r then
+        local r, g, b = ns.W.InkRGB(c.r, c.g, c.b)
+        return { r, g, b, 1 }
+    end
 end
 
 local SECTIONS = {

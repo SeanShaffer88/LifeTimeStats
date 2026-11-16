@@ -62,12 +62,62 @@ end
 -- Small caps: no WoW font has them, so headings are set in capitals one point smaller.
 function W.SmallCaps(text) return tostring(text or ""):upper() end
 
+-- Ink: on the notebook's paper, any colour lighter than a dark ink is darkened (same hue) until
+-- it reads like ink. Bright gold headings, grey details, class colours, white and green item
+-- names all pass through here. On the dark skins colours are left alone.
+local INK_MAX = 0.34 -- brightest luminance allowed on paper
+function W.InkRGB(r, g, b)
+    if not (ns.Notebook and ns.Notebook()) or type(r) ~= "number" then return r, g, b end
+    local lum = 0.299 * r + 0.587 * (g or 0) + 0.114 * (b or 0)
+    if lum <= INK_MAX then return r, g, b end
+    local k = INK_MAX / lum
+    return r * k, (g or 0) * k, (b or 0) * k
+end
+function W.InkCodes(text)
+    if type(text) ~= "string" or not (ns.Notebook and ns.Notebook()) or not text:find("|c", 1, true) then return text end
+    return (text:gsub("|c(%x%x)(%x%x)(%x%x)(%x%x)", function(a, rr, gg, bb)
+        local r, g, b = W.InkRGB(tonumber(rr, 16) / 255, tonumber(gg, 16) / 255, tonumber(bb, 16) / 255)
+        return string.format("|c%s%02x%02x%02x", a, math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+    end))
+end
+-- Every FontString made by W.Text inks its own colours on paper.
+local function InkFontString(fs)
+    local setText, setColor = fs.SetText, fs.SetTextColor
+    if type(setText) == "function" then
+        fs.SetText = function(self, t)
+            setText(self, W.InkCodes(t))
+            -- single-line text that is too long shrinks a little instead of ending in "..."
+            local canWrap = self.CanWordWrap or self.GetWordWrap
+            if t and t ~= "" and canWrap and canWrap(self) == false and not rawget(self, "fitting") then
+                self.fitting = true
+                W.FitText(self)
+                self.fitting = nil
+            end
+        end
+    end
+    if type(setColor) == "function" then
+        fs.SetTextColor = function(self, r, g, b, a)
+            r, g, b = W.InkRGB(r, g, b)
+            return setColor(self, r, g, b, a)
+        end
+    end
+end
+
+-- Notebook type sizes: nothing below 11 points on paper, and the common 11 becomes 12.
+function W.PaperSize(size)
+    size = size or 12
+    if size <= 10 then return 11.5 end
+    if size < 12 then return 12 end
+    return size
+end
+
 function W.Text(parent, size, c, font, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     size = size or 12
     if ns.Notebook and ns.Notebook() then
-        if size < 11 then size = size + 1 end
+        size = W.PaperSize(size)
         if fs.SetShadowOffset then fs:SetShadowOffset(0, 0) end
+        InkFontString(fs)
     end
     fs:SetFont(font or W.FONT, size, "")
     fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
@@ -91,13 +141,21 @@ function W.Line(parent, c, layer)
     return t
 end
 
+-- Tooltip colours. The game's tooltip is always dark, so on the notebook skin (whose palette is
+-- dark ink for paper) tooltips use light parchment colours instead.
+local TIP_LIGHT = { amber = { 1, 0.82, 0.38 }, text = { 0.96, 0.92, 0.84 }, dim = { 0.78, 0.72, 0.62 } }
+function ns.TipColor(name, wrap)
+    local c = (ns.Notebook and ns.Notebook()) and TIP_LIGHT[name] or T[name] or TIP_LIGHT.text
+    return c[1], c[2], c[3], wrap
+end
+
 function W.Tip(owner, title, body, extra)
     owner:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(type(title) == "function" and title() or title, T.amber[1], T.amber[2], T.amber[3])
+        GameTooltip:AddLine(type(title) == "function" and title() or title, ns.TipColor("amber"))
         local b = type(body) == "function" and body() or body
-        if b then GameTooltip:AddLine(b, T.text[1], T.text[2], T.text[3], true) end
-        if extra then GameTooltip:AddLine(extra, T.dim[1], T.dim[2], T.dim[3], true) end
+        if b then GameTooltip:AddLine(b, ns.TipColor("text", true)) end
+        if extra then GameTooltip:AddLine(extra, ns.TipColor("dim", true)) end
         GameTooltip:Show()
     end)
     owner:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -302,9 +360,9 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
     f.tipTitle, f.tipBody = label, tip
     f:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(self.tipTitle, T.amber[1], T.amber[2], T.amber[3])
-        if self.exact then GameTooltip:AddLine(self.exact, T.text[1], T.text[2], T.text[3]) end
-        if self.tipBody then GameTooltip:AddLine(self.tipBody, T.dim[1], T.dim[2], T.dim[3], true) end
+        GameTooltip:AddLine(self.tipTitle, ns.TipColor("amber"))
+        if self.exact then GameTooltip:AddLine(self.exact, ns.TipColor("text")) end
+        if self.tipBody then GameTooltip:AddLine(self.tipBody, ns.TipColor("dim", true)) end
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -427,6 +485,7 @@ function W.RingWithLegend(body, bw, bh)
                 r.tx:SetText(p[1])
                 r.val:SetText((fmt or ns.FormatInt)(p[2]))
                 r.val:SetWidth(0); r.val:SetWidth(math.ceil(r.val:GetStringWidth()) + 1)
+                r.tx:SetText(p[1]) -- again, now that the value's width is known: a long label shrinks to fit
             else
                 r.sw:Hide(); r.tx:Hide(); r.val:Hide()
             end
@@ -548,10 +607,11 @@ function W.Columns(parent, bw, bh, n, mode, series)
             if o.hoverI == i then return end
             o.hoverI = i
             GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
-            GameTooltip:AddLine(o.labels[i] or "", T.amber[1], T.amber[2], T.amber[3])
+            GameTooltip:AddLine(o.labels[i] or "", ns.TipColor("amber"))
             for s = 1, series do
                 local name = o.seriesNames and o.seriesNames[s] or ""
-                GameTooltip:AddDoubleLine(name, (o.fmt or ns.FormatInt)(o.values[i][s] or 0), T.text[1], T.text[2], T.text[3], T.amber[1], T.amber[2], T.amber[3])
+                local lr, lg, lb = ns.TipColor("text")
+                GameTooltip:AddDoubleLine(name, (o.fmt or ns.FormatInt)(o.values[i][s] or 0), lr, lg, lb, ns.TipColor("amber"))
             end
             GameTooltip:Show()
         end)
@@ -673,7 +733,9 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
     f.heads = {}
     for i, c in ipairs(cols) do
         local h = W.Text(f, 10, book and T.text or T.dim, nil, (c.kind == "num" or c.kind == "dim") and "RIGHT" or "LEFT")
-        h:SetPoint("TOPLEFT", xs[i] + 8, -6); h:SetWidth(c.w - 16)
+        local padL = c.w < 50 and 3 or 8
+        h:SetPoint("TOPLEFT", xs[i] + padL, -6); h:SetWidth(c.w - padL * 2)
+        if book then W.Bold(h) end
         h:SetText(c[1])
         f.heads[i] = h
     end
@@ -710,7 +772,9 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
                 local col = c.kind == "num" and T.amber or (c.kind == "dim" and T.dim or T.text)
                 local fs = W.Text(row, c.kind == "text" and 12 or 13, col, font, (c.kind == "num" or c.kind == "dim") and "RIGHT" or "LEFT")
                 if book and c.kind == "num" then W.Bold(fs, T.amber) end
-                fs:SetPoint("LEFT", xs[i] + 8, 0); fs:SetWidth(c.w - 16)
+                local padL = c.w < 50 and 3 or 8
+                fs:SetPoint("LEFT", xs[i] + padL, 0); fs:SetWidth(c.w - padL * 2)
+                if book then fs:SetWordWrap(false) end -- one line per cell; long text shrinks to fit
                 row.cells[i] = fs
             end
         end
@@ -724,9 +788,9 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
             self.hl:Show()
             if not d or not (d.tip or d.what or d.tipTitle) then return end
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(d.tipTitle or d[1], T.amber[1], T.amber[2], T.amber[3])
-            if d.tip then GameTooltip:AddLine(d.tip, T.text[1], T.text[2], T.text[3], true) end
-            if d.what then GameTooltip:AddLine("Source: " .. d.what, T.dim[1], T.dim[2], T.dim[3], true) end
+            GameTooltip:AddLine(d.tipTitle or d[1], ns.TipColor("amber"))
+            if d.tip then GameTooltip:AddLine(d.tip, ns.TipColor("text", true)) end
+            if d.what then GameTooltip:AddLine("Source: " .. d.what, ns.TipColor("dim", true)) end
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function(self) self.hl:Hide(); GameTooltip:Hide() end)
@@ -760,6 +824,9 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
                     if v then cell.bar:SetWidth(math.max(1, cell.w * math.max(0, math.min(1, v)))) end
                 else
                     cell:SetText(d and d[i] ~= nil and tostring(d[i]) or "")
+                    if book and cell.SetShadowOffset then
+                        if d and d.head and i == 2 then W.Bold(cell, T.amber) elseif c.kind ~= "num" then cell:SetShadowOffset(0, 0) end
+                    end
                     if d and d.color and i == 1 then cell:SetTextColor(d.color[1], d.color[2], d.color[3])
                     elseif i == 1 and c.kind == "text" then cell:SetTextColor(T.text[1], T.text[2], T.text[3]) end
                 end
@@ -801,6 +868,24 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
         self:Render()
     end)
     return f
+end
+
+-- Shrink a FontString one point at a time (down to 9) until its text fits its width,
+-- instead of letting the game cut it with "...".
+function W.FitText(fs, text, size)
+    if not fs or not fs.GetStringWidth or not fs.GetWidth then return end
+    local ok, w = pcall(fs.GetWidth, fs)
+    if not ok or type(w) ~= "number" or w <= 0 then return end
+    local font = (fs.GetFont and select(1, fs:GetFont())) or W.FONT
+    size = size or (fs.GetFont and select(2, fs:GetFont())) or 12
+    if type(size) ~= "number" then return end
+    if type(rawget(fs, "fitBase")) ~= "number" then fs.fitBase = size end
+    for s = fs.fitBase, 9, -0.5 do
+        pcall(fs.SetFont, fs, font, s, "")
+        if text then fs:SetText(text) end
+        local sw = fs:GetStringWidth()
+        if type(sw) ~= "number" or sw <= w then break end
+    end
 end
 
 -- Called once the accent colour is known (after ADDON_LOADED).
