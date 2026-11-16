@@ -23,6 +23,14 @@ ns.THEMES = {
       text = hex("24190f"), dim = hex("4c3c29"), amber = hex("2c5a48"),
       cream2 = hex("7a6a4c"), rust = hex("9c3a24"), teal = hex("3d7563"), font = FRIZ, num = FRIZ,
       journal = { gold = hex("33281c"), trim = hex("6b5233"), top = hex("e8dab9"), base = hex("dccbaa"), tab = hex("cdb88f"), page = hex("e4d5b3") } },
+    { id = "stone", name = "Stone & Gold (Altoholic style)", desc = "Dark stone and steel with gold trim, a round portrait, gold category headers in the menu and chapter tabs along the bottom, in the style of the Altoholic addon. LifeTimeStats' own artwork; not affiliated with Altoholic.",
+      bg = { 0.09, 0.09, 0.10, 0.97 }, tile = { 0.05, 0.05, 0.06, 0.72 }, tileHi = { 0.30, 0.24, 0.08, 1 }, edge = { 0.50, 0.42, 0.22, 0.9 },
+      text = { 0.96, 0.96, 0.96, 1 }, dim = { 0.74, 0.74, 0.74, 1 }, amber = { 1, 0.82, 0, 1 },
+      cream2 = { 0.82, 0.82, 0.82, 1 }, rust = { 0.85, 0.27, 0.20, 1 }, teal = { 0.30, 0.78, 0.92, 1 }, font = FRIZ, num = FRIZ },
+    { id = "djournal", name = "Adventure Journal (Dungeon Journal style)", desc = "Dark brown leather in a darker frame with a thin gold line, gold titles and gold-edged buttons, in the style of the Dungeon Journal addon. LifeTimeStats' own artwork; not affiliated with Dungeon Journal.",
+      bg = hex("1a120c", 0.97), tile = hex("2a1d13", 0.92), tileHi = hex("4a3420"), edge = hex("8a6a36"),
+      text = hex("f2e6cc"), dim = hex("c4b08a"), amber = hex("f0c75e"),
+      cream2 = hex("d8c49a"), rust = hex("d9654c"), teal = hex("7fb8a4"), font = FRIZ, num = FRIZ },
     { id = "notebook", name = "Adventurer's Notebook", desc = "An adventurer's notebook: parchment pages, ink, a spiral binding and tabs down the side. Made for roleplayers and RPG fans.",
       bg = hex("d6c095"), tile = hex("e2cfa3", 0.30), tileHi = hex("cdb487"), edge = hex("33281c", 0.85),
       text = hex("1f150c"), dim = hex("3e3020"), amber = hex("6e2610"),
@@ -171,15 +179,18 @@ function ns.ThemeName(id)
     if id == "auto" then return "Auto (" .. (ns.THEME_BY_ID[ns.DetectUI()] or {}).name .. ")" end
     return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.notebook).name
 end
-ns.THEME_ORDER = { "auto", "ledger", "explorer", "notebook", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
+ns.THEME_ORDER = { "auto", "ledger", "explorer", "stone", "djournal", "notebook", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
 
 -- Skins drawn as a journal (mixed-case titles, inked numbers, banner shading): Forever Journal
 -- and the Adventurer's Notebook. ns.Notebook() is the notebook alone (its own window frame).
-function ns.JournalSkin() return ns.themeId == "forever" or ns.Paper() end
+function ns.JournalSkin() return ns.themeId == "forever" or ns.themeId == "djournal" or ns.Paper() end
 function ns.Notebook() return ns.themeId == "notebook" end
 -- The two framed tomes (Lifetime Stats and Stats Explorer) share a window frame.
 function ns.Framed() return ns.themeId == "ledger" or ns.themeId == "explorer" end
 function ns.Ledger() return ns.themeId == "ledger" end
+-- The two styled skins (Stone & Gold, Adventure Journal) share a frame of their own (Styled.lua).
+function ns.Styled() return ns.themeId == "stone" or ns.themeId == "djournal" end
+function ns.Stone() return ns.themeId == "stone" end
 function ns.Explorer() return ns.themeId == "explorer" end
 -- Parchment skins: dark ink on paper, so text sizes, ink and tooltips follow the paper rules.
 function ns.Paper() return ns.themeId == "notebook" or ns.themeId == "ledger" or ns.themeId == "explorer" end

@@ -39,6 +39,7 @@ Backup.lua
 Notebook.lua
 Framed.lua
 Overview.lua
+Styled.lua
 UI.lua
 GuideUI.lua
 RosterUI.lua

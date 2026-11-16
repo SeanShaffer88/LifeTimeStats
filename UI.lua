@@ -39,8 +39,8 @@ end
 local function ComputeLayout()
     local s = ns.settings and ns.settings.window or {}
     -- the framed skins put their title on a plaque over the top rail, so the header row sits lower
-    HEADER_H = (ns.Framed and ns.Framed()) and 62 or 44
-    local book = (ns.Notebook and ns.Notebook()) or (ns.Framed and ns.Framed())
+    HEADER_H = (ns.Framed and ns.Framed()) and 62 or ((ns.Styled and ns.Styled()) and 48 or 44)
+    local book = (ns.Notebook and ns.Notebook()) or (ns.Framed and ns.Framed()) or (ns.Styled and ns.Styled())
     WIN_W, WIN_H = ns.WindowSizeFor(s.size, UIParent:GetWidth(), UIParent:GetHeight(), s.scale or 1, book)
     Derive()
 end
@@ -2078,7 +2078,9 @@ function ns.ShowPage(id)
         b.text:SetTextColor(col[1], col[2], col[3])
         b.icon:SetVertexColor(sel and T.amber[1] or T.dim[1], sel and T.amber[2] or T.dim[2], sel and T.amber[3] or T.dim[3])
         if ns.Framed() and ns.StyleFramedNav then ns.StyleFramedNav(b, sel) end
+        if ns.Styled() and ns.StyleStyledNav then ns.StyleStyledNav(b, sel, id) end
     end
+    if ns.Styled() and ns.UpdateStyledTabs then ns.UpdateStyledTabs(id) end
     ns.RefreshWindow()
 end
 
@@ -2131,7 +2133,7 @@ local function BuildSectionBar()
     local book = ns.Notebook()
     local bar = CreateFrame("Frame", nil, win)
     bar:SetSize(SECTION_TAB_W, SECTION_TABS * (SECTION_TAB_H + SECTION_GAP))
-    local outside = book and 34 or (ns.Framed() and 30 or 2) -- past the parchment or the wooden frame
+    local outside = book and 34 or (ns.Framed() and 30 or (ns.Styled() and 24 or 2)) -- past the parchment or the frame
     bar:SetPoint("TOPLEFT", win, "TOPRIGHT", outside, -(HEADER_H + PAD))
     bar:SetFrameLevel((win:GetFrameLevel() or 1) + 1)
     bar.tabs = {}
@@ -2387,6 +2389,7 @@ local function CreateWindow()
 
     if ns.Notebook() and ns.BuildNotebookFrame then ns.BuildNotebookFrame(win, side, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
     if ns.Framed() and ns.BuildFramedSkin then ns.BuildFramedSkin(win, side, head, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
+    if ns.Styled() and ns.BuildStyledSkin then ns.BuildStyledSkin(win, side, head, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
 
     -- section tabs down the right side ---------------------------------
     BuildSectionBar()
