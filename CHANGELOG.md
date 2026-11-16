@@ -2,6 +2,14 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+From in-game screenshots of 1.23.0, where the parchment sheet rendered as designed.
+
+### Fixed
+- The scorched rim and darker corners reached into the page, which made the right column (Your legend, chart labels) and the Today numbers in the bottom-left hard to read. The rim is narrower, the vignette lighter, and the sheet's torn edges now sit further outside the window, so all content is on light paper.
+- Long page names in the margin tags ("Life on the Road") shrink to fit.
+
 ## [1.23.0-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.
