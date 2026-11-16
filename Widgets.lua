@@ -49,9 +49,27 @@ function W.Shade(texture, low, high)
     W.Color(texture, low)
 end
 
+-- Faux bold: WoW fonts have no bold face, so an ink shadow one pixel to the right thickens
+-- the strokes. Used for headings and numbers in the Adventurer's Notebook.
+function W.Bold(fs, c)
+    if not fs or not fs.SetShadowOffset then return fs end
+    c = c or ns.THEME.text
+    fs:SetShadowColor(c[1] * 0.85, c[2] * 0.85, c[3] * 0.85, 0.9)
+    fs:SetShadowOffset(1, 0)
+    return fs
+end
+
+-- Small caps: no WoW font has them, so headings are set in capitals one point smaller.
+function W.SmallCaps(text) return tostring(text or ""):upper() end
+
 function W.Text(parent, size, c, font, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(font or W.FONT, size or 12, "")
+    size = size or 12
+    if ns.Notebook and ns.Notebook() then
+        if size < 11 then size = size + 1 end
+        if fs.SetShadowOffset then fs:SetShadowOffset(0, 0) end
+    end
+    fs:SetFont(font or W.FONT, size, "")
     fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
     if justify then fs:SetJustifyH(justify) end
     fs:SetWordWrap(false)
@@ -169,7 +187,10 @@ end
 
 -- ------------------------------------------------------------ card
 -- Card titles are upper case, except in the Forever Journal skin.
-function ns.CardTitle(s) return ns.JournalSkin() and s or tostring(s):upper() end
+function ns.CardTitle(s)
+    if ns.Notebook and ns.Notebook() then return W.SmallCaps(s) end
+    return ns.JournalSkin() and s or tostring(s):upper()
+end
 
 function W.Card(parent, title, icon, x, y, w, h, tip)
     local f = W.Panel(parent, T.tile)
@@ -186,9 +207,11 @@ function W.Card(parent, title, icon, x, y, w, h, tip)
     local rule = W.Line(head); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(1)
     local ic = W.Icon(head, icon or "star", 14, journal and W.JOURNAL.gold or nil)
     ic:SetPoint("LEFT", 9, 0)
-    f.title = W.Text(head, journal and 13 or 12, journal and W.JOURNAL.gold or T.text)
+    local book = ns.Notebook and ns.Notebook()
+    f.title = W.Text(head, book and 12 or (journal and 13 or 12), journal and W.JOURNAL.gold or T.text)
     f.title:SetPoint("LEFT", ic, "RIGHT", 8, 0)
-    f.title:SetText(journal and title or title:upper())
+    f.title:SetText(ns.CardTitle(title))
+    if book then W.Bold(f.title) end
     if tip then head:EnableMouse(true); W.Tip(head, title, tip) end
     f.body = CreateFrame("Frame", nil, f)
     f.body:SetPoint("TOPLEFT", 10, -36)
@@ -245,6 +268,7 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
         wash:SetPoint("TOPLEFT", 1, -2); wash:SetPoint("BOTTOMRIGHT", -1, 1)
         W.Shade(wash, W.JOURNAL.base, W.JOURNAL.top)
         number = W.Text(f, 23, T.amber, W.NUM, "LEFT")
+        if ns.Notebook() then W.Bold(number, T.amber) end
         number:SetPoint("TOPLEFT", 12, -23)
         number:SetPoint("RIGHT", f.icon, "LEFT", -6, 0)
     else
@@ -647,7 +671,7 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
     head:SetPoint("TOPLEFT"); head:SetSize(width, HH)
     f.heads = {}
     for i, c in ipairs(cols) do
-        local h = W.Text(f, 10, T.dim, nil, (c.kind == "num" or c.kind == "dim") and "RIGHT" or "LEFT")
+        local h = W.Text(f, 10, book and T.text or T.dim, nil, (c.kind == "num" or c.kind == "dim") and "RIGHT" or "LEFT")
         h:SetPoint("TOPLEFT", xs[i] + 8, -6); h:SetWidth(c.w - 16)
         h:SetText(c[1])
         f.heads[i] = h
@@ -684,6 +708,7 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
                 local font = (c.kind == "num" or c.kind == "dim") and W.NUM or W.FONT
                 local col = c.kind == "num" and T.amber or (c.kind == "dim" and T.dim or T.text)
                 local fs = W.Text(row, c.kind == "text" and 12 or 13, col, font, (c.kind == "num" or c.kind == "dim") and "RIGHT" or "LEFT")
+                if book and c.kind == "num" then W.Bold(fs, T.amber) end
                 fs:SetPoint("LEFT", xs[i] + 8, 0); fs:SetWidth(c.w - 16)
                 row.cells[i] = fs
             end

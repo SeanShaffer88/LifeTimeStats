@@ -15,7 +15,7 @@ local ARIALN, FRIZ = "Fonts\\ARIALN.TTF", "Fonts\\FRIZQT__.TTF"
 ns.THEMES = {
     { id = "notebook", name = "Adventurer's Notebook", desc = "An adventurer's notebook: parchment pages, ink, a spiral binding and tabs down the side. Made for roleplayers and RPG fans.",
       bg = hex("d6c095"), tile = hex("e2cfa3", 0.30), tileHi = hex("cdb487"), edge = hex("33281c", 0.85),
-      text = hex("3a2e22"), dim = hex("6e5d48"), amber = hex("8b3a1e"),
+      text = hex("24190f"), dim = hex("4a3a27"), amber = hex("7c2f14"),
       cream2 = hex("8a7a5c"), rust = hex("a8432a"), teal = hex("4f7a5a"), font = FRIZ, num = FRIZ,
       journal = { gold = hex("33281c"), trim = hex("33281c"), top = hex("dcc697"), base = hex("c9b083"), tab = hex("b99d6c"), page = hex("d6c095") } },
     { id = "forever", name = "Forever Journal", desc = "A bound adventurer's journal with gold trim, warm paper panels and WoW's own fonts.",

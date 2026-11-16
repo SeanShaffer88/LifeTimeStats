@@ -112,7 +112,7 @@ function ns.BuildNotebookFrame(win, side, dim)
         b.bg = b:CreateTexture(nil, "BACKGROUND")
         b.bg:SetAllPoints()
         b.bg:SetTexture(MEDIA .. "tab")
-        b.text = W.Text(b, 10, T.dim, nil, "CENTER")
+        b.text = W.Text(b, 11, T.dim, nil, "CENTER")
         b.text:SetWordWrap(true)
         b.text:SetWidth(20)
         b.text:SetPoint("CENTER", 2, 0)
@@ -138,6 +138,7 @@ function ns.BuildNotebookFrame(win, side, dim)
     -- page index in the margin: chapter heading, then one tag per page of the chapter
     nb.chapter = W.Text(side, 10, T.dim, nil, "CENTER"); nb.chapter:SetPoint("TOP", side, "TOPLEFT", 130, -12); nb.chapter:SetWidth(92)
     nb.title = W.Text(side, 15, T.amber, nil, "CENTER"); nb.title:SetPoint("TOP", nb.chapter, "BOTTOM", 0, -3); nb.title:SetWidth(96)
+    W.Bold(nb.title, T.amber)
     local TAG_H, TAG_GAP = 26, 7
     for i = 1, 6 do
         local b = CreateFrame("Button", nil, side)
@@ -189,6 +190,7 @@ function ns.BuildNotebookFrame(win, side, dim)
             b.active = on and true or false
             local tc = on and T.amber or T.dim
             b.text:SetTextColor(tc[1], tc[2], tc[3])
+            if on then W.Bold(b.text, T.amber) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
         end
         local sk = ns.NOTEBOOK_SKETCHES[pageId]
         if sk then self.sketch:SetTexture(MEDIA .. "sketches\\" .. sk) end
@@ -202,9 +204,9 @@ function ns.BuildNotebookFrame(win, side, dim)
             b:SetShown(page ~= nil)
             if page then
                 local on = page == pageId
-                b.text:SetText(ns.NOTEBOOK_PAGE_NAMES[page] or page)
+                b.text:SetText(W.SmallCaps(ns.NOTEBOOK_PAGE_NAMES[page] or page))
                 -- long names ("Life on the Road") shrink to fit the tag
-                local size = 10
+                local size = 10 -- small caps: capitals, a point smaller
                 b.text:SetFont(W.FONT, size, "")
                 while size > 8 and (b.text:GetStringWidth() or 0) > 80 do size = size - 1; b.text:SetFont(W.FONT, size, "") end
                 local c = on and GREEN or J.base
@@ -213,6 +215,7 @@ function ns.BuildNotebookFrame(win, side, dim)
                 b.line:SetVertexColor(lc[1], lc[2], lc[3], 1)
                 local tc = on and T.text or T.dim
                 b.text:SetTextColor(tc[1], tc[2], tc[3])
+                if on then W.Bold(b.text) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
             end
         end
         self.current = pageId
