@@ -2,6 +2,17 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+From in-game screenshots of 1.23.1.
+
+### Fixed
+- **Options panel** (Options > AddOns > LifeTimeStats) in the Adventurer's Notebook: it now sits on its own parchment sheet, so the dark ink is readable on the dark Options window.
+- **Achievement alerts** buttons were covered by the Tracking and title card; the card moved down.
+- **Theme** value shrinks to fit between its arrows ("Auto (Adventurer's Notebook)" overflowed).
+- **Today** box in the notebook margin: values were clipped by the margin rule.
+- **Gold sources** legend cut "Quests" and "Vendor" to "Qu..." and "Ve..."; the ring is a little smaller and values a point smaller.
+
 ## [1.23.1-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.

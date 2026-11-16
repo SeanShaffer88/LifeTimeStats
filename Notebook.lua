@@ -166,8 +166,9 @@ function ns.BuildNotebookFrame(win, side, dim)
     local tb = rawget(win, "todayBox")
     if tb then
         tb:ClearAllPoints()
-        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 80, 8)
-        tb:SetSize(100, 128)
+        -- ends at x 170, left of the inked margin rule at 174, so values are not clipped
+        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 72, 8)
+        tb:SetSize(98, 128)
         -- smaller values so "Online 23m 33s" fits the margin
         for _, v in ipairs(rawget(win, "today") or {}) do
             if v.SetFont then pcall(v.SetFont, v, W.NUM, 10, "") end
