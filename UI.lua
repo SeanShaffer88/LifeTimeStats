@@ -88,7 +88,17 @@ end
 local function KpiRow(page, defs, allowFormatted)
     page.kpis = {}
     for i, d in ipairs(defs) do
-        page.kpis[i] = W.Odometer(page, (i - 1) * (KPI_W + GAP), 0, KPI_W, KPI_H, d.label, d.icon, d.tip, allowFormatted)
+        local tile = W.Odometer(page, (i - 1) * (KPI_W + GAP), 0, KPI_W, KPI_H, d.label, d.icon, d.tip, allowFormatted)
+        page.kpis[i] = tile
+        -- a tile backed by a statistic opens its card when clicked
+        tile.stat = ns.FindStat and (ns.FindStat(d.id) or ns.FindStat(d.label))
+        if tile.HookScript then
+            tile:EnableMouse(true)
+            tile:HookScript("OnMouseUp", function(self, button)
+                local st = rawget(self, "stat")
+                if st and button ~= "RightButton" then ns.ShowStatDetail(st) end
+            end)
+        end
     end
     page.kpiDefs = defs
 end
@@ -213,6 +223,7 @@ local function UpdateDashboardKpis(page, view, base, sess)
         end
         local tile = page.kpis[nextSlot]
         tile:Configure(stat.label, pin.icon, tip)
+        tile.stat = stat
         local sub = "Pinned · " .. pin.category
         local goal = ns.GoalFor and ns.GoalFor(id)
         if goal and type(value) == "number" then
@@ -239,6 +250,7 @@ local function UpdateDashboardKpis(page, view, base, sess)
             local seal = rawget(tile, "goalSeal")
             if seal then seal:Hide() end
             tile:Configure(def.label, def.icon, def.tip)
+            tile.stat = ns.FindStat(def.id) or ns.FindStat(def.label)
             UpdateKpi(tile, def, view, base, sess)
             nextSlot = nextSlot + 1
         end
@@ -427,6 +439,9 @@ local function CreateStatDetail()
     local chartY, chartH = 206, 112
     layer.chartTitle = W.Text(dlg, 10, T.dim)
     layer.chartTitle:SetPoint("TOPLEFT", 14, -chartY)
+    -- the pace line: when the next round number comes at the last 30 days' rate
+    layer.pace = W.Text(dlg, 11, T.amber, nil, "RIGHT")
+    layer.pace:SetPoint("TOPRIGHT", -14, -chartY + 1); layer.pace:SetWidth(width - 160); layer.pace:SetWordWrap(false)
     local chartHost = CreateFrame("Frame", nil, dlg)
     chartHost:SetPoint("TOPLEFT", 14, -chartY - 16); chartHost:SetSize(width - 28, chartH)
     layer.chart = W.Columns(chartHost, width - 28, chartH, 30, "single")
@@ -486,8 +501,19 @@ function ns.ShowStatDetail(st)
         for i, e in ipairs(h.series) do vals[i] = { e.v or 0 }; labels[i] = DayLabel(e.d) end
         L.chart:Set(vals, { C.amber }, labels, { labels[1], labels[15], "Today" }, F, { st.label }, true)
         L.chartHost:Show(); L.chartTitle:Show()
+        local pace = ns.StatPace(st, h)
+        local text = ""
+        if pace and pace.rate == 0 then
+            text = "Not done in the last 30 days."
+        elseif pace and pace.target then
+            local rate = pace.rate >= 10 and Int(pace.rate) or string.format("%.1f", pace.rate)
+            if st.fmt and st.fmt ~= "int" then rate = F(pace.rate) end
+            text = string.format("At %s a day: %s %s", rate, F(pace.target),
+                pace.days <= 1 and "by tomorrow" or ("around " .. date("%b %d, %Y", pace.at) .. " (in " .. Int(pace.days) .. " days)"))
+        end
+        L.pace:SetText(text); L.pace:Show()
     else
-        L.chartHost:Hide(); L.chartTitle:Hide()
+        L.chartHost:Hide(); L.chartTitle:Hide(); L.pace:Hide()
     end
 
     if h.kind == "record" then

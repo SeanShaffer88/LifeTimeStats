@@ -128,6 +128,44 @@ eq(layer.chartHost:IsShown(), false, "computed stats have no daily chart")
 ns.ShowPage("combat")
 eq(layer:IsShown(), false, "a page change closes the card")
 
+-- ------------------------------------------------------------ pace forecasts
+eq(ns.NextMilestone(0), 10, "first milestone")
+eq(ns.NextMilestone(10), 25, "after 10 comes 25")
+eq(ns.NextMilestone(500), 1000, "after 500 comes 1,000")
+eq(ns.NextMilestone(999), 1000, "999 heads for 1,000")
+eq(ns.NextMilestone(2600), 5000, "2,600 heads for 5,000")
+eq(ns.NextMilestone(3000, "time"), 3600, "times count in hours: 50 minutes heads for 1 hour"); eq(ns.NextMilestone(4000, "time"), 9000, "then 2.5 hours")
+eq(ns.NextMilestone(15000, "money"), 2.5 * 10000, "money counts in gold")
+local pace = ns.StatPace(st, ns.StatHistory(st, ch))
+eq(math.floor(pace.rate * 100 + 0.5), math.floor(59 / 30 * 100 + 0.5), "pace over 30 days")
+eq(pace.target, 1000, "heading for 1,000 jumps")
+eq(pace.days, math.ceil(500 / (59 / 30)), "days to go")
+ns.ShowStatDetail(st)
+eq(layer.pace:GetText():find("1,000", 1, true) ~= nil or layer.pace:GetText():find("1000", 1, true) ~= nil, true, "pace line names the next milestone")
+eq(layer.pace:IsShown(), true, "pace line shown for counters")
+local idle = find("travel", "flights")
+ch.c.flights = 3
+ns.ShowStatDetail(idle)
+eq(layer.pace:GetText(), "Not done in the last 30 days.", "no pace without recent activity")
+ns.ShowStatDetail(rs)
+eq(layer.pace:IsShown(), false, "no pace line for records")
+
+-- ------------------------------------------------------------ tiles open their statistic
+eq(ns.FindStat("counter:jumps"), st, "find by tile id")
+eq(ns.FindStat("Steps taken") ~= nil, true, "find by label")
+eq(ns.FindStat("nonsense"), nil, "unknown ids find nothing")
+ns.ShowPage("dashboard")
+local dash = ns.Page("dashboard")
+layer:Hide()
+local jumpTile
+for _, t in ipairs(dash.kpis) do if rawget(t, "stat") == st then jumpTile = t end end
+eq(jumpTile ~= nil, true, "the jumps tile knows its statistic")
+jumpTile.scripts.OnMouseUp(jumpTile, "LeftButton")
+eq(layer:IsShown() and layer.stat == st, true, "clicking a tile opens its card")
+layer:Hide()
+jumpTile.scripts.OnMouseUp(jumpTile, "RightButton")
+eq(layer:IsShown(), false, "right-click does not open it")
+
 -- every statistic on every page opens without an error
 for _, list in pairs(ns.STATS) do for _, s in ipairs(list) do ns.ShowStatDetail(s) end end
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))
