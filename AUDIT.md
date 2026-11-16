@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.25.2-forever
+# Audit - LifeTimeStats 1.26.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,13 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.26.0
+- In game (1.25.2, 11 screenshots):
+  - Stats Explorer (overview, Deaths, Adventurer's Life), Forever Journal (Social, Journal) and Odometer (Compare, Wealth, Timeline, Combat, Top Lists, Fastest) render with their section tabs.
+  - Defect fixed here: the "Falls & the elements" tab was cut off.
+- Verified (offline): new `tests/styled.py` (29 assertions) covers the Stone & Gold and Adventure Journal textures, frames, headers, menus, chapter tabs and every page. All 19 suites pass.
+- Unverified (in client): how Stone & Gold and Adventure Journal look, and tiled textures (`SetHorizTile`).
 
 ## 1.25.2
 - In game (1.25.1, 4 screenshots of the Lifetime Stats skin):
