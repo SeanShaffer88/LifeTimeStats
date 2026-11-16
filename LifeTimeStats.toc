@@ -47,3 +47,4 @@ Expanded.lua
 Control.lua
 Satchel.lua
 Habits.lua
+Sections.lua

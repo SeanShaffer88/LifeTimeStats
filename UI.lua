@@ -94,12 +94,21 @@ local function PerChar(key)
     return table.concat(out, "\n")
 end
 
-local function StatRows(cat, view, sess)
-    local rows = {}
+-- Rows for a stat page, grouped into its sections: a heading row starts each section.
+-- Returns the rows and { { name, index } } for the section tabs. `focus` (a stat label) is
+-- inked in the accent colour, for search results that open the page.
+local function StatRows(cat, view, sess, focus)
+    local rows, sections = {}, {}
     local perChar = Settings().scope == "account" and Settings().range == "lifetime"
     local range = Settings().range
     local other = range == "session" and ns.GetView(Settings().scope, "today") or sess
-    for _, st in ipairs(ns.STATS[cat] or {}) do
+    local groups = ns.SectionedStats and ns.SectionedStats(cat) or { { stats = ns.STATS[cat] or {} } }
+    for _, group in ipairs(groups) do
+    if group.name and #groups > 1 then
+        rows[#rows + 1] = { group.name, "", "", header = true }
+        sections[#sections + 1] = { name = group.name, index = #rows }
+    end
+    for _, st in ipairs(group.stats) do
         local v, what = ns.StatValue(st, view)
         local ov = ns.StatValue(st, other)
         local empty = view.today and st.rec
@@ -108,14 +117,38 @@ local function StatRows(cat, view, sess)
             (st.label2 and what) and (st.label .. ": " .. what) or st.label,
             na and "n/a" or (empty and "—" or ns.FormatStat(st, v)),
             (Settings().showSession and type(ov) == "number" and ov > 0 and not st.get) and ("+" .. ns.FormatStat(st, ov)) or "",
-            tip = na and naTip or st.tip, what = what,
+            tip = na and naTip or st.tip, what = what, stat = st.label,
+            color = (focus and st.label == focus) and T.amber or nil,
         }
         if perChar and st.key and not na then
             local pc = PerChar(st.key)
             if pc then rows[#rows].tip = ((st.tip and (st.tip .. "\n\n")) or "") .. pc end
         end
     end
-    return rows
+    end
+    return rows, sections
+end
+
+-- Section tabs for a page whose table has heading rows: one tab per section, the active one
+-- being the section at the top of the visible rows. Clicking scrolls the table there.
+local function TableSectionTabs(tbl, sections)
+    local out = {}
+    local top = (tbl.offset or 0) + 1
+    local active = 1
+    for i, s in ipairs(sections or {}) do if s.index <= top + 1 then active = i end end
+    for i, s in ipairs(sections or {}) do
+        out[i] = { name = s.name, active = i == active, click = function() tbl:ScrollTo(s.index) end }
+    end
+    return out
+end
+ns.TableSectionTabs = TableSectionTabs
+
+-- Find the row for a stat on a page and bring it into view (used by search results).
+local function FocusRow(p, tbl, label)
+    p.focus = label
+    for i, d in ipairs(tbl.data or {}) do
+        if d.stat == label or d[1] == label then tbl:Reveal(i); return true end
+    end
 end
 
 -- A built page by id (used by the offline tests and other modules).
@@ -463,15 +496,25 @@ local function CategoryPage(id, kpis, panels, cols)
     end
     function p:Update(view, base, sess)
         UpdateKpis(self, view, base, sess)
+        local rows, sections
         if cols and cols.rows then
-            self.table:SetData(cols.rows(view, base, sess), true)
+            rows, sections = cols.rows(view, base, sess, self.focus)
         else
             self.table:SetHeader(2, RangeName())
             self.table:SetHeader(3, Settings().range == "session" and "TODAY" or "SESSION")
-            self.table:SetData(StatRows(id, view, sess), true)
+            rows, sections = StatRows(id, view, sess, self.focus)
         end
+        self.sections = sections
+        self.table:SetData(rows, true)
         for _, pn in ipairs(self.panels) do pn.def.update(pn.obj, view, base, sess) end
     end
+    function p:SectionTabs() return TableSectionTabs(self.table, self.sections) end
+    function p:FocusStat(label)
+        self.focus = label
+        ns.RefreshWindow()
+        FocusRow(self, self.table, label)
+    end
+    p.table.onScroll = function() if ns.UpdateSectionTabs then ns.UpdateSectionTabs() end end
     return p
 end
 
@@ -654,14 +697,19 @@ local function BuildCategories()
     }, {
         title = "Records",
         cols = { { "RECORD", 250, kind = "text" }, { "BEST", 100, kind = "num" }, { "SOURCE", 0, kind = "dim" } },
-        rows = function(view)
-            local rows = {}
-            for _, st in ipairs(ns.STATS.records) do
-                local v, what = ns.StatValue(st, view)
-                local na, naTip = ns.IsNA(st, v)
-                rows[#rows + 1] = { st.label, na and "n/a" or ((view.today) and "—" or ns.FormatStat(st, v)), what or "", tip = na and naTip or st.tip, what = what }
+        rows = function(view, base, sess, focus)
+            local rows, sections = {}, {}
+            for _, group in ipairs(ns.SectionedStats("records")) do
+                rows[#rows + 1] = { group.name, "", "", header = true }
+                sections[#sections + 1] = { name = group.name, index = #rows }
+                for _, st in ipairs(group.stats) do
+                    local v, what = ns.StatValue(st, view)
+                    local na, naTip = ns.IsNA(st, v)
+                    rows[#rows + 1] = { st.label, na and "n/a" or ((view.today) and "—" or ns.FormatStat(st, v)), what or "", tip = na and naTip or st.tip, what = what,
+                        stat = st.label, color = (focus and st.label == focus) and T.amber or nil }
+                end
             end
-            return rows
+            return rows, sections
         end,
     })
 end
@@ -731,19 +779,30 @@ local function BuildLists()
         p.selected = d.id
         ns.RefreshWindow()
     end)
+    function p:SectionTabs() return TableSectionTabs(self.nameT, self.sections) end
+    p.nameT.onScroll = function() if ns.UpdateSectionTabs then ns.UpdateSectionTabs() end end
     local rc = Panel(p, "Top 100", "star", lw + GAP, 0, CW - lw - GAP, CH)
     p.title = rc.title
     p.rankT = W.Table(rc.body, rc.bw, rc.bh, {
         { "#", 36, kind = "dim" }, { "NAME", 240, kind = "text" }, { "", 170, kind = "bar" }, { "TOTAL", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
     })
     function p:Update(view, base, sess)
-        local names = {}
-        for _, l in ipairs(ns.LISTS) do
-            local n = 0
-            if l.count then n = l.count(base) else for _ in pairs(base.t[l.id] or {}) do n = n + 1 end end
-            names[#names + 1] = { l.name, n, id = l.id, color = (l.id == self.selected) and T.amber or nil }
+        local names, sections = {}, {}
+        for _, group in ipairs(ns.SectionedLists()) do
+            names[#names + 1] = { group.name, "", header = true }
+            sections[#sections + 1] = { name = group.name, index = #names }
+            for _, l in ipairs(group.lists) do
+                local n = 0
+                if l.count then n = l.count(base) else for _ in pairs(base.t[l.id] or {}) do n = n + 1 end end
+                names[#names + 1] = { l.name, n, id = l.id, color = (l.id == self.selected) and T.amber or nil }
+            end
         end
+        self.sections = sections
         self.nameT:SetData(names, true)
+        if self.revealSelected then
+            self.revealSelected = nil
+            for i, d in ipairs(names) do if d.id == self.selected then self.nameT:Reveal(i) end end
+        end
         local def
         for _, l in ipairs(ns.LISTS) do if l.id == self.selected then def = l end end
         self.title:SetText(def.name:upper())
@@ -895,8 +954,10 @@ local function BuildSearch()
     }, function(d)
         if d.cat then
             win.search:SetText("")
-            if d.list and pages.lists then pages.lists.selected = d.list end
+            if d.list and pages.lists then pages.lists.selected = d.list; pages.lists.revealSelected = true end
             ns.ShowPage(d.cat)
+            local pg = pages[d.cat]
+            if pg and pg.FocusStat and d.stat then pg:FocusStat(d.stat) end
         end
     end)
     function p:Update(view, base, sess)
@@ -909,8 +970,11 @@ local function BuildSearch()
                 if st.label:lower():find(q, 1, true) then
                     local v, what = ns.StatValue(st, view)
                     local sv = ns.StatValue(st, sess)
-                    rows[#rows + 1] = { st.label, catName[cat] or cat, ns.FormatStat(st, v), (sv and sv > 0) and ("+" .. ns.FormatStat(st, sv)) or "",
-                        tip = (st.tip or "") .. "\nClick to open " .. (catName[cat] or cat) .. ".", what = what, cat = cat }
+                    local where = catName[cat] or cat
+                    local sec = ns.StatSection and ns.StatSection(cat, st)
+                    if sec then where = where .. " › " .. sec end
+                    rows[#rows + 1] = { st.label, where, ns.FormatStat(st, v), (sv and sv > 0) and ("+" .. ns.FormatStat(st, sv)) or "",
+                        tip = (st.tip or "") .. "\nClick to open " .. (catName[cat] or cat) .. ".", what = what, cat = cat, stat = st.label }
                 end
             end
         end
@@ -1058,6 +1122,17 @@ local function BuildAchievements()
     local opts = {}
     for i, cname in ipairs(ACH_CATS) do opts[i] = { id = cname, label = cname, tip = "Show " .. (cname == "All" and "every achievement" or (cname:lower() .. " achievements")) .. "." } end
     p.seg = W.Segmented(card, opts, function(id) p.cat = id; p.offset = 0; ns.RefreshWindow() end)
+    function p:SectionTabs()
+        local out = {}
+        for i, cname in ipairs(ACH_CATS) do
+            out[i] = { name = cname, active = self.cat == cname, click = function()
+                self.cat = cname; self.offset = 0
+                if self.seg.Select then self.seg:Select(cname) end
+                ns.RefreshWindow()
+            end }
+        end
+        return out
+    end
     for _, b in ipairs(p.seg.buttons) do b:SetWidth(math.max(40, b.text:GetStringWidth() + 12)) end
     local x = 1
     for _, b in ipairs(p.seg.buttons) do b:ClearAllPoints(); b:SetPoint("LEFT", x, 0); x = x + b:GetWidth() end
@@ -1684,6 +1759,7 @@ end
 
 -- ============================================================ HOW IT WORKS
 ns.HELP = {
+    { "Finding your way", "Tabs down the left edge open the chapters of the book (Hero, Deeds, Quests, Legends, Chronicle, Lore); the tags in the margin are the pages of that chapter. Tabs down the right edge jump to the sections of the page you are reading, and the highlighted one is the section in view. Ctrl+F searches every statistic: each result names its page and section, and clicking it opens the page at that row." },
     { "Counting", "LifeTimeStats starts counting when it is installed. The game does not remember most of these numbers, so nothing before that can be recovered. /played and lifetime honorable kills are read from the server." },
     { "Lifetime, Session, Today", "Lifetime is everything since install. Session is since you logged in (a /reload keeps it; Reset session in settings or /lts session clears it). Today resets at local midnight; 40 days of daily history are kept." },
     { "This character / All characters", "All characters adds up every character on this account that has logged in with LifeTimeStats. Records take the best, fastest times take the quickest, uniques are merged." },
@@ -1718,7 +1794,9 @@ local function BuildHelp()
     child:SetSize(card.bw - 12, 10)
     sf:SetScrollChild(child)
     local y = 0
+    p.topics = {}
     for _, h in ipairs(ns.HELP) do
+        p.topics[#p.topics + 1] = { name = h[1], y = y }
         local head = W.Text(child, 13, T.amber); head:SetPoint("TOPLEFT", 0, -y); head:SetText(h[1])
         local body = W.Text(child, 12, T.text, nil, "LEFT")
         body:SetWordWrap(true); body:SetWidth(card.bw - 20)
@@ -1736,7 +1814,20 @@ local function BuildHelp()
     sf:SetScript("OnMouseWheel", function(self, delta)
         local maxS = math.max(0, child:GetHeight() - self:GetHeight())
         self:SetVerticalScroll(math.max(0, math.min(maxS, self:GetVerticalScroll() - delta * 40)))
+        ns.UpdateSectionTabs()
     end)
+    -- one tab per topic; the active one is the topic at the top of the view
+    function p:SectionTabs()
+        local out, at, active = {}, sf:GetVerticalScroll() or 0, 1
+        for i, t in ipairs(self.topics) do if t.y <= at + 10 then active = i end end
+        for i, t in ipairs(self.topics) do
+            out[i] = { name = t.name, active = i == active, click = function()
+                local maxS = math.max(0, child:GetHeight() - sf:GetHeight())
+                sf:SetVerticalScroll(math.min(maxS, t.y))
+            end }
+        end
+        return out
+    end
     function p:Update() end
 end
 
@@ -1749,6 +1840,7 @@ function ns.ShowPage(id)
     if id ~= "journal" and noteLayer then noteLayer:Hide() end
     win:SetDashboardPinButtonShown(id == "dashboard")
     if current and current ~= pages[id] then current:Hide() end
+    if pages[id] ~= current then pages[id].focus = nil end
     current = pages[id]
     current:Show()
     local nb = rawget(win, "notebook")
@@ -1786,6 +1878,7 @@ function ns.RefreshWindow()
     local view, base, sess = Views()
     local ok, err = pcall(current.Update, current, view, base, sess)
     if not ok then ns.LogError("ui:" .. tostring(current.id), err) end
+    ns.UpdateSectionTabs()
     local since = ns.char.meta.created and date("%b %d, %Y", ns.char.meta.created) or "?"
     win.footer:SetText(string.format("Counting since %s   ·   %d statistics tracked   ·   %d character%s",
         since, ns.CountStats(), ns.CharCount(), ns.CharCount() == 1 and "" or "s"))
@@ -1805,6 +1898,84 @@ local function DefaultScale()
     local w, h = UIParent:GetWidth() or WIN_W, UIParent:GetHeight() or WIN_H
     local sc = math.min(1, w * 0.96 / WIN_W, h * 0.92 / WIN_H)
     return math.max(0.05, math.floor(sc * 20) / 20)
+end
+
+-- Section tabs: bookmarks down the right edge of the window, one per section of the page
+-- shown (stat pages, Records, Top Lists, Achievements). Pages without sections hide them.
+local SECTION_TABS, SECTION_TAB_W, SECTION_TAB_H, SECTION_GAP = 26, 118, 22, 3
+local function BuildSectionBar()
+    local book = ns.Notebook()
+    local bar = CreateFrame("Frame", nil, win)
+    bar:SetSize(SECTION_TAB_W, SECTION_TABS * (SECTION_TAB_H + SECTION_GAP))
+    bar:SetPoint("TOPLEFT", win, "TOPRIGHT", book and 34 or 2, -(HEADER_H + PAD))
+    bar:SetFrameLevel((win:GetFrameLevel() or 1) + 1)
+    bar.tabs = {}
+    for i = 1, SECTION_TABS do
+        local b = CreateFrame("Button", nil, bar)
+        b:SetSize(SECTION_TAB_W, SECTION_TAB_H)
+        b:SetPoint("TOPLEFT", 0, -(i - 1) * (SECTION_TAB_H + SECTION_GAP))
+        if book then
+            b.bg = b:CreateTexture(nil, "BACKGROUND")
+            b.bg:SetAllPoints()
+            b.bg:SetTexture(W.MEDIA .. "notebook\\tag")
+            b.bg:SetTexCoord(1, 0, 0, 1) -- the tag points away from the page
+        else
+            b.bg = W.Fill(b, T.tile, "BACKGROUND")
+            b.bg:SetAllPoints()
+            b.edge = W.Fill(b, T.amber, "BORDER"); b.edge:SetPoint("TOPLEFT"); b.edge:SetPoint("BOTTOMLEFT"); b.edge:SetWidth(2)
+        end
+        b.text = W.Text(b, 10, T.dim, nil, "LEFT")
+        b.text:SetPoint("LEFT", book and 10 or 8, 0); b.text:SetWidth(SECTION_TAB_W - 16)
+        b.text:SetWordWrap(false)
+        b:SetScript("OnClick", function(self) if self.def and self.def.click then self.def.click(); ns.UpdateSectionTabs() end end)
+        b:SetScript("OnEnter", function(self)
+            if not self.def then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(self.def.name, T.amber[1], T.amber[2], T.amber[3])
+            GameTooltip:AddLine("Jump to this section of the page.", T.text[1], T.text[2], T.text[3], true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b:Hide()
+        bar.tabs[i] = b
+    end
+    bar.book = book
+    -- keep the tabs on screen when the window is dragged against the right edge
+    if win.SetClampRectInsets then pcall(win.SetClampRectInsets, win, 0, -((book and 34 or 2) + SECTION_TAB_W), 0, 0) end
+    bar:Hide()
+    win.sectionBar = bar
+end
+
+function ns.UpdateSectionTabs()
+    local bar = win and rawget(win, "sectionBar")
+    if not bar then return end
+    local defs = current and current.SectionTabs and current:SectionTabs() or nil
+    if not defs or #defs < 2 then bar:Hide(); return end
+    local book = bar.book
+    local J = W.JOURNAL
+    for i, b in ipairs(bar.tabs) do
+        local d = defs[i]
+        b.def = d
+        if d then
+            local text = book and W.SmallCaps(d.name) or d.name
+            b.text:SetText(text)
+            local col = d.active and T.amber or (book and T.text or T.dim)
+            b.text:SetTextColor(col[1], col[2], col[3])
+            if book then
+                if d.active then W.Bold(b.text, T.amber) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
+                local c = d.active and J.page or J.tab
+                b.bg:SetVertexColor(c[1], c[2], c[3], 1)
+                b:SetPoint("TOPLEFT", d.active and 6 or 0, -(i - 1) * (SECTION_TAB_H + SECTION_GAP))
+            else
+                W.Color(b.bg, d.active and T.tileHi or T.tile)
+                b.edge:SetShown(d.active)
+            end
+            b:Show()
+        else
+            b:Hide()
+        end
+    end
+    bar:Show()
 end
 
 local function CreateWindow()
@@ -1986,6 +2157,9 @@ local function CreateWindow()
     end
 
     if ns.Notebook() and ns.BuildNotebookFrame then ns.BuildNotebookFrame(win, side, { HEADER_H = HEADER_H, FOOTER_H = FOOTER_H, SIDEBAR_W = SIDEBAR_W, PAD = PAD, CW = CW, CH = CH }) end
+
+    -- section tabs down the right side ---------------------------------
+    BuildSectionBar()
 
     -- content ---------------------------------------------------------
     local content = CreateFrame("Frame", nil, win)

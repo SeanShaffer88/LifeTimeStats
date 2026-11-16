@@ -92,7 +92,7 @@ function ns.ScanSatchel(force)
     end
     if total > 0 then
         ns.quietRecords = true -- bag sizes creep up one bag at a time; no Journal line each time
-        Max("bag_slots_max", total)
+        Max("max_bag_slots", total) -- the same record the character snapshot keeps
         Max("bag_filled_max", filled)
         ns.quietRecords = nil
     end
@@ -127,8 +127,7 @@ end)
 local tip = "Right-clicks and /use on items in your bags, not counting gear you equip or items sold, banked, mailed or traded."
 table.insert(ns.STATS.life, { label = "Items used from your bags", fmt = "int", key = "items_used", tip = tip })
 table.insert(ns.STATS.life, { label = "Quest items used", fmt = "int", key = "quest_items_used", tip = "Items used from the quest tracker or quest log." })
-table.insert(ns.STATS.records, { label = "Most bag space", fmt = "int", rec = "bag_slots_max", tip = "Bag slots across your backpack and equipped bags." })
 table.insert(ns.STATS.records, { label = "Most bag slots filled", fmt = "int", rec = "bag_filled_max" })
 table.insert(ns.UNIQUES, { set = "itemsheld", label = "Different items carried" })
 table.insert(ns.LISTS, { id = "itemsused", name = "Items used most", fmt = "int" })
-ns.SATCHEL_STAT_COUNT = 6
+ns.SATCHEL_STAT_COUNT = 5
