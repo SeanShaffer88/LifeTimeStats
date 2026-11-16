@@ -6,15 +6,43 @@ local T, W = ns.THEME, ns.W
 local C = W.C
 local Int, Time, Money = ns.FormatInt, ns.FormatTime, ns.FormatMoney
 
-local WIN_W, WIN_H = 1140, 740
+-- The window is 1140 x 740 ("Normal"), or as large as the screen allows ("Fill screen").
+-- The sizes below are recomputed by ComputeLayout() just before the window is built, so every
+-- page is laid out for the size in use.
+local BASE_W, BASE_H = 1140, 740
+local WIN_W, WIN_H = BASE_W, BASE_H
 local HEADER_H, SIDEBAR_W, FOOTER_H, PAD = 44, 176, 24, 10
-local CW = WIN_W - SIDEBAR_W - PAD * 2           -- content width  (944)
-local CH = WIN_H - HEADER_H - FOOTER_H - PAD * 2 -- content height (652)
 local KPI_H, GAP = 72, 10
 local NAV_STEP = 29 -- 18 pages still leave room for the 7-row Today box
-local KPI_W = (CW - GAP * 3) / 4
 local BODY_Y = KPI_H + GAP                        -- y where panels start (82)
-local BODY_H = CH - BODY_Y                        -- 570
+local CW, CH, KPI_W, BODY_H
+local function Derive()
+    CW = WIN_W - SIDEBAR_W - PAD * 2           -- content width  (944 at Normal)
+    CH = WIN_H - HEADER_H - FOOTER_H - PAD * 2 -- content height (652 at Normal)
+    KPI_W = (CW - GAP * 3) / 4
+    BODY_H = CH - BODY_Y                       -- 570 at Normal
+end
+Derive()
+
+-- Room the window needs beyond its own edges: the notebook's parchment overhangs 46 px on each
+-- side and 30 px top and bottom, and the section tabs stick out on the right.
+local TAB_ROOM = 118 + 34 + 12
+function ns.WindowSizeFor(mode, uiW, uiH, scale, book)
+    if mode ~= "fill" or type(uiW) ~= "number" or type(uiH) ~= "number" then return BASE_W, BASE_H end
+    scale = (type(scale) == "number" and scale > 0) and scale or 1
+    local w = uiW / scale - (book and 46 or 0) - TAB_ROOM - 16
+    local h = uiH / scale - (book and 60 or 0) - 24
+    w = math.max(BASE_W, math.min(2600, math.floor(w)))
+    h = math.max(BASE_H, math.min(1600, math.floor(h)))
+    return w, h
+end
+local function ComputeLayout()
+    local s = ns.settings and ns.settings.window or {}
+    local book = ns.Notebook and ns.Notebook()
+    WIN_W, WIN_H = ns.WindowSizeFor(s.size, UIParent:GetWidth(), UIParent:GetHeight(), s.scale or 1, book)
+    Derive()
+end
+function ns.WindowSize() return WIN_W, WIN_H end
 
 local win
 local pages = {}
@@ -369,7 +397,7 @@ local function BuildDashboard()
 
     local y3 = y2 + 210
     local h3 = CH - y3
-    local w1, w2 = 360, 300
+    local w1, w2 = math.floor(CW * 0.38), math.floor(CW * 0.32)
     local w3 = CW - w1 - w2 - GAP * 2
     local stc = Panel(p, "Steps per day", "steps", 0, y3, w1, h3)
     p.stepCols = W.Columns(stc.body, stc.bw, stc.bh, 30, "single")
@@ -480,10 +508,11 @@ end
 local function CategoryPage(id, kpis, panels, cols)
     local p = NewPage(id)
     KpiRow(p, kpis)
-    local tw = 470
+    local tw = math.max(470, math.floor(CW * 0.5))
+    if cols and cols.cols and not cols.scaled then cols.cols[1][2] = cols.cols[1][2] + (tw - 470); cols.scaled = true end
     local tc = Panel(p, (cols and cols.title) or "All statistics", "lists", 0, BODY_Y, tw, BODY_H, "Hover a row to see how it is measured.")
     p.table = W.Table(tc.body, tc.bw, tc.bh, cols and cols.cols or {
-        { "STATISTIC", 230, kind = "text" }, { "LIFETIME", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
+        { "STATISTIC", 230 + (tw - 470), kind = "text" }, { "LIFETIME", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
     })
     local rx, rw = tw + GAP, CW - tw - GAP
     local y = BODY_Y
@@ -772,7 +801,7 @@ end
 -- ============================================================ TOP LISTS
 local function BuildLists()
     local p = NewPage("lists")
-    local lw = 250
+    local lw = math.max(250, math.floor(CW * 0.27))
     local lc = Panel(p, "Lists", "lists", 0, 0, lw, CH)
     p.selected = ns.LISTS[1].id
     p.nameT = W.Table(lc.body, lc.bw, lc.bh, { { "LIST", 180, kind = "text" }, { "#", 0, kind = "dim" } }, function(d)
@@ -1116,7 +1145,7 @@ local function BuildAchievements()
               return n
           end, sub = function() return "every tier earned" end },
     })
-    local lw = 640
+    local lw = math.max(640, math.floor(CW * 0.68))
     local card = Panel(p, "Achievements", "trophy", 0, BODY_Y, lw, BODY_H, "Hover a badge to see every tier and when you earned it.")
     p.cat = "All"
     local opts = {}
@@ -1147,7 +1176,7 @@ local function BuildAchievements()
         p.offset = 0
         ns.RefreshWindow()
     end)
-    local cols, tileH, gap = 2, 74, 8
+    local cols, tileH, gap = (card.bw >= 940 and 3 or 2), 74, 8
     local tileW = (card.bw - gap) / cols
     local rowsVis = math.floor((card.bh + gap) / (tileH + gap))
     p.tiles = {}
@@ -1759,7 +1788,7 @@ end
 
 -- ============================================================ HOW IT WORKS
 ns.HELP = {
-    { "Finding your way", "Tabs down the left edge open the chapters of the book (Hero, Deeds, Quests, Legends, Chronicle, Lore); the tags in the margin are the pages of that chapter. Tabs down the right edge jump to the sections of the page you are reading, and the highlighted one is the section in view. Ctrl+F searches every statistic: each result names its page and section, and clicking it opens the page at that row." },
+    { "Finding your way", "Tabs down the left edge open the chapters of the book (Hero, Deeds, Quests, Legends, Chronicle, Lore); the tags in the margin are the pages of that chapter. Tabs down the right edge jump to the sections of the page you are reading, and the highlighted one is the section in view. Ctrl+F searches every statistic: each result names its page and section, and clicking it opens the page at that row. For more room, set Window size to Fill screen in the settings (or type /lts size fill)." },
     { "Counting", "LifeTimeStats starts counting when it is installed. The game does not remember most of these numbers, so nothing before that can be recovered. /played and lifetime honorable kills are read from the server." },
     { "Lifetime, Session, Today", "Lifetime is everything since install. Session is since you logged in (a /reload keeps it; Reset session in settings or /lts session clears it). Today resets at local midnight; 40 days of daily history are kept." },
     { "This character / All characters", "All characters adds up every character on this account that has logged in with LifeTimeStats. Records take the best, fastest times take the quickest, uniques are merged." },
@@ -1984,6 +2013,7 @@ local function CreateWindow()
     C = W.C
     local ink = ns.JournalSkin() and W.JOURNAL or nil
     local trim = ink and ink.trim or T.amber
+    ComputeLayout()
     win = W.Window(UIParent)
     win:SetSize(WIN_W, WIN_H)
     win:SetFrameStrata("HIGH")
@@ -1993,7 +2023,7 @@ local function CreateWindow()
     win:SetToplevel(true)
     win:Hide()
     local s = Settings().window
-    if not s.scale then s.scale = DefaultScale() end
+    if not s.scale then s.scale = s.size == "fill" and 1 or DefaultScale() end
     win:SetScale(s.scale)
     win:SetPoint(s.point or "CENTER", UIParent, s.point or "CENTER", s.x or 0, s.y or 0)
     tinsert(UISpecialFrames, "LifeTimeStatsWindow")
@@ -2277,13 +2307,33 @@ end
 
 function ns.ResetWindow()
     local s = Settings().window
-    s.point, s.x, s.y, s.scale = "CENTER", 0, 0, nil
+    local fill = s.size == "fill"
+    s.point, s.x, s.y, s.scale = "CENTER", fill and -math.floor(TAB_ROOM / 2) or 0, 0, nil
     if win then
-        s.scale = DefaultScale()
+        s.scale = fill and 1 or DefaultScale()
         win:SetScale(s.scale)
         win:ClearAllPoints()
-        win:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        win:SetPoint("CENTER", UIParent, "CENTER", s.x, 0)
     end
+end
+
+-- Normal or Fill screen. The pages are laid out once, so a new size applies after a reload.
+StaticPopupDialogs["LIFETIMESTATS_RELOAD_SIZE"] = {
+    text = "LifeTimeStats: the new window size applies after reloading the interface. Reload now?",
+    button1 = RELOADUI or "Reload", button2 = LATER or "Later",
+    OnAccept = function() ReloadUI() end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+function ns.SetWindowSize(mode)
+    mode = (mode == "fill") and "fill" or "normal"
+    local s = Settings().window
+    if (s.size or "normal") == mode then return false end
+    s.size = mode
+    -- centred, nudged left so the section tabs on the right stay on screen
+    s.point, s.x, s.y = "CENTER", (mode == "fill") and -math.floor(TAB_ROOM / 2) or 0, 0
+    if mode == "fill" then s.scale = 1 end
+    StaticPopup_Show("LIFETIMESTATS_RELOAD_SIZE")
+    return true
 end
 
 function ns.ApplyWindowSettings()

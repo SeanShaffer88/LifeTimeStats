@@ -840,6 +840,13 @@ SlashCmdList.LIFETIMESTATS = function(msg)
             ns.UpdateMinimapButton()
             ns.Print("Minimap button " .. (ns.settings.minimap.hide and "hidden" or "shown") .. ". /lts minimap reset brings it back; /lts minimap square or round sets the shape.")
         end
+    elseif cmd == "size" or cmd == "fill" or cmd == "normal" then
+        local arg = cmd == "size" and msg:match("^%S+%s+(%S+)") or cmd
+        if arg == "fill" or arg == "normal" then
+            if not ns.SetWindowSize(arg) then ns.Print("The window is already " .. (arg == "fill" and "filling the screen." or "at its normal size.")) end
+        else
+            ns.Print("/lts size fill makes the window fill the screen; /lts size normal returns it to 1140 x 740.")
+        end
     elseif cmd == "share" then
         ns.ShareCommand(msg:match("^share%s*(.*)$"))
     elseif cmd == "compare" then
@@ -897,6 +904,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("Commands:")
         ns.Print("/lts - open or close the window")
         ns.Print("/lts settings - open settings")
+        ns.Print("/lts size fill|normal - fill the screen or use the normal window size (applies after /reload)")
         ns.Print("/lts minimap - show/hide minimap button · /lts minimap reset · /lts minimap square|round")
         ns.Print("/lts session - reset session counters")
         ns.Print("/lts export | import - backup or restore this character")

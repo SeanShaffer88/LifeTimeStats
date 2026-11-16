@@ -176,7 +176,7 @@ function ns.CreateOptions()
     local sf = CreateFrame("ScrollFrame", nil, panel)
     sf:SetPoint("TOPLEFT", 4, -4); sf:SetPoint("BOTTOMRIGHT", -4, 4)
     local c = CreateFrame("Frame", nil, sf)
-    c:SetSize(CW, Y(700))
+    c:SetSize(CW, Y(740))
     sf:SetScrollChild(c)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d)
@@ -201,7 +201,7 @@ function ns.CreateOptions()
     local function Track(r) rows[#rows + 1] = r return r end
 
     -- APPEARANCE (left) -----------------------------------------------
-    local ap = W.Card(c, "Appearance", "dashboard", L, y0, colW, Y(262))
+    local ap = W.Card(c, "Appearance", "dashboard", L, y0, colW, Y(296))
     local b = ap.body
     RowLabel(b, 0, 0, "Theme", "Applies after /reload")
     local sw = Swatches(b); sw:SetPoint("TOPLEFT", 6, -Y(36) - 2)
@@ -225,18 +225,27 @@ function ns.CreateOptions()
     ns.themeChosen = S.theme
     Track(Toggle(b, 0, 56, ap.bw, "Class colour accent", "Use your class colour for numbers and charts. Applies after /reload.",
         function() return S.classColor end, function(v) S.classColor = v; reload:Show() end))
-    RowLabel(b, 0, 98, "Window scale")
+    RowLabel(b, 0, 98, "Window size", "Fill screen shows more rows; applies after /reload")
+    local sizeSeg = W.Segmented(b, {
+        { id = "normal", label = "Normal", tip = "1140 x 740, scaled to fit your screen." },
+        { id = "fill", label = "Fill screen", tip = "As large as your screen allows: taller tables and wider pages. Window scale still makes the text bigger or smaller." },
+    }, function(id) ns.SetWindowSize(id); sizeSeg:Select(S.window.size or "normal") end)
+    sizeSeg:SetPoint("TOPRIGHT", -2, -Y(98))
+    sizeSeg:Select(S.window.size or "normal")
+    sizeSeg.Sync = function(self) self:Select(S.window.size or "normal") end
+    Track(sizeSeg)
+    RowLabel(b, 0, 132, "Window scale")
     local sl = FlatSlider(b, 130, 0.6, 1.6, 0.05, function() return S.window.scale or 1 end,
         function(v) S.window.scale = math.floor(v * 100 + 0.5) / 100; ns.ApplyWindowSettings() end, function(v) return string.format("%d%%", v * 100 + 0.5) end)
-    sl:SetPoint("TOPRIGHT", -52, -Y(100))
+    sl:SetPoint("TOPRIGHT", -52, -Y(134))
     Track(sl)
-    Track(Toggle(b, 0, 134, ap.bw, "Lock window", "Stop the window from being dragged.",
+    Track(Toggle(b, 0, 168, ap.bw, "Lock window", "Stop the window from being dragged.",
         function() return S.lockWindow end, function(v) S.lockWindow = v end))
-    Track(Toggle(b, 0, 168, ap.bw, "Minimap button", "Left-click opens the window, right-click opens settings.",
+    Track(Toggle(b, 0, 202, ap.bw, "Minimap button", "Left-click opens the window, right-click opens settings.",
         function() return not S.minimap.hide end, function(v) S.minimap.hide = not v; ns.UpdateMinimapButton() end))
 
     -- SCREENSHOTS (left) ----------------------------------------------
-    local ss = W.Card(c, "Screenshots", "star", L, y0 + Y(272), colW, Y(150))
+    local ss = W.Card(c, "Screenshots", "star", L, y0 + Y(306), colW, Y(150))
     b = ss.body
     Track(Toggle(b, 0, 0, ss.bw, "On level-up", "A moment after each new level.",
         function() return S.shotLevel end, function(v) S.shotLevel = v end))
@@ -286,7 +295,7 @@ function ns.CreateOptions()
     Track(titleCyc)
 
     -- DATA (full width) -----------------------------------------------
-    local da = W.Card(c, "Your data", "chest", 0, y0 + Y(432), CW, 160)
+    local da = W.Card(c, "Your data", "chest", 0, y0 + Y(466), CW, 160)
     b = da.body
     local info = W.Text(b, 12, T.text); info:SetPoint("TOPLEFT", 6, -2)
     local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -24); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)
