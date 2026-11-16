@@ -2,7 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.23.1-forever] - 2026-11-16
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
 
 From in-game screenshots of 1.23.0, where the parchment sheet rendered as designed.
 
