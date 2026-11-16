@@ -52,7 +52,7 @@ for cx, cy in ((0, 0), (N, 0), (0, N), (N, N)):
 mask = mask.filter(ImageFilter.GaussianBlur(0.8))
 
 # distance-like falloff from the edge, for the scorched rim and darker border
-inner = mask.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.GaussianBlur(9))
+inner = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(5))
 ipx = inner.load()
 
 # ---------------------------------------------------------------- paper
@@ -67,9 +67,9 @@ for y in range(N):
         # lighter, warmer centre; darker towards the edge
         dx, dy = (x - N / 2) / (N / 2), (y - N / 2) / (N / 2)
         vign = (dx * dx + dy * dy) ** 1.1
-        k -= vign * 60 - 8
+        k -= vign ** 2.2 * 40 - 6
         rim = 1 - ipx[x, y] / 255.0          # 1 at the torn edge, 0 inside
-        k -= rim ** 1.15 * 135
+        k -= rim ** 1.7 * 125
         r, g, b = 220 + k, 198 + k * 0.97, 152 + k * 0.92
         spx[x, y] = (max(0, min(255, int(r))), max(0, min(255, int(g))), max(0, min(255, int(b))), mpx[x, y])
 

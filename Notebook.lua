@@ -78,8 +78,8 @@ function ns.BuildNotebookFrame(win, side, dim)
     -- control stays on solid paper.
     if win.SetBackdropBorderColor then pcall(win.SetBackdropBorderColor, win, 0, 0, 0, 0) end
     local sheet = win:CreateTexture(nil, "BACKGROUND", nil, -8)
-    sheet:SetPoint("TOPLEFT", win, "TOPLEFT", -30, 22)
-    sheet:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 30, -22)
+    sheet:SetPoint("TOPLEFT", win, "TOPLEFT", -46, 30)
+    sheet:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 46, -30)
     sheet:SetTexture(MEDIA .. "sheet")
     nb.sheet = sheet
     -- a soft drop shadow so the sheet lifts off the world behind it
@@ -203,6 +203,10 @@ function ns.BuildNotebookFrame(win, side, dim)
             if page then
                 local on = page == pageId
                 b.text:SetText(ns.NOTEBOOK_PAGE_NAMES[page] or page)
+                -- long names ("Life on the Road") shrink to fit the tag
+                local size = 10
+                b.text:SetFont(W.FONT, size, "")
+                while size > 8 and (b.text:GetStringWidth() or 0) > 80 do size = size - 1; b.text:SetFont(W.FONT, size, "") end
                 local c = on and GREEN or J.base
                 b.bg:SetVertexColor(c[1], c[2], c[3], on and 1 or 0.75)
                 local lc = on and { 0.37, 0.50, 0.23 } or T.dim
