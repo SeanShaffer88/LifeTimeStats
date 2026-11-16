@@ -124,6 +124,8 @@ ns.ACHIEVEMENTS = {
     { id = "cinema", name = "Front Row Seat", cat = "Silly", icon = "star", desc = "Watch %s cinematics to the end", fmt = "int", tiers = { 1, 5, 25 }, value = function(v) return c(v, "cinematics_finished") end },
     { id = "skipper", name = "No Spoilers", cat = "Silly", icon = "star", desc = "Skip %s cinematics", fmt = "int", tiers = { 1, 10, 50 }, value = function(v) return c(v, "cinematics_skipped") end },
     { id = "respec", name = "Change of Heart", cat = "Adventure", icon = "scroll", desc = "Respec your talents %s times", fmt = "int", tiers = { 1, 5, 25 }, value = function(v) return c(v, "respecs") end },
+    { id = "packrat", name = "Pack Rat", cat = "Wealth", icon = "chest", desc = "Carry %s different items", fmt = "int", tiers = { 100, 500, 2000 }, value = function(v) return u(v, "itemsheld") end },
+    { id = "consumer", name = "Bottoms Up", cat = "Adventure", icon = "heart", desc = "Use %s items from your bags", fmt = "int", tiers = { 100, 1000, 10000 }, value = function(v) return c(v, "items_used") end },
     { id = "friends", name = "Social Butterfly", cat = "Silly", icon = "person", desc = "Group with %s different players", fmt = "int", tiers = { 10, 50, 250, 1000 }, value = function(v) return u(v, "groupmates") end },
     { id = "npcs", name = "NPC Whisperer", cat = "Silly", icon = "person", desc = "Meet %s different NPCs", fmt = "int", tiers = { 25, 100, 500, 1000 }, value = function(v) return u(v, "npcs") end },
     { id = "errors", name = "Not Enough Mana", cat = "Silly", icon = "skull", desc = "See %s red error messages", fmt = "int", tiers = { 100, 1000, 10000, 50000 }, value = function(v) return c(v, "ui_errors") end },
