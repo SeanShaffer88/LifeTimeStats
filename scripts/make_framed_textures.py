@@ -12,6 +12,7 @@ Writes Media/framed/*.tga, all power-of-two 32-bit TGA:
   crest      128x128    white shield (tinted per card) and crest_rim, its gold rim
   navsel     256x32     menu selection, pointed on the right (white, tinted)
   divider    256x16     an ornamental rule with a diamond (white, tinted)
+  arrow      32x32      the dropdown chevron (white, tinted)
 """
 import math
 import random
@@ -181,3 +182,8 @@ d.polygon([(512, 22), (522, 32), (512, 42), (502, 32)], fill=(255, 255, 255, 255
 for x in (440, 584):
     d.ellipse((x - 6, 26, x + 6, 38), fill=(255, 255, 255, 255))
 save(big.resize((256, 16), Image.LANCZOS), "divider")
+
+# ---------------------------------------------------------------- dropdown arrow (white chevron, tinted)
+big = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+ImageDraw.Draw(big).line([(18, 40), (64, 88), (110, 40)], fill=(255, 255, 255, 255), width=18, joint="curve")
+save(big.resize((32, 32), Image.LANCZOS), "arrow")

@@ -85,8 +85,7 @@ local function InkFontString(fs)
     local setText, setColor = fs.SetText, fs.SetTextColor
     if type(setText) == "function" then
         fs.SetText = function(self, t)
-            if rawget(self, "noInk") then return setText(self, t) end
-            setText(self, W.InkCodes(t))
+            setText(self, rawget(self, "noInk") and t or W.InkCodes(t))
             -- single-line text that is too long shrinks a little instead of ending in "..."
             local canWrap = self.CanWordWrap or self.GetWordWrap
             if t and t ~= "" and canWrap and canWrap(self) == false and not rawget(self, "fitting") then
@@ -160,6 +159,24 @@ function W.Tip(owner, title, body, extra)
         GameTooltip:Show()
     end)
     owner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+-- A filled box with a 1-pixel edge, drawn as textures on f itself. Unlike W.Panel (a child
+-- frame, drawn above f's own text), it always sits behind f's text and icons.
+function W.Box(f, c, edge)
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    W.Color(bg, c)
+    local e = edge or T.edge
+    local lines = {}
+    for i, pts in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" }, { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+        local l = f:CreateTexture(nil, "BORDER")
+        W.Color(l, e)
+        l:SetPoint(pts[1]); l:SetPoint(pts[2])
+        if i <= 2 then l:SetHeight(1) else l:SetWidth(1) end
+        lines[i] = l
+    end
+    return bg, lines
 end
 
 function W.Panel(parent, c, edge)
@@ -882,7 +899,7 @@ function W.FitText(fs, text, size)
     size = size or (fs.GetFont and select(2, fs:GetFont())) or 12
     if type(size) ~= "number" then return end
     if type(rawget(fs, "fitBase")) ~= "number" then fs.fitBase = size end
-    for s = fs.fitBase, 9, -0.5 do
+    for s = fs.fitBase, math.min(fs.fitBase, 10), -0.5 do
         pcall(fs.SetFont, fs, font, s, "")
         if text then fs:SetText(text) end
         local sw = fs:GetStringWidth()

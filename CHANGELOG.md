@@ -2,6 +2,21 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+From in-game screenshots of 1.25.1.
+
+### Fixed
+- **Overview tiles** (and the Stats Explorer cards and dropdowns) looked washed out, because their background was drawn over their text. Backgrounds are now drawn behind it.
+- **Dropdown arrows** showed as small dark squares. They are now a chevron drawn for the skin.
+- **Menu names** were cut off ("Adventurer's...", "Fastest/Uniq..."). They now use the room the hidden shortcut badge had, and shrink a little if needed.
+- **Long titles** (milestones, achievements) no longer shrink below 10 points; past that the game's own "..." is easier to read.
+- **Achievements:** the category bar covered the Sort button. The categories are now only the tabs down the right edge of the window.
+- **Right-hand tabs** were see-through over the game world on the framed skins. They are now solid parchment, with dark text.
+
+### Changed
+- **README:** in-game screenshots of the Lifetime Stats skin (overview, Travel with its section tabs, Characters, Achievements), and the statistic count updated to 992.
+
 ## [1.25.1-forever] - 2026-11-17
 
 Prerelease. Offline regression suites pass; not yet checked in the live client.

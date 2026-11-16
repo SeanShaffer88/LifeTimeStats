@@ -7,12 +7,19 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 - **Author:** Malikor
 - **Client:** WoW: Forever (interface 16001, build 1.60.1)
 - **License:** GPL-3.0-or-later (see `LICENSE`)
-- **Tracks:** 943 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
+- **Tracks:** 992 statistics, top lists, fastest times, uniques and firsts, plus a **dungeon book** for all 35 Forever dungeons and 3 raids (bosses found, full clears, fastest clear, runs under or over level), an **Adventurer score**, play-session history with CSV export, peak character stats and battleground scoreboards
 
-![Dashboard](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/dashboard.png)
+![The overview in the Lifetime Stats skin, in game](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/ingame-overview.jpg)
+
+| | |
+|---|---|
+| ![Travel](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/ingame-travel.jpg)<br>Travel: sections in the table and as tabs on the right | ![Characters](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/ingame-characters.jpg)<br>Characters |
+| ![Achievements](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/ingame-achievements.jpg)<br>Achievements, with their categories as tabs | |
+
+In-game screenshots from 1.25.1, Lifetime Stats skin, Tauren Druid at level 10.
 
 <details>
-<summary><b>More screenshots (every page)</b></summary>
+<summary><b>More screenshots (every page, from the earlier dark skin)</b></summary>
 
 | | |
 |---|---|
