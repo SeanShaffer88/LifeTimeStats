@@ -2,6 +2,14 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Crowd control while it is restricted:** Forever 1.60.1 hides the whole loss-of-control entry at times (`SecretWhenLossOfControlRestricted`). Such an effect now counts once, under "Other loss of control" and without a duration, instead of being read field by field.
+
+### Checked
+- Every client call added in 1.24 and 1.25 was checked against the Forever 1.60.1.70755 API declarations, including event payloads and secret-value rules: `LOSS_OF_CONTROL_ADDED`, `C_LossOfControl`, `CONFIRM_TALENT_WIPE`, `CINEMATIC_START`, `PLAY_MOVIE`, `STOP_MOVIE`, `PLAYER_SPECIALIZATION_CHANGED`, `C_Container.GetContainerItemInfo`, `C_Spell.GetSpellName`, `SetPortraitTexture` and the `Line` widget.
+
 ## [1.25.0-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client. The readability changes come from in-game screenshots of 1.24.0, and the two new skins from the user's mock-ups.

@@ -2,7 +2,8 @@
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local _, ns = ...
 local Add, Max, On, Tally = ns.Add, ns.Max, ns.On, ns.Tally
-local S, Bad = ns.IsSecret, ns.BadNumber
+local Bad = ns.BadNumber
+local function S(v) return ns.IsSecret(v) end -- looked up each time, so the check is always current
 
 local function Num(v) if type(v) == "number" and not S(v) and not Bad(v) then return v end end
 local function Str(v) if type(v) == "string" and not S(v) and v ~= "" then return v end end
@@ -48,6 +49,9 @@ local function ReadControl(unit, index)
     if (not ok or type(data) ~= "table") and unit == "player" and type(api.GetActiveLossOfControlData) == "function" then
         ok, data = pcall(api.GetActiveLossOfControlData, index)
     end
+    -- While loss of control is restricted (Forever 1.60.1: SecretWhenLossOfControlRestricted) the
+    -- whole entry is secret: it still counts once, with no type, spell or time read from it.
+    if ok and data ~= nil and S(data) then return "secret" end
     if ok and type(data) == "table" then return data end
 end
 
@@ -58,6 +62,11 @@ function ns.TrackLossOfControl(a, b)
     if unit ~= "player" or not Num(index) then return end
     local data = ReadControl(unit, index)
     if not data then return end
+    if data == "secret" then
+        Add("cc_taken"); Add("cc_other")
+        ns.src.lossOfControl = true
+        return
+    end
     local kind = CC_KIND[Str(data.locType) or ""] or "other"
     local name = SpellName(data.spellID) or Str(data.displayText)
     Add("cc_taken")
