@@ -11,8 +11,9 @@ From in-game screenshots of 1.23.1.
 - **Cinematics** (Adventurer's Life): cinematics and movies watched, watched to the end, skipped, time watching and the longest scene.
 - **Talents** (Adventurer's Life): respecs, gold spent on respecs, the most expensive respec, talent loadouts loaded and specialization changes.
 - **Your bags** (Adventurer's Life and Records): items used from your bags (with a top list by item), quest items used, different items ever carried, and records for the most bag space and most slots filled.
-- **Achievements:** Pack Rat, Bottoms Up, Seeing Stars, Puppet on a String, Front Row Seat, No Spoilers and Change of Heart.
-- 42 new catalog entries (985 in total) and a "How it works" section on where these come from.
+- **Interface habits** (Social & Silly): map pins placed and removed, /who searches, players unignored, bags sorted, sell-all-junk clicks, minimap tracking changes, macros created, walk/run toggles, camera and minimap zoom steps, and how often you open the game menu, calendar, collections, achievements, guild, chat channels and customer support windows.
+- **Achievements:** Restless Wheel, A Place for Everything, Are We There Yet?, Pack Rat, Bottoms Up, Seeing Stars, Puppet on a String, Front Row Seat, No Spoilers and Change of Heart.
+- 64 new catalog entries (1,007 in total) and a "How it works" section on where these come from.
 
 ### Fixed
 - **Options panel** (Options > AddOns > LifeTimeStats) in the Adventurer's Notebook: it now sits on its own parchment sheet, so the dark ink is readable on the dark Options window.
