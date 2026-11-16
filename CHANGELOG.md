@@ -12,6 +12,8 @@ From in-game screenshots of 1.24.0.
   - **Counters:** lifetime, this session, today, the last 7 and 30 days, the best day ever with its date, how many days you did it at all, and the total across all your characters. A chart shows the last 30 days.
   - **Records:** the best, where it was set, how often it was beaten, when it was first set and last beaten, and the best on the account. A table lists every time it was beaten, with the date and where.
   - **Your characters:** a table shows the statistic on every character, most first, in their class colours.
+  - **Pace:** for counters, the card says when you reach the next round number at the pace of the last 30 days. For example: "At 2.0 a day: 1,000 around Jan 18, 2027 (in 63 days)". Times count in hours, money in gold, distances in miles.
+  - **Tiles too:** the counters across the top of each page, and pinned statistics on the Dashboard, open the same card when clicked.
   - Click outside the card, press its close button or change page to close it.
 - **Fill screen window size** (Settings > Appearance > Window size, or `/lts size fill`; applies after a reload):
   - The window grows to fill your screen and still leaves room for the section tabs.

@@ -27,6 +27,52 @@ function ns.StatHome(st)
     end
 end
 
+-- The next round number above v, in the statistic's own unit: 10, 25, 50, 100, 250, 500,
+-- 1,000 ... of the thing itself, of hours for times, of gold for money, of miles for distances.
+local NICE = { 1, 2.5, 5 }
+local UNIT = { time = 3600, money = 10000, yards = 1760 }
+function ns.NextMilestone(v, fmt)
+    local unit = UNIT[fmt] or 1
+    local x = (v or 0) / unit
+    local p = 1
+    while true do
+        for _, m in ipairs(NICE) do
+            local target = m * p
+            if target >= 10 or unit > 1 then
+                if target > x + 1e-9 then return target * unit end
+            end
+        end
+        p = p * 10
+        if p > 1e15 then return nil end
+    end
+end
+
+-- At the pace of the last 30 days, when does a counter reach its next round number?
+-- Returns { rate = per day, target, days, at = timestamp } or nil when there is no pace.
+function ns.StatPace(st, h)
+    if not st.key or not h or not h.series or (h.value or 0) < 0 then return nil end
+    local rate = (h.last30 or 0) / #h.series
+    if rate <= 0 then return { rate = 0 } end
+    local target = ns.NextMilestone(h.value, st.fmt)
+    if not target then return { rate = rate } end
+    local days = math.ceil((target - h.value) / rate)
+    return { rate = rate, target = target, days = days, at = time() + days * 86400 }
+end
+
+-- A statistic definition by its key, record key or label (the Dashboard tiles use these).
+function ns.FindStat(id)
+    if type(id) ~= "string" then return nil end
+    local key = id:match("^%a+:(.+)$") or id
+    for _, list in pairs(ns.STATS) do
+        for _, st in ipairs(list) do
+            if st.key == key or st.rec == key then return st end
+        end
+    end
+    for _, list in pairs(ns.STATS) do
+        for _, st in ipairs(list) do if st.label == id then return st end end
+    end
+end
+
 -- Everything the detail card shows, for one statistic and one character record.
 function ns.StatHistory(st, rec, n)
     rec = rec or ns.char
