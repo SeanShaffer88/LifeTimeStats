@@ -18,6 +18,12 @@ Lifetime statistics for your character in **World of Warcraft: Forever**. Instal
 
 In-game screenshots from 1.25.1, Lifetime Stats skin, Tauren Druid at level 10.
 
+**Other skins (1.26.0, in game):**
+
+| | |
+|---|---|
+| ![Stone & Gold](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/skin-stone.jpg)<br>Stone & Gold (Altoholic style): Combat | ![Adventure Journal](https://raw.githubusercontent.com/SeanShaffer88/LifeTimeStats/main/docs/screenshots/skin-journal.jpg)<br>Adventure Journal (Dungeon Journal style): Adventure |
+
 <details>
 <summary><b>More screenshots (every page, from the earlier dark skin)</b></summary>
 
