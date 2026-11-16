@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # textures: present, power-of-two, with alpha
 SKETCHES = ("backpack", "swords", "skull", "boot", "quill", "compass", "hero", "scales", "mugs", "mapscroll",
             "tower", "campfire", "crown", "hourglass", "medal", "scroll", "sunmoon", "book", "magnifier")
-for name in ("paper", "age", "wood", "ring", "tab", "tag", "tagline", "crease", "seal") + tuple("sketches/" + s for s in SKETCHES):
+for name in ("sheet", "paper", "age", "wood", "ring", "tab", "tag", "tagline", "crease", "seal") + tuple("sketches/" + s for s in SKETCHES):
     path = ROOT / "Media" / "notebook" / (name + ".tga")
     assert path.exists(), path
     im = Image.open(path)
@@ -56,8 +56,9 @@ local win = LifeTimeStatsWindow
 local nb = rawget(win, "notebook")
 eq(nb ~= nil, true, "notebook frame built")
 eq(#nb.tabs, 6, "six chapter tabs")
-eq(#nb.rings > 10, true, "spiral rings drawn")
-eq(nb.age ~= nil, true, "edge wear drawn over the page")
+eq(nb.sheet ~= nil, true, "parchment sheet drawn")
+eq(#nb.rings, 0, "no spiral on the parchment sheet")
+eq(nb.shadow ~= nil, true, "sheet casts a shadow")
 for _, b in ipairs(win.navButtons) do eq(b.shown, false, "sidebar buttons hidden") end
 
 -- every page belongs to exactly one chapter (search is the exception)
