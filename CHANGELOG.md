@@ -2,9 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.25.2-forever] - 2026-11-17
 
-From in-game screenshots of 1.25.1.
+Prerelease. Offline regression suites pass; not yet checked in the live client. Fixes come from in-game screenshots of 1.25.1.
 
 ### Fixed
 - **Overview tiles** (and the Stats Explorer cards and dropdowns) looked washed out, because their background was drawn over their text. Backgrounds are now drawn behind it.
