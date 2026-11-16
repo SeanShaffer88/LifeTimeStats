@@ -2,9 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.24.0-forever] - 2026-11-16
 
-From in-game screenshots of 1.23.1.
+Prerelease. Offline regression suites pass; not yet checked in the live client. Layout fixes come from in-game screenshots of 1.23.1.
 
 ### Added
 - **Crowd control suffered** (Combat page): times stunned, feared, rooted, silenced, locked out, pacified, charmed, incapacitated and disarmed, with time spent in each, total time controlled, the longest effect (a record) and two top lists: by spell and time by spell.
