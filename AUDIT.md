@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.23.1-forever
+# Audit - LifeTimeStats 1.24.0-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,22 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.24.0
+- In game (1.23.1, 3 screenshots):
+  - The Hero overview, the How it works page and the Options panel render.
+  - Defects fixed here: the Options panel used dark ink on the dark Options window, the Tracking card covered the Achievement alerts buttons, the Theme value overflowed, the margin rule clipped the Today values, and the Gold sources labels were cut off.
+- Verified (offline):
+  - New suites: `tests/control.py` (48 assertions), `tests/satchel.py` (20), `tests/habits.py` (68) and `tests/sections.py` (912).
+  - `tests/sections.py` checks that every stat row has exactly one section and one page, that each heading has a tab, that clicking a tab scrolls the table, that the active tab follows scrolling, that Top Lists, Records, Achievements and How it works have tabs, and that a search result opens its page at the row.
+  - All 15 suites pass. The catalog has 992 entries.
+  - Every new client call is in the captured Forever API dump: `C_LossOfControl`, `C_Spell.GetSpellName`, `C_ClassTalents.LoadConfig`, `ConfirmTalentWipe`, `CinematicFrame_CancelCinematic`, `StopCinematic`, `C_Container.GetContainerItemInfo`, `C_Item.IsEquippableItem`, `C_Item.UseItemByName`, `UseQuestLogSpecialItem`, `C_Map.SetUserWaypoint`, `C_FriendList.SendWho`, `C_Container.SortBags`, `C_MerchantFrame.SellAllJunkItems`, `C_Minimap.SetTracking` and the window toggles.
+- Unverified (in client):
+  - the look and placement of the right-hand section tabs;
+  - the `LOSS_OF_CONTROL_ADDED` arguments and field names on Forever, and whether its durations are readable;
+  - `CINEMATIC_START`/`STOP`, and whether Escape on a cinematic goes through `CinematicFrame_CancelCinematic`;
+  - `CONFIRM_TALENT_WIPE` showing the price;
+  - whether the camera zoom bindings call `CameraZoomIn`/`CameraZoomOut` through Lua.
 
 ## 1.23.1
 - In game (1.23.0, 6 screenshots):
