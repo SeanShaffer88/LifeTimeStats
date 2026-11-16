@@ -145,7 +145,7 @@ local function StatRows(cat, view, sess, focus)
             (st.label2 and what) and (st.label .. ": " .. what) or st.label,
             na and "n/a" or (empty and "—" or ns.FormatStat(st, v)),
             (Settings().showSession and type(ov) == "number" and ov > 0 and not st.get) and ("+" .. ns.FormatStat(st, ov)) or "",
-            tip = na and naTip or st.tip, what = what, stat = st.label,
+            tip = na and naTip or st.tip, what = what, stat = st.label, def = st,
             color = (focus and st.label == focus) and T.amber or nil,
         }
         if perChar and st.key and not na then
@@ -355,6 +355,159 @@ local function CreateDashboardPinPicker()
     return layer
 end
 
+
+-- ------------------------------------------------------------ one statistic, in detail
+-- Clicking a row of a stat page opens this card over the window: the statistic's last 30
+-- days, its totals and best day, and the same statistic on every character (or, for a record,
+-- every time it was beaten).
+local detailLayer
+local function DetailDay(d)
+    if type(d) ~= "string" or #d ~= 8 then return tostring(d or "") end
+    local t = time({ year = tonumber(d:sub(1, 4)), month = tonumber(d:sub(5, 6)), day = tonumber(d:sub(7, 8)), hour = 12 })
+    return date("%b %d, %Y", t)
+end
+local function CreateStatDetail()
+    local layer = CreateFrame("Frame", nil, win)
+    layer:SetAllPoints()
+    layer:SetFrameLevel((win:GetFrameLevel() or 0) + 12)
+    layer:EnableMouse(true)
+    layer:Hide()
+    local dim = W.Fill(layer, { 0.06, 0.04, 0.02, 0.66 })
+    dim:SetPoint("TOPLEFT", 1, -HEADER_H); dim:SetPoint("BOTTOMRIGHT", -1, FOOTER_H)
+    -- a click outside the card closes it
+    layer:SetScript("OnMouseDown", function() layer:Hide() end)
+
+    local width = math.min(760, CW)
+    local height = math.min(CH, 560)
+    local dlg = W.Window(layer)
+    dlg:SetSize(width, height)
+    dlg:SetPoint("CENTER", win.content or layer, "CENTER")
+    dlg:EnableMouse(true)
+    dlg:SetScript("OnMouseDown", function() end)
+    local ink = ns.JournalSkin() and W.JOURNAL or nil
+    local banner = W.Fill(dlg, T.tile)
+    banner:SetPoint("TOPLEFT", 1, -1); banner:SetPoint("TOPRIGHT", -1, -1); banner:SetHeight(52)
+    if ink then W.Shade(banner, ink.base, ink.top) end
+    if ns.Notebook() then banner:SetAlpha(0.35) end
+    local rule = W.Line(dlg, ink and ink.trim or nil)
+    rule:SetPoint("TOPLEFT", 1, -53); rule:SetPoint("TOPRIGHT", -1, -53); rule:SetHeight(1)
+    layer.title = W.Text(dlg, 16, ink and ink.gold or T.amber)
+    layer.title:SetPoint("TOPLEFT", 14, -10); layer.title:SetPoint("RIGHT", -44, 0); layer.title:SetJustifyH("LEFT")
+    if ns.Notebook() then W.Bold(layer.title, T.amber) end
+    layer.home = W.Text(dlg, 11, T.dim)
+    layer.home:SetPoint("TOPLEFT", 14, -32); layer.home:SetPoint("RIGHT", -44, 0); layer.home:SetJustifyH("LEFT")
+
+    local close
+    if ink then
+        local ok, native = pcall(CreateFrame, "Button", nil, dlg, "UIPanelCloseButtonNoScripts")
+        if ok then close = native end
+    end
+    if not close then close = W.FlatButton(dlg, "×", 24, 24) end
+    close:SetSize(24, 24); close:SetPoint("TOPRIGHT", -9, -12)
+    close:SetScript("OnClick", function() layer:Hide() end)
+    W.Tip(close, "Close", "Close this statistic.")
+
+    layer.tip = W.Text(dlg, 12, T.text)
+    layer.tip:SetPoint("TOPLEFT", 14, -64); layer.tip:SetPoint("RIGHT", -14, 0)
+    layer.tip:SetJustifyH("LEFT"); layer.tip:SetWordWrap(true)
+
+    -- eight facts in two rows
+    layer.facts = {}
+    local fw = (width - 28) / 4
+    for i = 1, 8 do
+        local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
+        local lab = W.Text(dlg, 10, T.dim)
+        lab:SetPoint("TOPLEFT", 14 + col * fw, -112 - row * 44); lab:SetWidth(fw - 10); lab:SetJustifyH("LEFT")
+        local val = W.Text(dlg, 15, T.amber, W.NUM)
+        val:SetPoint("TOPLEFT", lab, "BOTTOMLEFT", 0, -3); val:SetWidth(fw - 10); val:SetJustifyH("LEFT"); val:SetWordWrap(false)
+        if ns.Notebook() then W.Bold(val, T.amber) end
+        layer.facts[i] = { lab = lab, val = val }
+    end
+
+    local chartY, chartH = 206, 112
+    layer.chartTitle = W.Text(dlg, 10, T.dim)
+    layer.chartTitle:SetPoint("TOPLEFT", 14, -chartY)
+    local chartHost = CreateFrame("Frame", nil, dlg)
+    chartHost:SetPoint("TOPLEFT", 14, -chartY - 16); chartHost:SetSize(width - 28, chartH)
+    layer.chart = W.Columns(chartHost, width - 28, chartH, 30, "single")
+    layer.chartHost = chartHost
+
+    local tableY = chartY + 16 + chartH + 12
+    layer.tableHost = CreateFrame("Frame", nil, dlg)
+    layer.tableHost:SetPoint("TOPLEFT", 14, -tableY); layer.tableHost:SetSize(width - 28, height - tableY - 12)
+    layer.charTable = W.Table(layer.tableHost, width - 28, height - tableY - 12,
+        { { "CHARACTER", 260, kind = "text" }, { "VALUE", 180, kind = "num" }, { "", 0, kind = "dim" } }, nil, "No characters yet")
+    layer.recTable = W.Table(layer.tableHost, width - 28, height - tableY - 12,
+        { { "WHEN", 190, kind = "dim" }, { "NEW BEST", 170, kind = "num" }, { "WHERE", 0, kind = "text" } }, nil, "Not beaten yet")
+    return layer
+end
+
+function ns.ShowStatDetail(st)
+    if not win or not st then return end
+    if not detailLayer then detailLayer = CreateStatDetail() end
+    local L = detailLayer
+    local h = ns.StatHistory(st, ns.char)
+    L.stat = st
+    L.data = h
+    local F = function(v) return ns.FormatStat(st, v) end
+    L.title:SetText(st.label)
+    L.home:SetText(h.home or "")
+    L.tip:SetText(st.tip or (st.rec and "A personal record: the best value ever reached." or ""))
+
+    local facts
+    if h.kind == "record" then
+        local first, last = h.history[#h.history], h.history[1]
+        facts = {
+            { "Best", F(h.value) }, { "Set at", h.what or "—" }, { "Times beaten", Int(#h.history) },
+            { "Characters with it", Int((function() local n = 0 for _, c in ipairs(h.chars) do if c.v > 0 then n = n + 1 end end return n end)()) },
+            { "First set", first and date("%b %d, %Y", first.at) or "—" }, { "Last beaten", last and date("%b %d, %Y", last.at) or "—" },
+            { "Best on the account", h.chars[1] and h.chars[1].v > 0 and (F(h.chars[1].v) .. " · " .. tostring(h.chars[1].name)) or "—" }, { "", "" },
+        }
+    else
+        facts = {
+            { "Lifetime", F(h.value) }, { "This session", F(h.session or 0) },
+            { "Today", h.series and F(h.today) or "—" }, { "Last 7 days", h.series and F(h.last7) or "—" },
+            { "Last 30 days", h.series and F(h.last30) or "—" },
+            { "Best day", h.bestEver and (F(h.bestEver.v) .. " · " .. DetailDay(h.bestEver.d)) or "—" },
+            { "Days with any", h.series and (Int(h.daysOnFile or 0) .. " of the last 40") or "—" },
+            { "All characters", (function() local t = 0 for _, c in ipairs(h.chars) do t = t + c.v end return F(t) end)() },
+        }
+    end
+    for i, f in ipairs(L.facts) do
+        local d = facts[i] or { "", "" }
+        f.lab:SetText(ns.Notebook() and W.SmallCaps(d[1]) or d[1]:upper())
+        f.val:SetText(d[2])
+    end
+
+    -- the 30-day chart (counters only)
+    if h.series then
+        L.chartTitle:SetText(ns.Notebook() and W.SmallCaps("Last 30 days") or "LAST 30 DAYS")
+        local vals, labels = {}, {}
+        for i, e in ipairs(h.series) do vals[i] = { e.v or 0 }; labels[i] = DayLabel(e.d) end
+        L.chart:Set(vals, { C.amber }, labels, { labels[1], labels[15], "Today" }, F, { st.label }, true)
+        L.chartHost:Show(); L.chartTitle:Show()
+    else
+        L.chartHost:Hide(); L.chartTitle:Hide()
+    end
+
+    if h.kind == "record" then
+        local rows = {}
+        for _, e in ipairs(h.history) do
+            rows[#rows + 1] = { date("%b %d, %Y  %H:%M", e.at), F(e.v), e.w or "", tip = e.character }
+        end
+        L.recTable:SetData(rows); L.recTable:Show(); L.charTable:Hide()
+    else
+        local rows = {}
+        for _, c in ipairs(h.chars) do
+            local col = c.class and ns.ClassRGB and ns.ClassRGB(c.class) or nil
+            rows[#rows + 1] = { tostring(c.name) .. (c.me and "  (this character)" or ""), F(c.v), "", color = col }
+        end
+        L.charTable:SetData(rows); L.charTable:Show(); L.recTable:Hide()
+    end
+    L:Show()
+end
+function ns.HideStatDetail() if detailLayer then detailLayer:Hide() end end
+
 local function OpenDashboardPinPicker()
     if not pinLayer then pinLayer = CreateDashboardPinPicker() end
     pinLayer:Show()
@@ -510,10 +663,10 @@ local function CategoryPage(id, kpis, panels, cols)
     KpiRow(p, kpis)
     local tw = math.max(470, math.floor(CW * 0.5))
     if cols and cols.cols and not cols.scaled then cols.cols[1][2] = cols.cols[1][2] + (tw - 470); cols.scaled = true end
-    local tc = Panel(p, (cols and cols.title) or "All statistics", "lists", 0, BODY_Y, tw, BODY_H, "Hover a row to see how it is measured.")
+    local tc = Panel(p, (cols and cols.title) or "All statistics", "lists", 0, BODY_Y, tw, BODY_H, "Hover a row to see how it is measured. Click it for its last 30 days, best day and every character.")
     p.table = W.Table(tc.body, tc.bw, tc.bh, cols and cols.cols or {
         { "STATISTIC", 230 + (tw - 470), kind = "text" }, { "LIFETIME", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
-    })
+    }, function(d) if d.def then ns.ShowStatDetail(d.def) end end)
     local rx, rw = tw + GAP, CW - tw - GAP
     local y = BODY_Y
     p.panels = {}
@@ -735,7 +888,7 @@ local function BuildCategories()
                     local v, what = ns.StatValue(st, view)
                     local na, naTip = ns.IsNA(st, v)
                     rows[#rows + 1] = { st.label, na and "n/a" or ((view.today) and "—" or ns.FormatStat(st, v)), what or "", tip = na and naTip or st.tip, what = what,
-                        stat = st.label, color = (focus and st.label == focus) and T.amber or nil }
+                        stat = st.label, def = st, color = (focus and st.label == focus) and T.amber or nil }
                 end
             end
             return rows, sections
@@ -1788,7 +1941,7 @@ end
 
 -- ============================================================ HOW IT WORKS
 ns.HELP = {
-    { "Finding your way", "Tabs down the left edge open the chapters of the book (Hero, Deeds, Quests, Legends, Chronicle, Lore); the tags in the margin are the pages of that chapter. Tabs down the right edge jump to the sections of the page you are reading, and the highlighted one is the section in view. Ctrl+F searches every statistic: each result names its page and section, and clicking it opens the page at that row. For more room, set Window size to Fill screen in the settings (or type /lts size fill)." },
+    { "Finding your way", "Tabs down the left edge open the chapters of the book (Hero, Deeds, Quests, Legends, Chronicle, Lore); the tags in the margin are the pages of that chapter. Tabs down the right edge jump to the sections of the page you are reading, and the highlighted one is the section in view. Ctrl+F searches every statistic: each result names its page and section, and clicking it opens the page at that row. Click any statistic for its last 30 days, best day and every character. For more room, set Window size to Fill screen in the settings (or type /lts size fill)." },
     { "Counting", "LifeTimeStats starts counting when it is installed. The game does not remember most of these numbers, so nothing before that can be recovered. /played and lifetime honorable kills are read from the server." },
     { "Lifetime, Session, Today", "Lifetime is everything since install. Session is since you logged in (a /reload keeps it; Reset session in settings or /lts session clears it). Today resets at local midnight; 40 days of daily history are kept." },
     { "This character / All characters", "All characters adds up every character on this account that has logged in with LifeTimeStats. Records take the best, fastest times take the quickest, uniques are merged." },
@@ -1870,6 +2023,7 @@ function ns.ShowPage(id)
     win:SetDashboardPinButtonShown(id == "dashboard")
     if current and current ~= pages[id] then current:Hide() end
     if pages[id] ~= current then pages[id].focus = nil end
+    if detailLayer then detailLayer:Hide() end
     current = pages[id]
     current:Show()
     local nb = rawget(win, "notebook")

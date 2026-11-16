@@ -777,6 +777,15 @@ function ns.DaySeries(view, key, n)
     return out
 end
 
+-- A class colour as { r, g, b }, inked for paper on the notebook skin.
+function ns.ClassRGB(class)
+    local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if not c or not c.r then return nil end
+    local r, g, b = c.r, c.g, c.b
+    if ns.W and ns.W.InkRGB then r, g, b = ns.W.InkRGB(r, g, b) end
+    return { r, g, b, 1 }
+end
+
 function ns.CharCount()
     local n = 0
     for _, rec in pairs(ns.db.chars) do if Valid(rec) then n = n + 1 end end

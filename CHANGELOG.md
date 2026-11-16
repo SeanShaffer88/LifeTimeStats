@@ -7,6 +7,12 @@ All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepach
 From in-game screenshots of 1.24.0.
 
 ### Added
+- **Every statistic has its own story:** click any row on a stat page or on Records to open a card for that statistic.
+  - **What it is:** its name, where it lives (Battles › Crowd control) and how it is measured.
+  - **Counters:** lifetime, this session, today, the last 7 and 30 days, the best day ever with its date, how many days you did it at all, and the total across all your characters. A chart shows the last 30 days.
+  - **Records:** the best, where it was set, how often it was beaten, when it was first set and last beaten, and the best on the account. A table lists every time it was beaten, with the date and where.
+  - **Your characters:** a table shows the statistic on every character, most first, in their class colours.
+  - Click outside the card, press its close button or change page to close it.
 - **Fill screen window size** (Settings > Appearance > Window size, or `/lts size fill`; applies after a reload):
   - The window grows to fill your screen and still leaves room for the section tabs.
   - Stat tables, Top Lists, the Characters tables and the charts get taller and wider. At 1920×1080, a stat page shows 34 rows at once instead of 22, and the window is 1694×996.

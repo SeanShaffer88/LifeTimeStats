@@ -48,3 +48,4 @@ Control.lua
 Satchel.lua
 Habits.lua
 Sections.lua
+StatDetail.lua
