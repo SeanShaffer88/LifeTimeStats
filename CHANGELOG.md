@@ -2,6 +2,26 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+From in-game screenshots of 1.24.0.
+
+### Changed
+- **Easier to read on paper (Adventurer's Notebook):**
+  - **Bigger type:** nothing is smaller than 11.5 points, and the common 11-point text is now 12.
+  - **Ink, not paint:** any colour too light for parchment is darkened to ink strength, keeping its hue. This covers the bright gold section headings on the Characters, Dungeon Tome and Collections pages, grey details and realm names, class colours ("Hex", "Abraca") and white or green item names.
+  - **Darker palette:** body text, faint text and the red-brown accent are all a step darker.
+  - **No more "...":** single-line labels and table cells that are too long shrink slightly to fit instead of being cut off ("Vend..." in Gold sources).
+  - **Bold headings:** table column headers and heading rows are set in faux bold.
+  - **Lighter page fold:** the crease down the middle of the page no longer darkens the numbers it crosses.
+  - **Tooltips:** they now use light parchment colours. They were drawn in dark ink on the game's dark tooltip background.
+- **Options panel:** rows are taller and every description gets two full lines instead of being cut off. Hovering a row shows its full text.
+
+### Fixed
+- **Today box:** values sat under the margin rule and were cut off. They now sit inside the box in a larger type.
+- **Play habits:** the # column showed "..." for most hours; hour rows now leave it empty, since the hour is in the entry.
+- **Narrow # columns:** numbers were truncated in every table with a # column; these columns now use less padding.
+
 ## [1.24.0-forever] - 2026-11-16
 
 Prerelease. Offline regression suites pass; not yet checked in the live client. Layout fixes come from in-game screenshots of 1.23.1.

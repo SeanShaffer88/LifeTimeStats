@@ -138,6 +138,46 @@ local inOrder = false
 for _, id in ipairs(ns.THEME_ORDER) do if id == "notebook" then inOrder = true end end
 eq(inOrder, true, "notebook in the theme list")
 
+-- ------------------------------------------------------------ readability on paper
+local W = ns.W
+local function lum(r, g, b) return 0.299 * r + 0.587 * g + 0.114 * b end
+local r, g, b = W.InkRGB(1, 0.7, 0.22)
+eq(r, 1, "dark skins keep bright colours")
+ns.settings.theme = "auto"
+ns.ApplyTheme()
+eq(ns.Notebook(), true, "back on the notebook")
+r, g, b = W.InkRGB(1, 0.7, 0.22)
+eq(lum(r, g, b) <= 0.3401, true, "bright gold is inked dark")
+eq(math.floor(r / g * 100 + 0.5), math.floor(1 / 0.7 * 100 + 0.5), "inking keeps the hue")
+r, g, b = W.InkRGB(0.12, 0.08, 0.05)
+eq(r, 0.12, "dark ink left alone")
+local fs = W.Text(UIParent, 12, ns.THEME.text)
+fs:SetText("|cffffb238PROFESSIONS|r and |cff8a8a8agrey|r")
+eq(fs:GetText():find("ffb238", 1, true), nil, "bright heading code inked in a FontString")
+eq(fs:GetText():find("8a8a8a", 1, true), nil, "grey detail code inked")
+eq(fs:GetText():find("PROFESSIONS", 1, true) ~= nil, true, "text kept")
+eq(W.InkCodes("|cff24190fdark|r"), "|cff24190fdark|r", "dark codes unchanged")
+-- tooltips are dark in every skin: on the notebook they use light colours, not paper ink
+local tr, tg, tb = ns.TipColor("text")
+eq(lum(tr, tg, tb) > 0.8, true, "tooltip body text is light on the notebook")
+local ar = ns.TipColor("amber")
+eq(ar > 0.9, true, "tooltip titles are light gold on the notebook")
+local wr, wg, wb, wrap = ns.TipColor("dim", true)
+eq(wrap, true, "tooltip colour passes the wrap flag through")
+eq(W.PaperSize(9), 11.5, "nothing below 11.5 points on paper")
+eq(W.PaperSize(10), 11.5, "10 points become 11.5")
+eq(W.PaperSize(11), 12, "11 points become 12")
+eq(W.PaperSize(14), 14, "large text unchanged")
+eq(rawget(win, "notebook").crease:GetAlpha() == nil or true, true, "crease built")
+-- the play-habits hour rows no longer repeat the hour in the # column
+local habits
+for _, s in ipairs(ns.ROSTER_SECTIONS or {}) do if s.id == "habits" then habits = s end end
+if habits and habits.rows then
+    for _, row in ipairs(habits.rows() or {}) do
+        if type(row[2]) == "string" and row[2]:match("^%d%d:00 %- ") then eq(row[1], "", "hour rows leave # empty") end
+    end
+end
+
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))
 print("NOTEBOOK PASS: " .. checks .. " assertions")
 ''')

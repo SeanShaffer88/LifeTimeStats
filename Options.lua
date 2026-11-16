@@ -38,30 +38,37 @@ StaticPopupDialogs["LIFETIMESTATS_RELOAD"] = {
 
 -- ------------------------------------------------------------ themed controls
 local W
-local ROW_H = 34
+-- Rows are laid out on a 34-pixel grid and stretched by K, so every description has room for
+-- two full lines instead of being cut off with "...".
+local K = 1.3
+local function Y(n) return math.floor(n * K + 0.5) end
+local ROW_H = Y(34)
 
--- Toggle row: square box, label, one-line description. The whole row is clickable.
+-- Toggle row: square box, label, a description of up to two lines. The whole row is clickable.
 local function Toggle(parent, x, y, w, label, desc, get, set)
     local r = CreateFrame("Button", nil, parent)
-    r:SetPoint("TOPLEFT", x, -y); r:SetSize(w, ROW_H)
+    r:SetPoint("TOPLEFT", x, -Y(y)); r:SetSize(w, ROW_H)
     r.hl = W.Fill(r, T.tileHi); r.hl:SetAllPoints(); r.hl:Hide()
     local box = W.Panel(r, T.bg, T.edge); box:SetSize(14, 14); box:SetPoint("TOPLEFT", 6, -4)
     local fill = W.Fill(box, T.amber, "ARTWORK"); fill:SetPoint("TOPLEFT", 3, -3); fill:SetPoint("BOTTOMRIGHT", -3, 3)
     local l = W.Text(r, 12, T.text); l:SetPoint("TOPLEFT", 28, -4); l:SetText(label)
-    local d = W.Text(r, 10, T.dim); d:SetPoint("TOPLEFT", 28, -19); d:SetPoint("RIGHT", -4, 0); d:SetJustifyH("LEFT"); d:SetText(desc)
+    local d = W.Text(r, 10, T.dim); d:SetPoint("TOPLEFT", 28, -20); d:SetPoint("RIGHT", -4, 0); d:SetJustifyH("LEFT")
+    d:SetJustifyV("TOP"); d:SetWordWrap(true); if d.SetMaxLines then d:SetMaxLines(2) end
+    d:SetText(desc)
     function r:Sync() fill:SetShown(get() and true or false) end
     r:SetScript("OnClick", function(self) set(not get()); self:Sync() end)
     r:SetScript("OnEnter", function() r.hl:Show() end)
     r:SetScript("OnLeave", function() r.hl:Hide() end)
+    W.Tip(r, label, desc) -- the full text, in case a long description is still cut
     r:Sync()
     return r
 end
 
 -- Label on the left, control on the right.
 local function RowLabel(parent, x, y, label, desc)
-    local l = W.Text(parent, 12, T.text); l:SetPoint("TOPLEFT", x + 6, -y - 4); l:SetText(label)
+    local l = W.Text(parent, 12, T.text); l:SetPoint("TOPLEFT", x + 6, -Y(y) - 4); l:SetText(label)
     if desc then
-        local d = W.Text(parent, 10, T.dim); d:SetPoint("TOPLEFT", x + 6, -y - 19); d:SetText(desc)
+        local d = W.Text(parent, 10, T.dim); d:SetPoint("TOPLEFT", x + 6, -Y(y) - 20); d:SetText(desc)
         return l, d
     end
     return l
@@ -169,7 +176,7 @@ function ns.CreateOptions()
     local sf = CreateFrame("ScrollFrame", nil, panel)
     sf:SetPoint("TOPLEFT", 4, -4); sf:SetPoint("BOTTOMRIGHT", -4, 4)
     local c = CreateFrame("Frame", nil, sf)
-    c:SetSize(CW, 700)
+    c:SetSize(CW, Y(700))
     sf:SetScrollChild(c)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d)
@@ -194,12 +201,12 @@ function ns.CreateOptions()
     local function Track(r) rows[#rows + 1] = r return r end
 
     -- APPEARANCE (left) -----------------------------------------------
-    local ap = W.Card(c, "Appearance", "dashboard", L, y0, colW, 262)
+    local ap = W.Card(c, "Appearance", "dashboard", L, y0, colW, Y(262))
     local b = ap.body
     RowLabel(b, 0, 0, "Theme", "Applies after /reload")
-    local sw = Swatches(b); sw:SetPoint("TOPLEFT", 6, -36)
+    local sw = Swatches(b); sw:SetPoint("TOPLEFT", 6, -Y(36) - 2)
     local reload = Button(b, "Reload now", 90, "Reload the interface to apply the new theme.", function() ReloadUI() end)
-    reload:SetPoint("TOPRIGHT", -2, -30); reload:Hide()
+    reload:SetPoint("TOPRIGHT", -2, -Y(30)); reload:Hide()
     local function ThemeId()
         local theme = S.theme or "auto"
         return theme == "auto" and ns.DetectUI() or theme
@@ -221,7 +228,7 @@ function ns.CreateOptions()
     RowLabel(b, 0, 98, "Window scale")
     local sl = FlatSlider(b, 130, 0.6, 1.6, 0.05, function() return S.window.scale or 1 end,
         function(v) S.window.scale = math.floor(v * 100 + 0.5) / 100; ns.ApplyWindowSettings() end, function(v) return string.format("%d%%", v * 100 + 0.5) end)
-    sl:SetPoint("TOPRIGHT", -46, -100)
+    sl:SetPoint("TOPRIGHT", -52, -Y(100))
     Track(sl)
     Track(Toggle(b, 0, 134, ap.bw, "Lock window", "Stop the window from being dragged.",
         function() return S.lockWindow end, function(v) S.lockWindow = v end))
@@ -229,7 +236,7 @@ function ns.CreateOptions()
         function() return not S.minimap.hide end, function(v) S.minimap.hide = not v; ns.UpdateMinimapButton() end))
 
     -- SCREENSHOTS (left) ----------------------------------------------
-    local ss = W.Card(c, "Screenshots", "star", L, y0 + 272, colW, 150)
+    local ss = W.Card(c, "Screenshots", "star", L, y0 + Y(272), colW, Y(150))
     b = ss.body
     Track(Toggle(b, 0, 0, ss.bw, "On level-up", "A moment after each new level.",
         function() return S.shotLevel end, function(v) S.shotLevel = v end))
@@ -239,7 +246,7 @@ function ns.CreateOptions()
         function() return S.shotAch end, function(v) S.shotAch = v end))
 
     -- CHAT & DISPLAY (right) ------------------------------------------
-    local cd = W.Card(c, "Chat and display", "social", R, y0, colW, 298)
+    local cd = W.Card(c, "Chat and display", "social", R, y0, colW, Y(298))
     b = cd.body
     Track(Toggle(b, 0, 0, cd.bw, "Session column", "Show how much each value grew this session.",
         function() return S.showSession end, function(v) S.showSession = v; ns.RefreshWindow() end))
@@ -260,14 +267,14 @@ function ns.CreateOptions()
         { id = "toast", label = "Toast", tip = "A small pop-up you can click to open the page." },
         { id = "both", label = "Both", tip = "Chat line and toast." },
     }, function(id) S.achAnnounce = id; alerts:Select(id) end)
-    alerts:SetPoint("TOPLEFT", 6, -225)
+    alerts:SetPoint("TOPLEFT", 6, -Y(225))
     alerts:Select(S.achAnnounce or "off")
     alerts.Sync = function(self) self:Select(S.achAnnounce or "off") end
     Track(alerts)
 
     -- TRACKING (right) ------------------------------------------------
     -- below Chat and display (298 tall), so the alerts row is not covered
-    local tr = W.Card(c, "Tracking and title", "records", R, y0 + 308, colW, 114)
+    local tr = W.Card(c, "Tracking and title", "records", R, y0 + Y(308), colW, Y(114))
     b = tr.body
     Track(Toggle(b, 0, 0, tr.bw, "Count pet and guardian damage", "Include your pet's damage, kills and misses.",
         function() return S.countPet end, function(v) S.countPet = v end))
@@ -275,14 +282,14 @@ function ns.CreateOptions()
     local titleCyc = Cycler(b, 160, function() return ns.TitledName() end, function(dir)
         ns.CycleTitle(dir); if ns.RefreshWindow then ns.RefreshWindow() end
     end, { "Title", "Cycle through the titles you have earned (or none)." })
-    titleCyc:SetPoint("TOPRIGHT", -2, -42)
+    titleCyc:SetPoint("TOPRIGHT", -2, -Y(40) - 2)
     Track(titleCyc)
 
     -- DATA (full width) -----------------------------------------------
-    local da = W.Card(c, "Your data", "chest", 0, y0 + 432, CW, 150)
+    local da = W.Card(c, "Your data", "chest", 0, y0 + Y(432), CW, 160)
     b = da.body
     local info = W.Text(b, 12, T.text); info:SetPoint("TOPLEFT", 6, -2)
-    local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -20); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)
+    local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -24); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)
     note:SetText("Stored twice (account file and character file), so one lost SavedVariables file does not wipe your totals. Backups are plain text.")
     local bw2, bx = (da.bw - 5 * 8) / 6, 0
     local function Btn(label, tip, fn, danger)
