@@ -6,6 +6,14 @@ All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepach
 
 From in-game screenshots of 1.24.0.
 
+### Added
+- **Fill screen window size** (Settings > Appearance > Window size, or `/lts size fill`; applies after a reload):
+  - The window grows to fill your screen and still leaves room for the section tabs.
+  - Stat tables, Top Lists, the Characters tables and the charts get taller and wider. At 1920×1080, a stat page shows 34 rows at once instead of 22, and the window is 1694×996.
+  - Achievements show three columns of badges.
+  - Window scale still makes the text bigger or smaller, and the window resizes to fit.
+  - `/lts size normal` returns to the 1140×740 window.
+
 ### Changed
 - **Easier to read on paper (Adventurer's Notebook):**
   - **Bigger type:** nothing is smaller than 11.5 points, and the common 11-point text is now 12.
