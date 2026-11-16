@@ -43,6 +43,10 @@ jobs:
         run: python tests/compendium_collections.py
       - name: Verify history, snapshots, size and exports
         run: python tests/history.py
+      - name: Install Pillow for the texture check
+        run: python -m pip install --disable-pip-version-check --prefer-binary pillow
+      - name: Verify the Adventurer's Notebook skin
+        run: python tests/notebook.py
       - name: Verify release packaging
         run: python tests/package_release.py
 

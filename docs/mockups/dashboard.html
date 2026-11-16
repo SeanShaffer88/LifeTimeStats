@@ -1,0 +1,109 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Notebook dashboard</title><link rel="stylesheet" href="notebook.css"></head>
+<body><div class="window">
+  <div class="header">
+    <span class="title">LifeTimeStats</span>
+    <div class="seg"><span class="on">Character</span><span>Account</span></div>
+    <div class="seg"><span class="on">Lifetime</span><span>Session</span><span>Today</span><span>Week</span><span>Month</span></div>
+    <span class="grow"></span>
+    <div class="who"><b>Moo</b><small>Level 10 · 2,118 pts</small></div>
+    <div class="x">✕</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab on"><span>Character</span></div>
+    <div class="tab"><span>Stats</span></div>
+    <div class="tab"><span>Quest Log</span></div>
+    <div class="tab"><span>Places</span></div>
+    <div class="tab"><span>Records</span></div>
+    <div class="tab"><span>Journal</span></div>
+    <div class="tab"><span>Notes</span></div>
+  </div>
+
+  <div class="book">
+    <div class="page left">
+      <div class="pagehead">Moo · Tauren Druid</div>
+      <div class="subtabs"><span class="tag on">Dashboard</span><span class="tag">Characters</span><span class="tag">Compare</span></div>
+      <div class="grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="box kpi"><div class="l">Steps taken</div><div class="v">50,474</div><div class="s">+2,620 today</div></div>
+        <div class="box kpi"><div class="l">Times jumped</div><div class="v">346</div><div class="s">+19 today</div></div>
+        <div class="box kpi"><div class="l">Enemies slain</div><div class="v">220</div><div class="s">0 players</div></div>
+        <div class="box kpi"><div class="l">Deaths</div><div class="v">2</div><div class="s">first: Swoop</div></div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1.15fr 1fr; margin-top: 10px;">
+        <div class="box">
+          <h4>Backpack &amp; Purse</h4>
+          <svg class="sketch" width="96" height="88" viewBox="0 0 96 88" fill="none" stroke="#3a2e22" stroke-width="2" stroke-linejoin="round">
+            <path d="M30 22 q18 -20 36 0" /><path d="M18 30 h60 q6 0 6 6 v38 q0 8 -8 8 h-56 q-8 0 -8 -8 v-38 q0 -6 6 -6z"/>
+            <path d="M18 44 h60"/><path d="M38 44 v12 h20 v-12"/><path d="M26 62 h12 v14 h-12z"/><path d="M58 62 h12 v14 h-12z"/>
+            <path d="M24 36 h4 M68 36 h4" stroke-width="3"/>
+          </svg>
+          <div class="row"><span class="k">Gold earned</span><span class="dots"></span><span class="v">36s 13c</span></div>
+          <div class="row"><span class="k">Gold spent</span><span class="dots"></span><span class="v">21s 36c</span></div>
+          <div class="row"><span class="k">Items looted</span><span class="dots"></span><span class="v">610</span></div>
+          <div class="row"><span class="k">Vendor value of loot</span><span class="dots"></span><span class="v">77c</span></div>
+          <div class="row"><span class="k">Bag space</span><span class="dots"></span><span class="v">2 / 38 free</span></div>
+        </div>
+        <div class="box">
+          <h4>Deaths by Cause</h4>
+          <div class="ring"><b>2</b><small>deaths</small></div>
+          <div class="row"><span class="k">Creatures</span><span class="dots"></span><span class="v">2</span></div>
+          <div class="row"><span class="k">Falling</span><span class="dots"></span><span class="v">0</span></div>
+          <div class="row"><span class="k">Drowning</span><span class="dots"></span><span class="v">0</span></div>
+          <div class="row"><span class="k">Killed most by</span><span class="dots"></span><span class="v">Swoop</span></div>
+        </div>
+      </div>
+      <div class="box" style="margin-top: 10px;">
+        <h4>Steps per Day</h4>
+        <div class="bars"><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:2%"></b><b style="height:66%"></b><b style="height:100%"></b><b style="height:49%"></b><b style="height:41%"></b><b style="height:8%"></b><b style="height:15%"></b><b style="height:14%"></b></div>
+        <div class="axis"><span>Oct 17</span><span>Oct 31</span><span>Today</span></div>
+      </div>
+    </div>
+
+    <div class="spiral">
+      <i style="top:14px"></i><i style="top:44px"></i><i style="top:74px"></i><i style="top:104px"></i><i style="top:134px"></i><i style="top:164px"></i><i style="top:194px"></i><i style="top:224px"></i><i style="top:254px"></i><i style="top:284px"></i><i style="top:314px"></i><i style="top:344px"></i><i style="top:374px"></i><i style="top:404px"></i><i style="top:434px"></i><i style="top:464px"></i><i style="top:494px"></i><i style="top:524px"></i><i style="top:554px"></i><i style="top:584px"></i><i style="top:614px"></i>
+    </div>
+
+    <div class="page right">
+      <div class="pagehead">Your Legend</div>
+      <div class="box ledger" style="padding-top:6px;">
+        <div class="row"><span class="k">Signature spell</span><span class="dots"></span><span class="v">Wrath · 24,048</span></div>
+        <div class="row"><span class="k">Nemesis</span><span class="dots"></span><span class="v">Swoop</span></div>
+        <div class="row"><span class="k">Most hunted</span><span class="dots"></span><span class="v">Prairie Wolf · 22</span></div>
+        <div class="row"><span class="k">Best fight</span><span class="dots"></span><span class="v">15.2 dps</span></div>
+        <div class="row"><span class="k">Homeland</span><span class="dots"></span><span class="v">Mulgore</span></div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: 10px;">
+        <div class="box">
+          <h4>Gold Sources</h4>
+          <div class="row"><span class="k">Looted</span><span class="dots"></span><span class="v">91c</span></div>
+          <div class="row"><span class="k">Quests</span><span class="dots"></span><span class="v">11s 32c</span></div>
+          <div class="row"><span class="k">Vendors</span><span class="dots"></span><span class="v">18s 58c</span></div>
+          <div class="row"><span class="k">Other</span><span class="dots"></span><span class="v">5s 32c</span></div>
+        </div>
+        <div class="box">
+          <h4>Rates</h4>
+          <div class="row"><span class="k">Crit rate</span><span class="dots"></span><span class="v">3%</span></div>
+          <div class="row"><span class="k">Quests finished</span><span class="dots"></span><span class="v">72%</span></div>
+          <div class="row"><span class="k">XP per hour</span><span class="dots"></span><span class="v">5,696</span></div>
+          <div class="row"><span class="k">Gold per hour</span><span class="dots"></span><span class="v">7s 33c</span></div>
+        </div>
+      </div>
+      <div class="box" style="margin-top: 10px;">
+        <h4>Goals</h4>
+        <div class="row"><span class="k">Take 100,000 steps</span><span class="dots"></span><span class="v">50%</span></div>
+        <div style="height:8px;border:1.5px solid var(--ink);border-radius:4px;margin:0 0 6px;"><div style="width:50%;height:100%;background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 6px);"></div></div>
+        <div class="row"><span class="k">Kill 500 enemies</span><span class="dots"></span><span class="v">44%</span></div>
+        <div style="height:8px;border:1.5px solid var(--ink);border-radius:4px;"><div style="width:44%;height:100%;background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 6px);"></div></div>
+      </div>
+      <div class="box ledger" style="margin-top: 10px; height: 120px;">
+        <h4>Today</h4>
+        <div class="row"><span class="k">Steps</span><span class="dots"></span><span class="v">2,620</span></div>
+        <div class="row"><span class="k">Quests</span><span class="dots"></span><span class="v">1</span></div>
+        <div class="row"><span class="k">Online</span><span class="dots"></span><span class="v">20m 30s</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot"><span>Counting since Nov 10, 2026 · 943 statistics · 3 characters</span><span class="grow"></span><span>v1.21.0</span><span class="btn">Sheet</span><span class="btn">Share</span><span class="btn">Backup</span></div>
+</div></body></html>

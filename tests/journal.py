@@ -47,7 +47,7 @@ fire("ADDON_LOADED", "LifeTimeStats")
 fire("PLAYER_LOGIN")
 fire("PLAYER_ENTERING_WORLD", true, false)
 eq(ns.settings.theme, "auto", "new installs use Auto")
-eq(ns.DetectUI(), "forever", "Auto uses Forever Journal without a UI replacement")
+eq(ns.DetectUI(), "notebook", "Auto uses the Adventurer's Notebook without a UI replacement")
 local loaded = { Tukui = true, ElvUI = true, EllesmereUI = true }
 C_AddOns = { IsAddOnLoaded = function(name) return loaded[name] end }
 eq(ns.DetectUI(), "ellesmere", "Auto keeps EllesmereUI precedence")
@@ -95,12 +95,12 @@ ns.W.Shade(texture, ns.W.JOURNAL.base, ns.W.JOURNAL.top)
 eq(texture.rejected, true, "attempts native gradient before falling back")
 eq(texture.color[1], ns.W.JOURNAL.base[1], "uses solid journal colour when gradient is rejected")
 CreateColor = savedCreateColor
-ns.settings.theme = "auto"
+ns.settings.theme = "forever"
 loaded.Tukui = false
 ns.char.journal = {}
 ns.ToggleWindow()
 ns.ShowPage("journal")
-eq(ns.themeId, "forever", "the window applies Auto on creation")
+eq(ns.themeId, "forever", "the window applies the chosen skin on creation")
 eq(ns.settings.window.scale * 1140 <= UIParent:GetWidth(), true, "initial scale checks screen width")
 
 local feed, nativeClose, nativeRim

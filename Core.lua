@@ -343,6 +343,8 @@ function ns.ApplyAccent()
     local r, g, b = cc.r, cc.g, cc.b
     -- Very light class colours (Priest) would blend with cream text: tint them slightly darker.
     if r + g + b > 2.6 then r, g, b = r * 0.82, g * 0.82, b * 0.82 end
+    -- On the notebook's paper, class colours are inked: darker so they read like ink.
+    if ns.Notebook and ns.Notebook() then r, g, b = r * 0.62, g * 0.62, b * 0.62 end
     local a = ns.THEME.amber
     a[1], a[2], a[3] = r, g, b
     ns.accent2 = { r * 0.78, g * 0.78, b * 0.78, 1 }

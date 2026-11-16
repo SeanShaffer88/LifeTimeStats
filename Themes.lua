@@ -13,6 +13,11 @@ local ARIALN, FRIZ = "Fonts\\ARIALN.TTF", "Fonts\\FRIZQT__.TTF"
 
 -- Each theme: palette, fonts and a short description for the settings button.
 ns.THEMES = {
+    { id = "notebook", name = "Adventurer's Notebook", desc = "An adventurer's notebook: parchment pages, ink, a spiral binding and tabs down the side. Made for roleplayers and RPG fans.",
+      bg = hex("ece2c8"), tile = hex("f4ecd8", 0.55), tileHi = hex("dccca3"), edge = hex("3a2e22", 0.85),
+      text = hex("3a2e22"), dim = hex("6e5d48"), amber = hex("8b3a1e"),
+      cream2 = hex("8a7a5c"), rust = hex("a8432a"), teal = hex("4f7a5a"), font = FRIZ, num = FRIZ,
+      journal = { gold = hex("3a2e22"), trim = hex("3a2e22"), top = hex("f4ecd8"), base = hex("e4d7b6"), tab = hex("d6c69e"), page = hex("ece2c8") } },
     { id = "forever", name = "Forever Journal", desc = "A bound adventurer's journal with gold trim, warm paper panels and WoW's own fonts.",
       bg = hex("19130f", 0.98), tile = hex("251d16"), tileHi = hex("463324"), edge = hex("795b36"),
       text = hex("f5e9d2"), dim = hex("c3ae89"), amber = hex("eac773"),
@@ -54,7 +59,7 @@ function ns.DetectUI()
     if Loaded("EllesmereUI") or type(_G.EllesmereUI) == "table" and _G.EllesmereUI.ELLESMERE_GREEN then return "ellesmere" end
     if Loaded("ElvUI") then return "elvui" end
     if Loaded("Tukui") then return "tukui" end
-    return "forever"
+    return "notebook"
 end
 
 -- Live colours / font from the UI addon itself, if loaded. Every read is guarded.
@@ -117,7 +122,7 @@ local function Copy(dst, src) if src then dst[1], dst[2], dst[3], dst[4] = src[1
 function ns.ApplyTheme()
     local want = (ns.settings and ns.settings.theme) or "auto"
     local id = want == "auto" and ns.DetectUI() or want
-    local base = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.forever
+    local base = ns.THEME_BY_ID[id] or ns.THEME_BY_ID.notebook
     id = base.id
     local p = {}
     for k, v in pairs(base) do p[k] = type(v) == "table" and { v[1], v[2], v[3], v[4] } or v end
@@ -126,6 +131,19 @@ function ns.ApplyTheme()
     for _, k in ipairs({ "bg", "tile", "tileHi", "edge", "text", "dim", "amber" }) do Copy(T[k], p[k]) end
     ns.themeId, ns.themeLive = id, p.liveUsed and true or false
     local W = ns.W
+    if W and W.JOURNAL then
+        -- The journal-style skins share W.JOURNAL; the notebook swaps in its paper and ink.
+        W.JOURNAL_FOREVER = W.JOURNAL_FOREVER or (function()
+            local c = {}
+            for k, v in pairs(W.JOURNAL) do c[k] = { v[1], v[2], v[3] } end
+            return c
+        end)()
+        local src = base.journal or W.JOURNAL_FOREVER
+        for k, v in pairs(src) do
+            local dst = W.JOURNAL[k]
+            if dst then dst[1], dst[2], dst[3] = v[1], v[2], v[3] else W.JOURNAL[k] = { v[1], v[2], v[3] } end
+        end
+    end
     if W then
         W.FONT = p.font or STANDARD_TEXT_FONT or FRIZ
         W.NUM = p.num or ARIALN
@@ -141,9 +159,14 @@ end
 
 function ns.ThemeName(id)
     if id == "auto" then return "Auto (" .. (ns.THEME_BY_ID[ns.DetectUI()] or {}).name .. ")" end
-    return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.forever).name
+    return (ns.THEME_BY_ID[id] or ns.THEME_BY_ID.notebook).name
 end
-ns.THEME_ORDER = { "auto", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
+ns.THEME_ORDER = { "auto", "notebook", "forever", "odometer", "blizzard", "elvui", "tukui", "ellesmere" }
+
+-- Skins drawn as a journal (mixed-case titles, inked numbers, banner shading): Forever Journal
+-- and the Adventurer's Notebook. ns.Notebook() is the notebook alone (its own window frame).
+function ns.JournalSkin() return ns.themeId == "forever" or ns.themeId == "notebook" end
+function ns.Notebook() return ns.themeId == "notebook" end
 
 -- EllesmereUI skinning API: register once; the getters feed the EllesmereUI theme.
 if type(_G.EllesmereUI) == "table" and type(_G.EllesmereUI.RegisterSkin) == "function" then

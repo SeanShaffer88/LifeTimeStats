@@ -100,7 +100,7 @@ end
 
 function W.Window(parent)
     local f = W.Panel(parent, T.bg)
-    if ns.themeId == "forever" and BackdropTemplateMixin then
+    if ns.JournalSkin() and BackdropTemplateMixin then
         local created, rim = pcall(CreateFrame, "Frame", nil, f, "BackdropTemplate")
         if created and rim then
             local applied = pcall(rim.SetBackdrop, rim, {
@@ -124,7 +124,7 @@ function W.FlatButton(parent, label, w, h, tipTitle, tip)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(w, h)
     b.bg = W.Fill(b, T.tile); b.bg:SetAllPoints()
-    local journal = ns.themeId == "forever"
+    local journal = ns.JournalSkin()
     local trim = journal and W.JOURNAL.trim or T.amber
     b.edge = W.Fill(b, trim, "BORDER"); b.edge:SetPoint("BOTTOMLEFT"); b.edge:SetPoint("BOTTOMRIGHT"); b.edge:SetHeight(1); b.edge:SetAlpha(0.5)
     b.text = W.Text(b, 11, T.text); b.text:SetPoint("CENTER"); b.text:SetText(label)
@@ -139,7 +139,7 @@ end
 -- Segmented toggle: options = { {id, label, tip}, ... }
 function W.Segmented(parent, options, onPick)
     local f = W.Panel(parent, T.bg)
-    local journal = ns.themeId == "forever"
+    local journal = ns.JournalSkin()
     local trim = journal and W.JOURNAL.trim or T.amber
     f.buttons = {}
     local x = 1
@@ -169,7 +169,7 @@ end
 
 -- ------------------------------------------------------------ card
 -- Card titles are upper case, except in the Forever Journal skin.
-function ns.CardTitle(s) return ns.themeId == "forever" and s or tostring(s):upper() end
+function ns.CardTitle(s) return ns.JournalSkin() and s or tostring(s):upper() end
 
 function W.Card(parent, title, icon, x, y, w, h, tip)
     local f = W.Panel(parent, T.tile)
@@ -177,7 +177,7 @@ function W.Card(parent, title, icon, x, y, w, h, tip)
     f:SetSize(w, h)
     local head = CreateFrame("Frame", nil, f)
     head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1); head:SetHeight(27)
-    local journal = ns.themeId == "forever"
+    local journal = ns.JournalSkin()
     if journal then
         local banner = W.Fill(head, W.JOURNAL.base)
         banner:SetAllPoints()
@@ -233,7 +233,7 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
     local f = W.Panel(parent, T.tile)
     f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
     f:SetSize(w, h)
-    local journal = ns.themeId == "forever"
+    local journal = ns.JournalSkin()
     local top = W.Fill(f, journal and W.JOURNAL.trim or T.amber, "ARTWORK")
     top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(journal and 2 or 3)
     f.label = W.Text(f, 10, T.dim); f.label:SetPoint("TOPLEFT", 12, -10)
@@ -642,7 +642,8 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
         c.w = (i == #cols) and (width - x) or c[2]
         x = x + c.w
     end
-    local head = W.Fill(f, { 0x1d / 255, 0x1f / 255, 0x23 / 255, 1 }, "BACKGROUND")
+    local book = ns.Notebook and ns.Notebook()
+    local head = W.Fill(f, book and W.JOURNAL.base or { 0x1d / 255, 0x1f / 255, 0x23 / 255, 1 }, "BACKGROUND", book and 0.55 or nil)
     head:SetPoint("TOPLEFT"); head:SetSize(width, HH)
     f.heads = {}
     for i, c in ipairs(cols) do
@@ -655,11 +656,13 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
     -- grid lines
     for i = 1, #cols + 1 do
         local l = W.Line(f, T.edge, "ARTWORK")
+        if book then l:SetAlpha(0.22) end
         l:SetPoint("TOPLEFT", (i <= #cols and xs[i] or width) - (i > #cols and 1 or 0), 0)
         l:SetSize(1, gridH)
     end
     for r = 0, visible + 1 do
         local l = W.Line(f, T.edge, "ARTWORK")
+        if book then l:SetAlpha(0.22) end
         l:SetPoint("TOPLEFT", 0, -(r == 0 and 0 or (HH + (r - 1) * RH)))
         l:SetSize(width, 1)
     end
@@ -668,7 +671,7 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
         local row = CreateFrame("Button", nil, f)
         row:SetPoint("TOPLEFT", 0, -(HH + (r - 1) * RH))
         row:SetSize(width, RH)
-        row.zebra = W.Fill(row, { 0x1f / 255, 0x22 / 255, 0x26 / 255, 1 }, "BACKGROUND")
+        row.zebra = W.Fill(row, book and T.text or { 0x1f / 255, 0x22 / 255, 0x26 / 255, 1 }, "BACKGROUND", book and 0.05 or nil)
         row.zebra:SetAllPoints()
         row.hl = W.Fill(row, T.tileHi, "BACKGROUND"); row.hl:SetAllPoints(); row.hl:Hide()
         row.cells = {}
