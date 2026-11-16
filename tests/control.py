@@ -81,6 +81,18 @@ eq(c.cc_other, 2, "a hidden type is other")
 eq(c.cc_time, 26, "a hidden duration adds no time")
 ns.IsSecret = function() return false end
 
+-- a wholly secret entry (loss of control restricted) counts once, as other, with no time
+local realSecret = ns.IsSecret
+local secretEntry = {}
+locData[1] = secretEntry
+ns.IsSecret = function(v) return v == secretEntry end
+local before, beforeOther, beforeTime = c.cc_taken, c.cc_other, c.cc_time
+fire("LOSS_OF_CONTROL_ADDED", "player", 1)
+ns.IsSecret = realSecret
+eq(c.cc_taken, before + 1, "a secret entry still counts")
+eq(c.cc_other, beforeOther + 1, "as other")
+eq(c.cc_time, beforeTime, "and adds no time")
+
 -- ------------------------------------------------------------ cinematics
 fire("CINEMATIC_START")
 NOW = NOW + 42
