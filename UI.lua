@@ -1845,6 +1845,7 @@ local function CreateWindow()
     end)
     local hbg = W.Fill(head, T.tile); hbg:SetAllPoints()
     if ink then W.Shade(hbg, ink.base, ink.top) end
+    if ns.Notebook() then hbg:SetAlpha(0) end -- the parchment sheet shows through
     local rule = W.Fill(head, trim, "ARTWORK"); rule:SetPoint("BOTTOMLEFT"); rule:SetPoint("BOTTOMRIGHT"); rule:SetHeight(2)
     local logo = head:CreateTexture(nil, "ARTWORK"); logo:SetSize(28, 28); logo:SetPoint("LEFT", 10, 0); logo:SetTexture(W.MEDIA .. "icon")
     local t1 = W.Text(head, 18, ink and ink.gold or T.amber); t1:SetPoint("LEFT", logo, "RIGHT", 8, 0); t1:SetText("LifeTime")
@@ -1995,6 +1996,7 @@ local function CreateWindow()
     foot:SetPoint("BOTTOMLEFT", 1, 1); foot:SetPoint("BOTTOMRIGHT", -1, 1); foot:SetHeight(FOOTER_H)
     local fbg = W.Fill(foot, T.tile); fbg:SetAllPoints()
     if ink then W.Shade(fbg, ink.base, ink.top) end
+    if ns.Notebook() then fbg:SetAlpha(0) end
     local ftop = W.Line(foot); ftop:SetPoint("TOPLEFT"); ftop:SetPoint("TOPRIGHT"); ftop:SetHeight(1)
     win.footer = W.Text(foot, 10, T.dim); win.footer:SetPoint("LEFT", 10, 0)
     local restore = W.FlatButton(foot, "Restore", 64, 18, nil, "Merge a stats backup or preview a full character restore.")

@@ -2,6 +2,15 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Hand-made parchment:** the Adventurer's Notebook window is now one sheet, drawn by `scripts/make_parchment_sheet.py`.
+  - **The sheet:** torn, deckled edges with a few deep tears, a scorched brown rim, aged mottling, water stains, specks and faint creases, and an inked double frame with corner flourishes.
+  - **Fit and shadow:** the sheet is drawn slightly larger than the window, so the torn edges sit just outside it, with a soft drop shadow.
+  - **What it replaces:** the wood frame and spiral binding. The header and footer bands are see-through, so the sheet shows behind them.
+  - **What stays:** the bookmark tabs, page index, sketches and the fold down the middle.
+
 ## [1.22.1-forever] - 2026-11-16
 
 From in-game screenshots of 1.22.0, where the skin rendered as designed.

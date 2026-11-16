@@ -73,47 +73,37 @@ function ns.BuildNotebookFrame(win, side, dim)
     -- the window's own backdrop would draw over the wood and paper on the same layer
     if win.SetBackdropColor then pcall(win.SetBackdropColor, win, 0, 0, 0, 0) end
 
-    -- wood all around, parchment from the spiral to the right edge
-    local wood = win:CreateTexture(nil, "BACKGROUND", nil, -8)
-    wood:SetAllPoints()
-    wood:SetTexture(MEDIA .. "wood", "REPEAT", "REPEAT")
-    if wood.SetHorizTile then wood:SetHorizTile(true); wood:SetVertTile(true) end
-    local paper = win:CreateTexture(nil, "BACKGROUND", nil, -7)
-    paper:SetPoint("TOPLEFT", win, "TOPLEFT", 78, -3)
-    paper:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -3, 3)
-    paper:SetTexture(MEDIA .. "paper", "REPEAT", "REPEAT")
-    if paper.SetHorizTile then paper:SetHorizTile(true); paper:SetVertTile(true) end
-    nb.paper, nb.wood = paper, wood
-    -- age: browned, worn edges and darker corners stretched over the whole page
-    local age = win:CreateTexture(nil, "BACKGROUND", nil, -6)
-    age:SetAllPoints(paper)
-    age:SetTexture(MEDIA .. "age")
-    nb.age = age
-    -- the fold between the two pages, under the content
+    -- one hand-made parchment sheet for the whole window: torn edges, scorched rim, inked frame.
+    -- It is a little larger than the window, so the torn edges sit just outside and every
+    -- control stays on solid paper.
+    if win.SetBackdropBorderColor then pcall(win.SetBackdropBorderColor, win, 0, 0, 0, 0) end
+    local sheet = win:CreateTexture(nil, "BACKGROUND", nil, -8)
+    sheet:SetPoint("TOPLEFT", win, "TOPLEFT", -30, 22)
+    sheet:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", 30, -22)
+    sheet:SetTexture(MEDIA .. "sheet")
+    nb.sheet = sheet
+    -- a soft drop shadow so the sheet lifts off the world behind it
+    local shadow = win:CreateTexture(nil, "BACKGROUND", nil, -8)
+    shadow:SetPoint("TOPLEFT", sheet, "TOPLEFT", 6, -8)
+    shadow:SetPoint("BOTTOMRIGHT", sheet, "BOTTOMRIGHT", 6, -8)
+    shadow:SetTexture(MEDIA .. "sheet")
+    shadow:SetVertexColor(0, 0, 0, 0.45)
+    shadow:SetDrawLayer("BACKGROUND", -8)
+    sheet:SetDrawLayer("BACKGROUND", -7)
+    nb.shadow = shadow
+    -- the fold down the middle of the page, under the content
     local crease = win:CreateTexture(nil, "BACKGROUND", nil, -5)
     local mid = dim.SIDEBAR_W + dim.PAD + dim.CW / 2
     crease:SetPoint("TOPLEFT", win, "TOPLEFT", mid - 24, -dim.HEADER_H)
     crease:SetPoint("BOTTOMRIGHT", win, "BOTTOMLEFT", mid + 24, dim.FOOTER_H)
     crease:SetTexture(MEDIA .. "crease")
     nb.crease = crease
+    -- an inked line between the margin and the page
+    local margin = side:CreateTexture(nil, "BORDER")
+    margin:SetPoint("TOPLEFT", side, "TOPLEFT", 174, -4); margin:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 174, 4); margin:SetWidth(1)
+    margin:SetColorTexture(T.text[1], T.text[2], T.text[3], 0.35)
 
-    -- spiral binding down the left edge of the paper
-    local strip = side:CreateTexture(nil, "BORDER")
-    strip:SetPoint("TOPLEFT", side, "TOPLEFT", 70, 0); strip:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 70, 0); strip:SetWidth(10)
-    strip:SetColorTexture(J.base[1] * 0.85, J.base[2] * 0.85, J.base[3] * 0.85, 0.9)
-    nb.rings = {}
-    local h = side:GetHeight()
-    if not h or h < 100 then h = dim.CH + dim.PAD * 2 end
-    local n = math.floor((h - 10) / 28)
-    for i = 1, n do
-        local r = side:CreateTexture(nil, "ARTWORK")
-        r:SetTexture(MEDIA .. "ring")
-        r:SetSize(44, 22)
-        r:SetPoint("LEFT", side, "TOPLEFT", 44, -14 - (i - 1) * 28)
-        nb.rings[i] = r
-    end
-
-    -- side tabs (on the wood, left of the spiral)
+    -- bookmark tabs down the left edge of the sheet
     local TAB_H, TAB_GAP = 100, 6
     for i, tab in ipairs(ns.NOTEBOOK_TABS) do
         local b = CreateFrame("Button", nil, side)
@@ -162,6 +152,8 @@ function ns.BuildNotebookFrame(win, side, dim)
         end end)
         nb.tags[i] = b
     end
+
+    nb.rings = {} -- the spiral binding was replaced by the parchment sheet in 1.23
 
     -- an ink sketch for the page, between the page index and Today
     nb.sketch = side:CreateTexture(nil, "ARTWORK")

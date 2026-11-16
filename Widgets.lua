@@ -100,7 +100,7 @@ end
 
 function W.Window(parent)
     local f = W.Panel(parent, T.bg)
-    if ns.JournalSkin() and BackdropTemplateMixin then
+    if ns.themeId == "forever" and BackdropTemplateMixin then
         local created, rim = pcall(CreateFrame, "Frame", nil, f, "BackdropTemplate")
         if created and rim then
             local applied = pcall(rim.SetBackdrop, rim, {
