@@ -29,11 +29,11 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.22.0 prerelease archive, `LifeTimeStats-1.22.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.22.1 prerelease archive, `LifeTimeStats-1.22.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
-**Adventurer's Notebook** (default from 1.21) turns the window into an adventurer's tome: parchment pages with a spiral binding, set in a wooden frame. Six chapter tabs run down the side: **Hero** (Overview, Characters, Compare), **Deeds** (Travels, Battles, Deaths, Purse & Pack, Company), **Quests** (Adventures, Dungeon Tome, Life on the Road), **Legends** (Records, Feats & Firsts, Honours, Rolls of Note), **Chronicle** (Journal, Days) and **Lore** (How it works). The margin of each page lists that chapter's pages as tags, with Today below them. Each tab reopens the page you last read in it. Values are inked in your class colour. Every page has its own ink sketch in the margin (a compass on the Overview, a skull for Deaths, a backpack for Purse & Pack, crossed swords for Battles, and more). Earned achievements are stamped with a wax seal showing their tier, and a pinned Dashboard statistic is sealed once its goal is reached. The other skins (Forever Journal, Odometer, Blizzard, ElvUI, Tukui, EllesmereUI) are still in Settings; changing skin needs a /reload.
+**Adventurer's Notebook** (default from 1.21) turns the window into an adventurer's tome: aged, weathered parchment pages with a spiral binding, set in a wooden frame. Six chapter tabs run down the side: **Hero** (Overview, Characters, Compare), **Deeds** (Travels, Battles, Deaths, Purse & Pack, Company), **Quests** (Adventures, Dungeon Tome, Life on the Road), **Legends** (Records, Feats & Firsts, Honours, Rolls of Note), **Chronicle** (Journal, Days) and **Lore** (How it works). The margin of each page lists that chapter's pages as tags, with Today below them. Each tab reopens the page you last read in it. Values are inked in your class colour. Every page has its own ink sketch in the margin (a compass on the Overview, a skull for Deaths, a backpack for Purse & Pack, crossed swords for Battles, and more). Earned achievements are stamped with a wax seal showing their tier, and a pinned Dashboard statistic is sealed once its goal is reached. The other skins (Forever Journal, Odometer, Blizzard, ElvUI, Tukui, EllesmereUI) are still in Settings; changing skin needs a /reload.
 
 
 A Warcraft-style adventurer's journal (`/lts`) with gold trim, warm page panels, chapter accents and ledger counters. The accent colour can follow your **class colour**.
@@ -192,7 +192,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.22.0-forever.zip`.
+1. Download `LifeTimeStats-1.22.1-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 

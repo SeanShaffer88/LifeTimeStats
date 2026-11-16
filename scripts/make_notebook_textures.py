@@ -31,17 +31,60 @@ def save(img, name):
     print("wrote", OUT / name, img.size)
 
 
-# parchment: warm paper with soft blotches and fine grain
-coarse = tileable_noise(512, 24, 3, 0, 255)
-fine = tileable_noise(512, 128, 0.6, 0, 255)
+# parchment: aged and weathered - darker tan, mottled blotches, tide-mark stains and fibres
+coarse = tileable_noise(512, 20, 3, 0, 255)
+mid = tileable_noise(512, 48, 1.5, 0, 255)
+fine = tileable_noise(512, 160, 0.5, 0, 255)
 paper = Image.new("RGBA", (512, 512))
 px = paper.load()
-cpx, fpx = coarse.load(), fine.load()
+cpx, mpx, fpx = coarse.load(), mid.load(), fine.load()
 for y in range(512):
     for x in range(512):
-        k = (cpx[x, y] - 128) * 0.10 + (fpx[x, y] - 128) * 0.05
-        px[x, y] = (int(236 + k), int(226 + k * 0.95), int(200 + k * 0.85), 255)
+        k = (cpx[x, y] - 128) * 0.26 + (mpx[x, y] - 128) * 0.12 + (fpx[x, y] - 128) * 0.09
+        px[x, y] = (max(0, min(255, int(214 + k))), max(0, min(255, int(192 + k * 0.95))), max(0, min(255, int(146 + k * 0.85))), 255)
+# tide-mark stains and darker spots, drawn with wrap-around so the tile stays seamless
+stains = Image.new("L", (512, 512), 0)
+sd = ImageDraw.Draw(stains)
+for _ in range(4):
+    cx, cy, r = random.randint(0, 511), random.randint(0, 511), random.randint(18, 70)
+    for ox in (-512, 0, 512):
+        for oy in (-512, 0, 512):
+            sd.ellipse((cx + ox - r, cy + oy - r, cx + ox + r, cy + oy + r), outline=38, width=2)
+            sd.ellipse((cx + ox - r + 6, cy + oy - r + 6, cx + ox + r - 6, cy + oy + r - 6), fill=10)
+for _ in range(60):
+    cx, cy, r = random.randint(0, 511), random.randint(0, 511), random.randint(1, 4)
+    for ox in (-512, 0, 512):
+        for oy in (-512, 0, 512):
+            sd.ellipse((cx + ox - r, cy + oy - r, cx + ox + r, cy + oy + r), fill=random.randint(40, 110))
+# paper fibres: short faint strokes
+for _ in range(500):
+    x0, y0 = random.randint(0, 511), random.randint(0, 511)
+    dx, dy = random.randint(-14, 14), random.randint(-5, 5)
+    for ox in (-512, 0, 512):
+        for oy in (-512, 0, 512):
+            sd.line((x0 + ox, y0 + oy, x0 + ox + dx, y0 + oy + dy), fill=random.randint(14, 34), width=1)
+stains = stains.filter(ImageFilter.GaussianBlur(2.2))
+spx = stains.load()
+for y in range(512):
+    for x in range(512):
+        a = spx[x, y] / 255.0
+        r, g, b, _ = px[x, y]
+        px[x, y] = (int(r * (1 - a * 0.55)), int(g * (1 - a * 0.6)), int(b * (1 - a * 0.7)), 255)
 save(paper, "paper.tga")
+
+# age: stretched over each page - edges browned and worn, darker towards the corners
+age = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+apx = age.load()
+wear = tileable_noise(512, 40, 2, 0, 255).load()
+for y in range(512):
+    for x in range(512):
+        dx = min(x, 511 - x) / 256.0
+        dy = min(y, 511 - y) / 256.0
+        edge = 1 - min(dx, dy) * 3.2 + (wear[x, y] - 128) / 640.0
+        corner = (1 - dx) * (1 - dy)
+        a = max(0.0, min(1.0, edge)) ** 2.2 * 0.85 + corner ** 6 * 0.35
+        apx[x, y] = (72, 44, 18, int(max(0, min(1, a)) * 255))
+save(age, "age.tga")
 
 # wood: dark planks with vertical grain
 grain = tileable_noise(256, 64, 0.8, 0, 255).resize((256, 256))

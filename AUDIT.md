@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.22.0-forever
+# Audit - LifeTimeStats 1.22.1-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,12 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.22.1
+- In game (1.22.0, 3 screenshots):
+  - The notebook renders: wood frame, tiled paper, spiral rings, stacked tab letters, page index tags, margin sketch (compass, open book), Today box, fold shadow, journal-style cards and charts, and the Settings panel with the theme "Auto (Adventurer's Notebook)".
+  - Defects fixed here: the paper was too light, the silver coin letter was hard to read, and the Today values ran into their labels.
+- Verified (offline): the notebook suite has 154 assertions (aged palette, edge-wear overlay, dark coin letters). All suites pass.
 
 ## 1.22.0
 - Verified (offline): `tests/notebook.py` (now 152 assertions) checks:

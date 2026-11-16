@@ -14,10 +14,10 @@ local ARIALN, FRIZ = "Fonts\\ARIALN.TTF", "Fonts\\FRIZQT__.TTF"
 -- Each theme: palette, fonts and a short description for the settings button.
 ns.THEMES = {
     { id = "notebook", name = "Adventurer's Notebook", desc = "An adventurer's notebook: parchment pages, ink, a spiral binding and tabs down the side. Made for roleplayers and RPG fans.",
-      bg = hex("ece2c8"), tile = hex("f4ecd8", 0.55), tileHi = hex("dccca3"), edge = hex("3a2e22", 0.85),
+      bg = hex("d6c095"), tile = hex("e2cfa3", 0.30), tileHi = hex("cdb487"), edge = hex("33281c", 0.85),
       text = hex("3a2e22"), dim = hex("6e5d48"), amber = hex("8b3a1e"),
       cream2 = hex("8a7a5c"), rust = hex("a8432a"), teal = hex("4f7a5a"), font = FRIZ, num = FRIZ,
-      journal = { gold = hex("3a2e22"), trim = hex("3a2e22"), top = hex("f4ecd8"), base = hex("e4d7b6"), tab = hex("d6c69e"), page = hex("ece2c8") } },
+      journal = { gold = hex("33281c"), trim = hex("33281c"), top = hex("dcc697"), base = hex("c9b083"), tab = hex("b99d6c"), page = hex("d6c095") } },
     { id = "forever", name = "Forever Journal", desc = "A bound adventurer's journal with gold trim, warm paper panels and WoW's own fonts.",
       bg = hex("19130f", 0.98), tile = hex("251d16"), tileHi = hex("463324"), edge = hex("795b36"),
       text = hex("f5e9d2"), dim = hex("c3ae89"), amber = hex("eac773"),

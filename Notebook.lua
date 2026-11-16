@@ -84,8 +84,13 @@ function ns.BuildNotebookFrame(win, side, dim)
     paper:SetTexture(MEDIA .. "paper", "REPEAT", "REPEAT")
     if paper.SetHorizTile then paper:SetHorizTile(true); paper:SetVertTile(true) end
     nb.paper, nb.wood = paper, wood
+    -- age: browned, worn edges and darker corners stretched over the whole page
+    local age = win:CreateTexture(nil, "BACKGROUND", nil, -6)
+    age:SetAllPoints(paper)
+    age:SetTexture(MEDIA .. "age")
+    nb.age = age
     -- the fold between the two pages, under the content
-    local crease = win:CreateTexture(nil, "BACKGROUND", nil, -6)
+    local crease = win:CreateTexture(nil, "BACKGROUND", nil, -5)
     local mid = dim.SIDEBAR_W + dim.PAD + dim.CW / 2
     crease:SetPoint("TOPLEFT", win, "TOPLEFT", mid - 24, -dim.HEADER_H)
     crease:SetPoint("BOTTOMRIGHT", win, "BOTTOMLEFT", mid + 24, dim.FOOTER_H)
@@ -168,8 +173,12 @@ function ns.BuildNotebookFrame(win, side, dim)
     local tb = rawget(win, "todayBox")
     if tb then
         tb:ClearAllPoints()
-        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 82, 8)
-        tb:SetSize(96, 128)
+        tb:SetPoint("BOTTOMLEFT", side, "BOTTOMLEFT", 80, 8)
+        tb:SetSize(100, 128)
+        -- smaller values so "Online 23m 33s" fits the margin
+        for _, v in ipairs(rawget(win, "today") or {}) do
+            if v.SetFont then pcall(v.SetFont, v, W.NUM, 10, "") end
+        end
     end
     for _, b in ipairs(win.navButtons or {}) do b:Hide() end
 
