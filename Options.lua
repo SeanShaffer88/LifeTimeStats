@@ -72,19 +72,27 @@ local function Cycler(parent, w, getText, step, tip)
     local f = W.Panel(parent, T.bg)
     f:SetSize(w, 22)
     local t = W.Text(f, 11, T.text); t:SetPoint("CENTER")
+    -- long values ("Auto (Adventurer's Notebook)") shrink to fit between the arrows
+    local function Fit(text)
+        t:SetText(text)
+        for size = 11, 8, -1 do
+            pcall(t.SetFont, t, W.FONT, size, "")
+            if (t:GetStringWidth() or 0) <= w - 46 then break end
+        end
+    end
     local function Arrow(sym, dir, point)
         local b = CreateFrame("Button", nil, f)
         b:SetSize(22, 22); b:SetPoint(point)
         local a = W.Text(b, 14, T.amber); a:SetPoint("CENTER"); a:SetText(sym)
-        b:SetScript("OnClick", function() step(dir); t:SetText(getText()) end)
+        b:SetScript("OnClick", function() step(dir); Fit(getText()) end)
         b:SetScript("OnEnter", function() a:SetTextColor(T.text[1], T.text[2], T.text[3]) end)
         b:SetScript("OnLeave", function() a:SetTextColor(T.amber[1], T.amber[2], T.amber[3]) end)
     end
     Arrow("<", -1, "LEFT"); Arrow(">", 1, "RIGHT")
     f:EnableMouse(true)
-    f:SetScript("OnMouseUp", function() step(1); t:SetText(getText()) end)
+    f:SetScript("OnMouseUp", function() step(1); Fit(getText()) end)
     if tip then W.Tip(f, tip[1], tip[2]) end
-    function f:Sync() t:SetText(getText()) end
+    function f:Sync() Fit(getText()) end
     f:Sync()
     return f
 end
@@ -149,10 +157,19 @@ function ns.CreateOptions()
     ns.optionsPanel = panel
     local CW = 620
 
+    -- The notebook palette is dark ink meant for paper; the Options window is dark, so the
+    -- panel gets its own parchment sheet behind it.
+    if ns.Notebook and ns.Notebook() then
+        local sheet = panel:CreateTexture(nil, "BACKGROUND", nil, -7)
+        sheet:SetPoint("TOPLEFT", -6, 6); sheet:SetPoint("BOTTOMRIGHT", 6, -6)
+        sheet:SetTexture(W.MEDIA .. "notebook\\sheet")
+        panel.sheet = sheet
+    end
+
     local sf = CreateFrame("ScrollFrame", nil, panel)
     sf:SetPoint("TOPLEFT", 4, -4); sf:SetPoint("BOTTOMRIGHT", -4, 4)
     local c = CreateFrame("Frame", nil, sf)
-    c:SetSize(CW, 660)
+    c:SetSize(CW, 700)
     sf:SetScrollChild(c)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d)
@@ -249,7 +266,8 @@ function ns.CreateOptions()
     Track(alerts)
 
     -- TRACKING (right) ------------------------------------------------
-    local tr = W.Card(c, "Tracking and title", "records", R, y0 + 272, colW, 150)
+    -- below Chat and display (298 tall), so the alerts row is not covered
+    local tr = W.Card(c, "Tracking and title", "records", R, y0 + 308, colW, 114)
     b = tr.body
     Track(Toggle(b, 0, 0, tr.bw, "Count pet and guardian damage", "Include your pet's damage, kills and misses.",
         function() return S.countPet end, function(v) S.countPet = v end))
