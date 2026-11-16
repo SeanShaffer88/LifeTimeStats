@@ -6,6 +6,14 @@ All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepach
 
 From in-game screenshots of 1.23.0, where the parchment sheet rendered as designed.
 
+### Changed
+- **More readable text in the Adventurer's Notebook:**
+  - **Darker ink:** body, label and accent colours are darker so they read on aged paper.
+  - **Bigger small print:** the smallest text sizes grow by a point.
+  - **Small caps:** card titles and margin tags are set in capitals, emulating small caps (WoW fonts have no small-caps face).
+  - **Bold:** headline numbers, table numbers, card titles, the chapter title, and the active tab and tag use a faux bold (a 1-pixel ink shadow, since WoW fonts have no bold face).
+  - **Table headers:** set in full ink instead of grey.
+
 ### Fixed
 - The scorched rim and darker corners reached into the page, which made the right column (Your legend, chart labels) and the Today numbers in the bottom-left hard to read. The rim is narrower, the vignette lighter, and the sheet's torn edges now sit further outside the window, so all content is on light paper.
 - Long page names in the margin tags ("Life on the Road") shrink to fit.
