@@ -46,3 +46,4 @@ Options.lua
 Expanded.lua
 Control.lua
 Satchel.lua
+Habits.lua
