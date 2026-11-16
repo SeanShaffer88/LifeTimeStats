@@ -1,4 +1,4 @@
-# Audit - LifeTimeStats 1.25.0-forever
+# Audit - LifeTimeStats 1.25.1-forever
 
 Date: 2026-11-08 · Target: WoW: Forever 1.60.1 (interface 16001) · Author: Malikor
 
@@ -15,6 +15,10 @@ Lua 5.1 (lupa) for offline checks · Python Pillow for icon, logo and glyph text
 avoidance split (dodge/parry in and out) · crits and crushing blows taken · unique creatures by NPC ID · fall survived vs fatal · corpse run time · quest accept→turn-in fastest with title · unique quests · dungeon boss typing and unique bosses · unique NPCs/vendors and first NPC · /roll, reputation, skill-up, bags-full parsing · continent time via map parents · daily buckets and Today view · class colour accent · LTS2 backup with fastest/labels/uniques/firsts and merge recount · every page in Lifetime, Today and Session ranges and in account scope · search page.
 
 **Bug caught by tests during this release:** the daily series passed `0` instead of an empty day to chart callbacks, which would have broken six pages on any day without activity. Fixed.
+
+## 1.25.1
+- Verified (API declarations, Forever 1.60.1.70755, via the wow-addon-api server): every client call added in 1.24 and 1.25, including event payloads and secret-value rules. `C_LossOfControl` entries are secret while loss of control is restricted; such an entry now counts once without being read. The control suite has 51 assertions, and all 18 suites pass.
+- Unverified (in client): everything listed under 1.25.0.
 
 ## 1.25.0
 - In game (1.24.0, 4 screenshots):
