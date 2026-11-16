@@ -2,7 +2,9 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.25.1-forever] - 2026-11-17
+
+Prerelease. Offline regression suites pass; not yet checked in the live client.
 
 ### Fixed
 - **Crowd control while it is restricted:** Forever 1.60.1 hides the whole loss-of-control entry at times (`SecretWhenLossOfControlRestricted`). Such an effect now counts once, under "Other loss of control" and without a duration, instead of being read field by field.
