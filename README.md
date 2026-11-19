@@ -235,6 +235,8 @@ Large backup pastes show checksum and entry-reading progress; full character bac
 
 Large backup exports show progress while encoding full-character data and computing checksums. Closing the dialog or switching formats cancels pending work. The export captures the character state when requested; later tracking changes do not alter that backup.
 
+Choose **Account preferences** in the backup window to copy a separate preferences backup. It includes an allowlist of appearance and tracking options, not character data, window positions, or screenshot settings. Paste it into Restore to review the settings that would change, then confirm to apply them account-wide. Use `/reload` to apply appearance changes.
+
 Full character backups cover one character's saved record. Account settings, other characters, Dashboard pins, the active session, and in-progress tracking are outside that snapshot.
 
 ## Commands
@@ -271,6 +273,8 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Tracking and title:** count pet damage, title picker.
 - **Your data:** statistics, size and days of history; Backup, Restore, Character sheet, Reset session, Reset window, Erase character (asks first).
 
+If the WoW UI canvas shrinks, the main window temporarily scales down to make room for the window and section tabs. It restores your preferred scale when space permits. Use **Reset window** in Options or `/lts resetwindow` if you need to recenter it. Switching between Normal and Fill screen still requires `/reload` to rebuild the layout.
+
 ## Good to know
 
 - **Forever and the combat log.** Forever does not give addons the combat log. LifeTimeStats reads combat from experience and honor messages, the units you fight, the combat text feed and your own health instead. After each fight it also reads Forever's built-in damage meter: damage and healing you do (total and per spell), damage taken and who dealt it, avoidable damage ("stood in the fire"), damage to each enemy, pet damage, your share of group damage, boss damage, interrupts, dispels and overkill. Every fight not yet counted is read, oldest first. Death causes come from the game's death recap (fire, lava, falling, drowning, or the attacker and spell), else the meter's killing blow during a fight. Overhealing, buffs, debuffs and killing blows you deal still need the combat log and show **n/a**. Inside instances creature names are hidden, so those kills appear as "Unknown (instance)". `/lts debug` shows which sources are working.
@@ -287,7 +291,7 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
 - Unique lists stop growing at 20,000 entries each; tally buckets track up to 400 distinct labels in normal play (existing labels continue counting; new labels may be omitted at the limit; aggregate counters are separate); daily history keeps 40 days, and older days are kept as monthly totals.
 - Nothing is ever sent anywhere unless you press Send in the Share dialog or type `/lts share` with a channel. No chat spam unless you turn on milestones.
-- Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested).
+- Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested for live tracking). Selected backup controls and progress messages have a German translation; untranslated text falls back to English.
 
 ## Files
 
@@ -313,7 +317,7 @@ Include the output of `/lts debug` and `/lts errors` (both open in a copyable wi
 | Same client | Non-English clients | Same ZIP | Some tracking paths use localized client strings; full coverage has not been verified. |
 | Other clients / external packaging | — | — | Retail and other Classic clients are unsupported. `.pkgmeta` is not the authoritative GitHub release recipe. |
 
-Before publishing, test the candidate ZIP in Forever: clean install without optional addons, upgrade on a copy of existing saves, `/reload` and logout recovery, restricted combat tracking, backup preview/restore, all skins at different UI scales, and large-data refresh/restore behavior. Record the build, locale, artifact checksum and any unverified cases. Stub timing does not establish in-client frame latency.
+Before publishing, test the candidate ZIP in Forever: clean install without optional addons, upgrade on a copy of existing saves, `/reload` and logout recovery, restricted combat tracking, backup preview/restore, all skins at different UI scales, and large-data refresh/restore behavior. Record the build, locale, artifact checksum and any unverified cases. Stub timing does not establish in-client frame latency. To check the API report against a specific capture, run `python scripts/api_scan.py <dump.json> --expect-client "<exact client label>"`. The scanner compares declarations, not runtime availability or behavior.
 
 ## Development
 - `tests/run.py` runs every Lua file under Lua 5.1 with a stubbed WoW API (needs Python and `pip install lupa`): `python tests/run.py`.

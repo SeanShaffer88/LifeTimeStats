@@ -68,7 +68,7 @@ function B.book(view)
         local tag = (d.raid and "raid " or "") .. d.min .. (d.max ~= d.min and ("-" .. d.max) or "")
         rows[#rows + 1] = { tostring(i), d.name .. "  " .. DIM .. tag .. "|r", total > 0 and found / total or 0,
             found .. " / " .. total .. (d.learn and "*" or ""),
-            Plural(seen, "boss") .. " seen · " .. Plural(runs, "run") .. (clears > 0 and (" · " .. Plural(clears, "clear")) or ""),
+            Plural(seen, "boss") .. " seen · " .. Plural(runs, "run") .. (d.learn and " · clear criteria unknown" or (clears > 0 and (" · " .. Plural(clears, "clear")) or "")),
             dkey = d.key, tip = d.zone .. (d.learn and "\n* Which bosses are optional is not known yet, so full clears are not counted here. Bosses not on the list are added as you meet them." or "") }
     end
     return rows

@@ -2165,6 +2165,28 @@ local function DefaultScale()
     return math.max(0.05, math.floor(sc * 20) / 20)
 end
 
+-- Fit the built footprint to the current UI canvas, not physical monitors.
+-- The cap is temporary: the preferred scale is restored on a larger canvas.
+function ns.FitWindowScale(width, height, preferred, canvasWidth, canvasHeight, decorated)
+    if ns.BadNumber(preferred) or preferred <= 0 then preferred = 1 end
+    if ns.BadNumber(canvasWidth) or ns.BadNumber(canvasHeight) or canvasWidth <= 0 or canvasHeight <= 0 then return preferred end
+    local footprintW = width + TAB_ROOM + (decorated and 46 or 0)
+    local footprintH = height + (decorated and 60 or 0)
+    return math.min(preferred, canvasWidth / footprintW, canvasHeight / footprintH)
+end
+
+local appliedWindowScale
+local function FitWindowToCanvas()
+    if not win then return end
+    local preferred = Settings().window.scale or DefaultScale()
+    local decorated = ns.Notebook() or ns.Framed() or ns.Styled()
+    local scale = ns.FitWindowScale(WIN_W, WIN_H, preferred, UIParent:GetWidth(), UIParent:GetHeight(), decorated)
+    if appliedWindowScale ~= scale then
+        win:SetScale(scale)
+        appliedWindowScale = scale
+    end
+end
+
 -- Section tabs: bookmarks down the right edge of the window, one per section of the page
 -- shown (stat pages, Records, Top Lists, Achievements). Pages without sections hide them.
 local SECTION_TABS, SECTION_TAB_W, SECTION_TAB_H, SECTION_GAP = 26, 118, 22, 3
@@ -2268,7 +2290,8 @@ local function CreateWindow()
     if not anchors[s.point] then s.point, s.x, s.y = "CENTER", 0, 0 end
     if ns.BadNumber(s.x) then s.x = 0 end
     if ns.BadNumber(s.y) then s.y = 0 end
-    win:SetScale(s.scale)
+    appliedWindowScale = nil
+    FitWindowToCanvas()
     win:SetPoint(s.point, UIParent, s.point, s.x, s.y)
     tinsert(UISpecialFrames, "LifeTimeStatsWindow")
     _G.LifeTimeStatsWindow = win
@@ -2288,7 +2311,7 @@ local function CreateWindow()
     head:SetScript("OnMouseWheel", function(_, delta)
         if not IsControlKeyDown() then return end
         s.scale = math.max(0.5, math.min(1.5, (s.scale or 1) + delta * 0.05))
-        win:SetScale(s.scale)
+        FitWindowToCanvas()
     end)
     local hbg = W.Fill(head, T.tile); hbg:SetAllPoints()
     if ink then W.Shade(hbg, ink.base, ink.top) end
@@ -2514,6 +2537,7 @@ local function CreateWindow()
     end)
 
     win:SetScript("OnShow", function()
+        FitWindowToCanvas()
         ns.Add("lts_opens")
         if SetPortraitTexture then SetPortraitTexture(win.portrait, "player") end
         ns.ShowPage(Settings().lastCategory)
@@ -2526,7 +2550,7 @@ local function CreateWindow()
     local acc = 0
     win:SetScript("OnUpdate", function(_, el)
         acc = acc + el
-        if acc >= 1 then acc = 0; RefreshWindow(true) end
+        if acc >= 1 then acc = 0; FitWindowToCanvas(); RefreshWindow(true) end
     end)
 end
 
@@ -2560,7 +2584,7 @@ function ns.ResetWindow()
     s.point, s.x, s.y, s.scale = "CENTER", fill and -math.floor(TAB_ROOM / 2) or 0, 0, nil
     if win then
         s.scale = fill and 1 or DefaultScale()
-        win:SetScale(s.scale)
+        FitWindowToCanvas()
         win:ClearAllPoints()
         win:SetPoint("CENTER", UIParent, "CENTER", s.x, 0)
     end
@@ -2586,7 +2610,7 @@ function ns.SetWindowSize(mode)
 end
 
 function ns.ApplyWindowSettings()
-    if win then win:SetScale(Settings().window.scale or DefaultScale()) end
+    FitWindowToCanvas()
 end
 
 -- ------------------------------------------------------------ minimap button
@@ -2752,7 +2776,8 @@ end
 
 -- ------------------------------------------------------------ backup dialog
 local dlg
-local RESTORE_HINT = "Paste a LifeTimeStats backup with Ctrl+V. Review the backup before merging statistics or replacing history."
+local L = ns.L
+local RESTORE_HINT = L["Paste a LifeTimeStats backup with Ctrl+V. Review the backup before merging statistics or replacing history."]
 
 local function CancelBackupJob()
     if dlg.cancelBackupJob then dlg.cancelBackupJob() end
@@ -2761,7 +2786,7 @@ end
 
 local function LayoutBackupDialog(mode, width, height)
     CancelBackupJob()
-    dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = mode, false, false, false
+    dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy, dlg.previewPreferences = mode, false, false, false, false
     dlg:SetSize(width, height)
     dlg.eb:SetWidth(width - 70)
     local export, restore = mode == "export", mode == "restore"
@@ -2775,9 +2800,9 @@ local function LayoutBackupDialog(mode, width, height)
     dlg.box:ClearAllPoints()
     dlg.box:SetPoint("TOPLEFT", 12, boxTop); dlg.box:SetPoint("BOTTOMRIGHT", -12, 44)
     dlg.action:SetShown(restore)
-    dlg.action.text:SetText("Review backup")
+    dlg.action.text:SetText(L["Review backup"])
     dlg.action.text:SetTextColor(T.text[1], T.text[2], T.text[3])
-    dlg.close.text:SetText(restore and "Cancel" or "Close")
+    dlg.close.text:SetText(restore and L["Cancel"] or L["Close"])
     dlg.close:ClearAllPoints()
     if restore then
         dlg.close:SetPoint("RIGHT", dlg.action, "LEFT", -8, 0)
@@ -2788,23 +2813,23 @@ end
 
 local function SetRestoreInput(hint)
     LayoutBackupDialog("restore", 480, 320)
-    dlg.title:SetText("Restore - " .. ns.charKey)
+    dlg.title:SetText(string.format(L["Restore - %s"], ns.charKey))
     dlg.hint:SetText(hint or RESTORE_HINT)
 end
 
 local function BackupProgress(phase, count, total)
-    dlg.hint:SetText(total and string.format("%s: %d / %d bytes", phase, count, total)
-        or string.format("%s: %d processed", phase, count))
+    dlg.hint:SetText(total and string.format(L["%s: %d / %d bytes"], L[phase], count, total)
+        or string.format(L["%s: %d processed"], L[phase], count))
 end
 
 local function ShowBackupExport(mode)
     CancelBackupJob()
     local full = mode == "full"
     dlg.exportModes:Select(mode)
-    dlg.title:SetText("Backup - " .. ns.charKey)
+    dlg.title:SetText(string.format(L["Backup - %s"], ns.charKey))
     dlg.eb:ClearFocus()
     dlg.eb:SetText("")
-    dlg.hint:SetText("Preparing backup…")
+    dlg.hint:SetText(L["Preparing backup…"])
     local job = {}
     dlg.backupJob = job
     local function Finished(payload, why)
@@ -2825,7 +2850,10 @@ local function ShowBackupExport(mode)
         if dlg.backupJob == job then BackupProgress(phase, count, total) end
     end
     local cancel
-    if full then cancel = ns.WriteFullBackup(Finished, Status)
+    if mode == "preferences" then
+        Finished(ns.SerializePreferences())
+        dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes portable account preferences only; no character history, window positions, or screenshot settings.")
+    elseif full then cancel = ns.WriteFullBackup(Finished, Status)
     else cancel = ns.WriteLegacyBackup(ns.char, Finished, Status) end
     if dlg.backupJob == job then dlg.cancelBackupJob = cancel end
 end
@@ -2851,8 +2879,44 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.summary.counts:SetText(string.format("%d Journal entries  ·  %d personal notes  ·  %d saved sessions", #journal, noteCount, #sessions))
     dlg.summary:Show()
     dlg.editPaste:Show()
-    dlg.action.text:SetText("Replace history")
+    dlg.action.text:SetText(L["Replace history"])
     dlg.action.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
+end
+
+local function ReviewPreferences(text)
+    local values, why = ns.DeserializePreferences(text)
+    if not values then SetRestoreInput(why); return end
+    local changes = ns.PreferenceChanges(values)
+    local old = dlg.previewPreferences
+    if old then
+        local same = #old == #changes
+        for i, entry in ipairs(changes) do
+            if not old[i] or old[i].key ~= entry.key or old[i].before ~= entry.before then same = false; break end
+        end
+        if same then
+            for _, entry in ipairs(changes) do ns.settings[entry.key] = entry.value end
+            if ns.RefreshDeathPins then pcall(ns.RefreshDeathPins) end
+            dlg:Hide()
+            ns.Print("Account preferences applied in memory. Use /reload to apply appearance changes.")
+            ns.RefreshWindow()
+            return
+        end
+    end
+    dlg.previewPreferences, dlg.previewInput = changes, text
+    dlg:SetSize(560, 254)
+    dlg.title:SetText(L["Restore account preferences"])
+    dlg.hint:SetText("Applies account-wide. Character data and window positions will not change.")
+    dlg.eb:ClearFocus()
+    dlg.box:Hide()
+    local labels = {}
+    for i, entry in ipairs(changes) do labels[i] = entry.label end
+    dlg.summary.source:SetText(#changes > 0 and (#changes .. " preferences will change") or "No preferences would change")
+    dlg.summary.saved:SetText(old and "Settings changed since review. Review again to apply." or "Appearance changes require /reload.")
+    dlg.summary.counts:SetText(table.concat(labels, " · "))
+    dlg.summary:Show()
+    dlg.editPaste:Show()
+    dlg.action.text:SetText(L["Apply preferences"])
+    dlg.action:SetShown(#changes > 0)
 end
 
 local function ApplyBackup(parsed, readError, readingFinished)
@@ -2862,6 +2926,7 @@ local function ApplyBackup(parsed, readError, readingFinished)
         SetRestoreInput("The pasted text changed. Review the backup again.")
         return
     end
+    if ns.IsPreferencesBackup(text) then ReviewPreferences(text); return end
     local full = ns.IsFullBackup(text)
     if not dlg.previewInput and not readingFinished then
         local reader = full and ns.ReadFullBackup or ns.ReadLegacyBackup
@@ -2921,7 +2986,7 @@ local function ApplyBackup(parsed, readError, readingFinished)
             dlg.summary.counts:SetText(string.format("%d proposed updates before retention limits", count))
             dlg.summary:Show()
             dlg.editPaste:Show()
-            dlg.action.text:SetText("Merge statistics")
+            dlg.action.text:SetText(L["Merge statistics"])
             return
         end
         if legacy.char ~= ns.char then
@@ -2959,8 +3024,9 @@ local function CreateDialog()
     dlg.title = W.Text(dlg, 13, T.amber); dlg.title:SetPoint("TOPLEFT", 12, -12)
     dlg.hint = W.Text(dlg, 11, T.dim); dlg.hint:SetPoint("TOPLEFT", 12, -32); dlg.hint:SetPoint("RIGHT", -12, 0); dlg.hint:SetJustifyH("LEFT"); dlg.hint:SetWordWrap(true)
     dlg.exportModes = W.Segmented(dlg, {
-        { id = "stats", label = "Stats only", tip = "Back up statistics and personal-best history for a merge restore." },
-        { id = "full", label = "Full character", tip = "Back up this character’s statistics and saved history including private Journal notes." },
+        { id = "stats", label = L["Stats only"], tip = "Back up statistics and personal-best history for a merge restore." },
+        { id = "full", label = L["Full character"], tip = "Back up this character’s statistics and saved history including private Journal notes." },
+        { id = "preferences", label = L["Account preferences"], tip = "Back up portable preferences without character data or window positions." },
     }, function(id) if dlg.mode == "export" then ShowBackupExport(id) end end)
     dlg.exportModes:SetPoint("TOPLEFT", 12, -34)
     dlg.exportModes:Hide()
@@ -2991,18 +3057,19 @@ local function CreateDialog()
     local rule = W.Line(dlg.summary)
     rule:SetPoint("TOPLEFT", 10, -52); rule:SetPoint("TOPRIGHT", -10, -52); rule:SetHeight(1)
     dlg.summary.counts = W.Text(dlg.summary, 12, T.text, nil, "LEFT")
-    dlg.summary.counts:SetPoint("TOPLEFT", 10, -66)
+    dlg.summary.counts:SetPoint("TOPLEFT", 10, -60); dlg.summary.counts:SetPoint("RIGHT", -10, 0)
+    dlg.summary.counts:SetWordWrap(true)
     local ready = W.Text(dlg.summary, 11, T.dim, nil, "LEFT")
     ready:SetPoint("TOPLEFT", dlg.summary, "BOTTOMLEFT", 0, -9)
     ready:SetText("The backup text is ready. Choose Edit paste to change it.")
     dlg.summary:Hide()
-    dlg.close = W.FlatButton(dlg, "Close", 80, 22, nil, "Close this dialog.")
+    dlg.close = W.FlatButton(dlg, L["Close"], 80, 22, nil, "Close this dialog.")
     dlg.close:SetScript("OnClick", function() dlg:Hide() end)
     dlg.action = W.FlatButton(dlg, "Restore", 128, 22)
     dlg.action:SetPoint("BOTTOMRIGHT", -12, 12)
     dlg.action:SetScript("OnClick", function() ApplyBackup() end)
     dlg.action:Hide()
-    dlg.editPaste = W.FlatButton(dlg, "Edit paste", 93, 22)
+    dlg.editPaste = W.FlatButton(dlg, L["Edit paste"], 93, 22)
     dlg.editPaste:SetPoint("BOTTOMLEFT", 12, 12)
     dlg.editPaste:SetScript("OnClick", function()
         SetRestoreInput()
@@ -3011,7 +3078,7 @@ local function CreateDialog()
     dlg.editPaste:Hide()
     dlg:SetScript("OnHide", function()
         CancelBackupJob()
-        dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = nil, false, false, false
+        dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy, dlg.previewPreferences = nil, false, false, false, false
         eb:ClearFocus()
         eb:SetText("")
     end)

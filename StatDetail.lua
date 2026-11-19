@@ -85,6 +85,16 @@ function ns.StatSource(st)
         if (src.loot or 0) > 0 then return "Self-loot chat; matching messages were seen this session." end
         return "Self-loot chat; no matching messages seen yet this session."
     end
+    if key == "quests_done" or key == "quests_accepted" then
+        if (src.questChat or 0) > 0 then return "Quest events and chat fallback; a fallback was used this session." end
+        if (src.questEvents or 0) > 0 then return "Quest events; an event was seen this session." end
+        return "Quest events and chat fallback; neither was seen yet this session."
+    end
+    if key == "money_in" then
+        if (src.moneyChat or 0) > 0 then return "Money changes and loot chat fallback; a fallback was used this session." end
+        if (src.moneyEvents or 0) > 0 then return "Money changes; an event was seen this session." end
+        return "Money changes and loot chat fallback; neither was seen yet this session."
+    end
     if key == "time_online" then return "Sampled elapsed time; long gaps are capped." end
 end
 

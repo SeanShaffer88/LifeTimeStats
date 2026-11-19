@@ -2,6 +2,8 @@
 import hashlib
 import importlib.util
 import tempfile
+import subprocess
+import sys
 import zipfile
 from lupa import lua51
 from pathlib import Path
@@ -76,6 +78,17 @@ with tempfile.TemporaryDirectory() as temporary:
         "## Version: 1.13.0\nCore.lua\nMissing.lua\n", encoding="utf-8"
     )
     expect_error(lambda: package.build(root, dist, "v1.13.0-forever"), "files missing from the package")
+
+    (root / "LifeTimeStats.toc").write_text("## Version: 1.13.0\nCore.lua\n", encoding="utf-8")
+    (root / "Core.lua").write_text('return W.MEDIA .. "icons\\\\Corpse"\n', encoding="utf-8")
+    expect_error(lambda: package.build(root, dist, "v1.13.0-forever"), "Media/icons/Corpse.tga")
+
+    capture = Path(temporary) / "api.json"
+    capture.write_text('{"client":"fixture-16001","functions":[],"namespaces":{}}', encoding="utf-8")
+    scan = [sys.executable, str(REPO / "scripts" / "api_scan.py"), str(capture), str(root), "--expect-client"]
+    assert subprocess.run(scan + ["fixture-16001"], capture_output=True).returncode == 0
+    mismatch = subprocess.run(scan + ["different-build"], capture_output=True, text=True)
+    assert mismatch.returncode != 0 and "does not match" in mismatch.stderr
 
     # Package the actual checkout on pull requests and main, too.
     version = package.version_from_toc(REPO)

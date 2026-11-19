@@ -10,7 +10,31 @@ local On = ns.On
 -- Missing keys fall back to the key itself, so untranslated text still reads in English.
 ns.L = setmetatable({}, { __index = function(_, key) return key end })
 local LOCALES = {
-    -- deDE = { ["Characters"] = "Charaktere", ... },   -- ready for translators
+    deDE = {
+        ["Review backup"] = "Backup prüfen",
+        ["Cancel"] = "Abbrechen",
+        ["Close"] = "Schließen",
+        ["Edit paste"] = "Text ändern",
+        ["Stats only"] = "Nur Statistik",
+        ["Full character"] = "Ganzer Charakter",
+        ["Account preferences"] = "Kontoeinstellungen",
+        ["Restore - %s"] = "Wiederherstellen – %s",
+        ["Backup - %s"] = "Backup – %s",
+        ["Preparing backup…"] = "Backup wird vorbereitet…",
+        ["Paste a LifeTimeStats backup with Ctrl+V. Review the backup before merging statistics or replacing history."] =
+            "Füge ein LifeTimeStats-Backup mit Strg+V ein. Prüfe es, bevor du Statistiken zusammenführst oder den Verlauf ersetzt.",
+        ["Checking checksum"] = "Prüfsumme wird geprüft",
+        ["Reading entries"] = "Einträge werden gelesen",
+        ["Reading character backup"] = "Charakter-Backup wird gelesen",
+        ["Validating character data"] = "Charakterdaten werden geprüft",
+        ["Encoding character backup"] = "Charakter-Backup wird kodiert",
+        ["%s: %d / %d bytes"] = "%s: %d / %d Bytes",
+        ["%s: %d processed"] = "%s: %d verarbeitet",
+        ["Restore account preferences"] = "Kontoeinstellungen wiederherstellen",
+        ["Apply preferences"] = "Übernehmen",
+        ["Merge statistics"] = "Zusammenführen",
+        ["Replace history"] = "Verlauf ersetzen",
+    },
 }
 do
     local locale = GetLocale and GetLocale() or "enUS"

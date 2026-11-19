@@ -888,3 +888,66 @@ function ns.RestoreFullBackup(snapshot)
     ns.InvalidateAccount()
     return true
 end
+
+-- Portable account preferences, deliberately separate from character backups.
+-- Do not include geometry, identity, notes, diagnostic flags or screenshot settings.
+local PREFS = {
+    { "theme", "Theme", function(v) return v == "auto" or ns.THEME_BY_ID[v] ~= nil end },
+    { "achAnnounce", "Achievement alerts", function(v) return v == "off" or v == "chat" or v == "toast" or v == "both" end },
+    { "classColor", "Class colour" }, { "countPet", "Pet tracking" },
+    { "deathPins", "Death pins" }, { "itemTooltips", "Item tooltips" },
+    { "levelMsg", "Level-up messages" }, { "milestones", "Milestones" },
+    { "recap", "Login recap" }, { "recordMoments", "Journal records" },
+}
+local PREF_INDEX = {}
+for _, def in ipairs(PREFS) do PREF_INDEX[def[1]] = def end
+local PREF_HEADER = "LTSP1|"
+
+function ns.IsPreferencesBackup(text)
+    return type(text) == "string" and not ns.IsSecret(text) and text:match("^%s*LTSP1|") ~= nil
+end
+
+function ns.SerializePreferences()
+    local entries = {}
+    for _, def in ipairs(PREFS) do
+        local key, rule = def[1], def[3]
+        local value = ns.settings[key]
+        if (rule and type(value) == "string" and rule(value)) or (not rule and type(value) == "boolean") then
+            entries[#entries + 1] = key .. "=" .. tostring(value)
+        end
+    end
+    local body = table.concat(entries, ";")
+    return PREF_HEADER .. Checksum(body) .. "|" .. body
+end
+
+function ns.DeserializePreferences(text)
+    if not ns.IsPreferencesBackup(text) or #text > 2048 then return nil, "Invalid preferences backup." end
+    local sum, body = text:match("^%s*LTSP1|(%x%x%x%x%x%x)|([%w=;]+)%s*$")
+    if not sum or Checksum(body) ~= sum then return nil, "Preferences backup checksum does not match." end
+    local result = {}
+    for entry in (body .. ";"):gmatch("(.-);") do
+        local key, value = entry:match("^(%w+)=(%w+)$")
+        local def = key and PREF_INDEX[key]
+        if not def or result[key] ~= nil then return nil, "Unexpected or repeated preference." end
+        if def[3] then
+            if not def[3](value) then return nil, "Invalid preference value." end
+            result[key] = value
+        elseif value == "true" or value == "false" then
+            result[key] = value == "true"
+        else
+            return nil, "Invalid preference value."
+        end
+    end
+    return result
+end
+
+function ns.PreferenceChanges(values)
+    local changes = {}
+    for _, def in ipairs(PREFS) do
+        local key = def[1]
+        if values[key] ~= nil and values[key] ~= ns.settings[key] then
+            changes[#changes + 1] = { key = key, label = def[2], value = values[key], before = ns.settings[key] }
+        end
+    end
+    return changes
+end

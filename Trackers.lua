@@ -46,16 +46,28 @@ ns.SpellName = SpellName
 -- Lua pattern plus the argument order (supports %1$s style positions).
 local function MakePattern(fmt)
     if type(fmt) ~= "string" or fmt == "" then return nil end
-    local order, n = {}, 0
-    local s = fmt:gsub("%%(%d?)%$?([sd])", function(idx, kind)
-        n = n + 1
-        order[n] = tonumber(idx) or n
-        return kind == "d" and "\001" or "\002"
-    end)
-    s = s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
-    s = s:gsub("\001", "(%%d+)")
-    s = s:gsub("\002", "(.-)")
-    return { pat = "^" .. s .. "$", order = order }
+    local order, parts, pos = {}, { "^" }, 1
+    local function Literal(text) return (text:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")) end
+    while pos <= #fmt do
+        local at = fmt:find("%", pos, true)
+        if not at then parts[#parts + 1] = Literal(fmt:sub(pos)); break end
+        parts[#parts + 1] = Literal(fmt:sub(pos, at - 1))
+        local nextChar = fmt:sub(at + 1, at + 1)
+        if nextChar == "%" then
+            parts[#parts + 1], pos = "%%", at + 2
+        else
+            local token = fmt:sub(at)
+            local index, kind, after = token:match("^%%(%d+)%$([sd])()")
+            if not kind then kind, after = token:match("^%%([sd])()") end
+            index = index and tonumber(index) or #order + 1
+            if not kind or index < 1 or index > 32 or #order >= 32 then return nil end
+            order[#order + 1] = index
+            parts[#parts + 1] = kind == "d" and "(%d+)" or "(.-)"
+            pos = at + after - 1
+        end
+    end
+    parts[#parts + 1] = "$"
+    return { pat = table.concat(parts), order = order }
 end
 ns.MakePattern = MakePattern
 
@@ -64,7 +76,11 @@ local function Match(p, msg)
     local caps = { msg:match(p.pat) }
     if #caps == 0 then return nil end
     local out = {}
-    for i = 1, #caps do out[p.order[i] or i] = caps[i] end
+    for i = 1, #caps do
+        local index = p.order[i] or i
+        if out[index] and out[index] ~= caps[i] then return nil end
+        out[index] = caps[i]
+    end
     return out
 end
 ns.Match = Match
