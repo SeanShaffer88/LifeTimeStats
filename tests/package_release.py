@@ -83,6 +83,9 @@ with tempfile.TemporaryDirectory() as temporary:
     (root / "Core.lua").write_text('return W.MEDIA .. "icons\\\\Corpse"\n', encoding="utf-8")
     expect_error(lambda: package.build(root, dist, "v1.13.0-forever"), "Media/icons/Corpse.tga")
 
+    (root / "LifeTimeStats.toc").write_text("## Version: 1.13.0\nMedia/../Core.lua\n", encoding="utf-8")
+    expect_error(lambda: package.build(root, dist, "v1.13.0-forever"), "Media/../Core.lua")
+
     capture = Path(temporary) / "api.json"
     capture.write_text('{"client":"fixture-16001","functions":[],"namespaces":{}}', encoding="utf-8")
     scan = [sys.executable, str(REPO / "scripts" / "api_scan.py"), str(capture), str(root), "--expect-client"]

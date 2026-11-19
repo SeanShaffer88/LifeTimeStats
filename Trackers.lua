@@ -72,7 +72,8 @@ end
 ns.MakePattern = MakePattern
 
 local function Match(p, msg)
-    if not p or type(msg) ~= "string" then return nil end
+    if not p or type(msg) ~= "string" or ns.IsSecret(msg) then return nil end
+    if #p.order == 0 then return msg:match(p.pat) and {} or nil end
     local caps = { msg:match(p.pat) }
     if #caps == 0 then return nil end
     local out = {}

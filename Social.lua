@@ -167,8 +167,6 @@ On("TAXIMAP_OPENED", function()
 end)
 
 -- ------------------------------------------------------------ system lines: spells, professions, loot rolls, repairs
-local lastRepair = -10
-On("UPDATE_INVENTORY_DURABILITY", function() lastRepair = GetTime() end)
 On("UPDATE_INVENTORY_ALERTS", function()
     if GetInventoryAlertStatus then
         for slot = 1, 19 do

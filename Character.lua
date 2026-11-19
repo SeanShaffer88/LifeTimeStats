@@ -78,11 +78,7 @@ end
 -- Every statistic, fastest time, unique count and first for every character and the account,
 -- one row each, as raw numbers a spreadsheet can sort (times in seconds, money in copper,
 -- distances in yards, firsts as Unix time).
-local function CSVField(v)
-    v = tostring(v == nil and "" or v)
-    if v:find('[,"\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
-    return v
-end
+local function CSVField(v) return ns.CSVField(v, true) end
 local function CSVNumber(v)
     if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then return "" end
     if v == math.floor(v) then return string.format("%.0f", v) end
