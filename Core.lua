@@ -959,7 +959,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
     elseif cmd == "compare" then
         if not ns.ShowPage then ns.ToggleWindow() end
         ns.OpenPage("compare")
-    elseif cmd == "export" or cmd == "backup" then
+    elseif msg == "export" or cmd == "backup" then
         ns.ShowExport()
     elseif cmd == "import" or cmd == "restore" then
         ns.ShowImport()
@@ -992,11 +992,17 @@ SlashCmdList.LIFETIMESTATS = function(msg)
     elseif cmd == "summary" then
         ns.ShowSessionSummary(true)
     elseif cmd == "export" and msg:match("^%S+%s+(%S+)") then
-        local kind = msg:match("^%S+%s+(%S+)")
-        local title, text = ns.ExportCSV(kind)
-        if title then ns.ShowText(title .. " (CSV)", "Ctrl+A, Ctrl+C and paste into a spreadsheet.", text)
-        else ns.Print("/lts export, or /lts export items | quests | runs | deaths") end
-    elseif cmd == "export" then
+        local kind, args = msg:match("^%S+%s+(%S+)%s*(.*)$")
+        local days = args:match("^days%s+(%d+)$")
+        days = days and tonumber(days)
+        if not ns.EXPORTS[kind] or (args ~= "" and (not days or days < 1 or days > 3650)) then
+            ns.Print("Usage: /lts export items|quests|runs|deaths [days 1-3650]")
+        else
+            local title, text, count = ns.ExportCSV(kind, false, days and time() - days * 86400)
+            local range = days and ("last " .. days .. (days == 1 and " day" or " days")) or "all retained history"
+            ns.ShowText(title .. " (CSV)", string.format("%d rows · %s. Ctrl+A, Ctrl+C and paste into a spreadsheet.", count, range), text)
+        end
+    elseif cmd == "compendium" then
         ns.ShowText("Compendium (CSV)", "Every statistic for every character, plus the account total. Ctrl+A, Ctrl+C and paste into a spreadsheet.", ns.CompendiumCSV())
     elseif cmd == "recap" then
         ns.Print("This session: " .. RecapText(ns.session.c, GetTime() - ns.session.start, SessionTopSpell()))

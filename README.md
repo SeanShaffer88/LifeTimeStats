@@ -191,12 +191,12 @@ Item tooltips say where you got an item, e.g. "Boss from Taragaman the Hungerer 
 
 - `/lts size` shows how big each character's saved data is and what takes the most space. You get a warning at login above 4 MB.
 - A snapshot of your statistics is kept each day you play: up to three, with a combined 4 MiB text budget, stored in that character's own saved file. `/lts snapshot` lists them, `/lts snapshot show 2` gives the backup text, and `/lts snapshot restore 2` previews a merge; confirm to apply it.
-- `/lts export items`, `quests`, `runs` and `deaths` export one log as CSV. Text starting like a spreadsheet formula is prefixed with an apostrophe so it is imported as text.
+- `/lts export items`, `quests`, `runs` and `deaths` export one log as CSV. Add `days 7` (for example, `/lts export quests days 7`) to copy only rows from the last seven days. The copy window shows the selected range and row count. Text starting like a spreadsheet formula is prefixed with an apostrophe so it is imported as text.
 - A pinned Dashboard statistic that has a goal shows its progress ("Goal 45% of 1,000,000").
 
 ## Export everything
 
-`/lts export` opens every statistic, fastest time, unique count, first and top list for every character, plus the account total, as CSV. Values are raw numbers: times in seconds, money in copper, distances in yards, firsts as Unix time. The Timeline page has a **Days / Months** switch; Months shows the last 12 months from the monthly totals.
+`/lts compendium` opens every statistic, fastest time, unique count, first and top list for every character, plus the account total, as CSV. Values are raw numbers: times in seconds, money in copper, distances in yards, firsts as Unix time. The Timeline page has a **Days / Months** switch; Months shows the last 12 months from the monthly totals.
 
 On clients with the addon compartment (the addon list button by the minimap), LifeTimeStats is listed there: click to open, right-click for settings.
 

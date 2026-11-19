@@ -147,13 +147,12 @@ function ns.BuildFramedSkin(win, side, head, dim)
     for _, k in ipairs({ "logo", "t1", "t2", "rule", "portrait", "ring" }) do if hp[k] then hp[k]:Hide() end end
     if win.nameText then win.nameText:Hide() end
     if win.level then win.level:Hide() end
-    local S = ns.settings
     local oldScope, oldRange = win.scopeSeg, win.rangeSeg
     oldScope:Hide(); oldRange:Hide()
     local charDD = Dropdown(head, explorer and 220 or 200, {
         { id = "char", label = UnitName("player") or "This character", tip = "Only this character." },
         { id = "account", label = "All characters", tip = "Every character on this account that has logged in with LifeTimeStats." },
-    }, function(id) S.scope = id; if ns.InvalidateAccount then ns.InvalidateAccount() end; ns.RefreshWindow() end,
+    }, ns.SelectViewScope,
         { portrait = true, tip = { "Character", "Whose statistics to show: this character or every character on the account." } })
     win.scopeSeg = charDD
     local sb = hp.sb
@@ -166,7 +165,7 @@ function ns.BuildFramedSkin(win, side, head, dim)
             { id = "week", label = "Weekly", tip = "The last 7 days, today included." },
             { id = "month", label = "Monthly", tip = "The last 30 days, today included." },
             { id = "lifetime", label = "Lifetime", tip = "Everything since LifeTimeStats was installed." },
-        }, function(id) S.range = id; ns.RefreshWindow() end)
+        }, ns.SelectViewRange)
         for _, b in ipairs(seg.buttons) do b:SetHeight(26); b:SetWidth(math.max(84, b:GetWidth())) end
         local x = 1
         for _, b in ipairs(seg.buttons) do b:ClearAllPoints(); b:SetPoint("LEFT", x, 0); x = x + b:GetWidth() end
@@ -196,7 +195,7 @@ function ns.BuildFramedSkin(win, side, head, dim)
             { id = "today", label = "Today", tip = "Since midnight, local time." },
             { id = "week", label = "Last 7 days", tip = "The last 7 days, today included." },
             { id = "month", label = "Last 30 days", tip = "The last 30 days, today included." },
-        }, function(id) S.range = id; ns.RefreshWindow() end, { icon = "clock", tip = { "Time range", "Which stretch of time the pages show." } })
+        }, ns.SelectViewRange, { icon = "clock", tip = { "Time range", "Which stretch of time the pages show." } })
         rangeDD:SetPoint("RIGHT", close, "LEFT", -12, 0)
         charDD:SetPoint("RIGHT", rangeDD, "LEFT", -10, 0)
         win.rangeSeg = rangeDD

@@ -73,17 +73,16 @@ function ns.BuildStyledSkin(win, side, head, dim)
     st.title:SetText(stone and ("LifeTimeStats  |cffffffffv" .. tostring(ns.VERSION) .. "|r  by |cff4fc4eeMalikor|r") or "LifeTimeStats Journal")
     if st.title.SetShadowOffset then st.title:SetShadowOffset(1, -1); st.title:SetShadowColor(0, 0, 0, 1) end
 
-    local S = ns.settings
     win.scopeSeg:Hide(); win.rangeSeg:Hide()
     local charDD = ns.FramedDropdown(head, 170, {
         { id = "char", label = UnitName("player") or "This character", tip = "Only this character." },
         { id = "account", label = "All characters", tip = "Every character on this account that has logged in with LifeTimeStats." },
-    }, function(id) S.scope = id; if ns.InvalidateAccount then ns.InvalidateAccount() end; ns.RefreshWindow() end,
+    }, ns.SelectViewScope,
         { portrait = true, tip = { "Character", "Whose statistics to show." } })
     local rangeDD = ns.FramedDropdown(head, 136, {
         { id = "lifetime", label = "All time" }, { id = "session", label = "This session" }, { id = "today", label = "Today" },
         { id = "week", label = "Last 7 days" }, { id = "month", label = "Last 30 days" },
-    }, function(id) S.range = id; ns.RefreshWindow() end, { icon = "clock", tip = { "Time range", "Which stretch of time the pages show." } })
+    }, ns.SelectViewRange, { icon = "clock", tip = { "Time range", "Which stretch of time the pages show." } })
     rangeDD:SetPoint("RIGHT", hp.close, "LEFT", -10, 0)
     charDD:SetPoint("RIGHT", rangeDD, "LEFT", -8, 0)
     win.scopeSeg, win.rangeSeg = charDD, rangeDD

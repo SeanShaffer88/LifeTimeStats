@@ -178,6 +178,44 @@ eq(opened, true, "click opens the journal note editor")
 local found = false
 for _, v in ipairs(shownTexts) do if v == anchor[2] then found = true end end
 eq(found, true, "note editor shows the full original entry")
+local window = LifeTimeStatsWindow
+local originalGetView, viewReads = ns.GetView, 0
+ns.GetView = function(...) viewReads = viewReads + 1; return originalGetView(...) end
+ns.settings.scope = "account"
+ns.ShowPage("help")
+window:GetScript("OnUpdate")(window, 1)
+eq(viewReads, 0, "static help does not aggregate account data")
+ns.ShowPage("journal")
+feed.offset = 0
+ns.Journal("Batched arrival one")
+ns.Journal("Batched arrival two")
+window:GetScript("OnUpdate")(window, 1)
+eq(feed.rows[1].prose:GetText(), "Batched arrival two", "journal refresh picks up the latest event burst")
+eq(viewReads, 0, "journal uses character data even when scope is account")
+ns.GetView = originalGetView
+ns.settings.scope = "char"
+local originalDate, travelFormats = date, 0
+local originalZone = GetRealZoneText
+local zoneName = "Audit travel fixture"
+GetRealZoneText = function() return zoneName end
+date = function(format, stamp)
+    if format == "%b %d %H:%M" then travelFormats = travelFormats + 1 end
+    return originalDate(format, stamp)
+end
+local function tick() window:GetScript("OnUpdate")(window, 1) end
+tick()
+eq(travelFormats, 0, "unchanged travel log does not rebuild on a live tick")
+ns.frame.scripts.OnEvent(ns.frame, "ZONE_CHANGED_NEW_AREA")
+tick()
+eq(travelFormats > 0, true, "first visit invalidates travel rows")
+travelFormats = 0
+ns.frame.scripts.OnEvent(ns.frame, "ZONE_CHANGED_NEW_AREA")
+tick()
+eq(travelFormats, 0, "repeat visit does not invalidate first-visit rows")
+ns.char.zonelog = { ["Restored zone"] = { stamp, 20 } }
+tick()
+eq(travelFormats > 0, true, "replaced travel table invalidates cached rows")
+date, GetRealZoneText = originalDate, originalZone
 eq(#ns.errors, 0, "no handler or rendering errors")
 print("JOURNAL PASS: " .. checks .. " assertions")
 ''')

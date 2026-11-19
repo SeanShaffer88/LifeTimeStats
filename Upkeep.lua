@@ -153,39 +153,39 @@ local function Field(v, spreadsheetSafe)
     if v:find('[,"\r\n]') then v = '"' .. v:gsub('"', '""') .. '"' end
     return v
 end
-local function Rows(header, list, fn, spreadsheetSafe)
+local function Rows(header, list, fn, spreadsheetSafe, since, timeKey)
     local out = { table.concat(header, ",") }
     for _, e in ipairs(list or {}) do
-        if type(e) == "table" then
+        if type(e) == "table" and (not since or (type(e[timeKey]) == "number" and e[timeKey] >= since)) then
             local row, cells = fn(e), {}
             -- empty fields are nil, so walk every column instead of ipairs
             for i = 1, #header do cells[i] = Field(row[i], spreadsheetSafe) end
             out[#out + 1] = table.concat(cells, ",")
         end
     end
-    return table.concat(out, "\n")
+    return table.concat(out, "\n"), #out - 1
 end
 local function Day(t) return t and date("%Y-%m-%d %H:%M", t) or "" end
 ns.EXPORTS = {
-    items = { "Item log", function(ch, safe)
+    items = { "Item log", function(ch, safe, since)
         return Rows({ "date", "item", "item_id", "quality", "item_level", "source", "from", "zone", "level", "count" }, ch.items,
-            function(e) return { Day(e.t), e.n, e.id, e.q, e.il, e.src, e.from, e.z, e.l, e.c or 1 } end, safe)
+            function(e) return { Day(e.t), e.n, e.id, e.q, e.il, e.src, e.from, e.z, e.l, e.c or 1 } end, safe, since, "t")
     end },
-    quests = { "Quest history", function(ch, safe)
+    quests = { "Quest history", function(ch, safe, since)
         return Rows({ "date", "quest", "quest_id", "zone", "level", "xp", "money_copper", "seconds_to_complete" }, ch.quests,
-            function(e) return { Day(e.t), e.n, e.id, e.z, e.l, e.xp, e.g, e.d } end, safe)
+            function(e) return { Day(e.t), e.n, e.id, e.z, e.l, e.xp, e.g, e.d } end, safe, since, "t")
     end },
-    runs = { "Run history", function(ch, safe)
+    runs = { "Run history", function(ch, safe, since)
         return Rows({ "start", "end", "instance", "level", "bosses", "deaths", "wipes", "group_size", "members", "full_clear", "items" }, ch.runlog,
-            function(e) return { Day(e.s), Day(e.e), e.n, e.l, e.b, e.de, e.w, e.g, e.m, e.c and "yes" or "", e.loot } end, safe)
+            function(e) return { Day(e.s), Day(e.e), e.n, e.l, e.b, e.de, e.w, e.g, e.m, e.c and "yes" or "", e.loot } end, safe, since, "s")
     end },
-    deaths = { "Deaths", function(ch, safe)
+    deaths = { "Deaths", function(ch, safe, since)
         return Rows({ "date", "cause", "zone", "level", "map_id", "x", "y" }, ch.deathlog,
-            function(e) return { Day(e.t), e.c, e.z, e.l, e.m, e.x and string.format("%.4f", e.x), e.y and string.format("%.4f", e.y) } end, safe)
+            function(e) return { Day(e.t), e.c, e.z, e.l, e.m, e.x and string.format("%.4f", e.x), e.y and string.format("%.4f", e.y) } end, safe, since, "t")
     end },
 }
-function ns.ExportCSV(kind, raw)
+function ns.ExportCSV(kind, raw, since)
     local def = ns.EXPORTS[kind]
     if not def or not ns.char then return nil end
-    return def[1], def[2](ns.char, not raw)
+    return def[1], def[2](ns.char, not raw, since)
 end

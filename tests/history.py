@@ -211,6 +211,17 @@ for _, kind in ipairs({ "items", "quests", "runs", "deaths" }) do
 end
 eq(select(2, ns.ExportCSV("quests")):find("Lazy Peons", 1, true) ~= nil, true, "quest CSV row")
 
+local fixture = { t = time() - 8 * 86400, n = "Old filtered quest", id = 9999 }
+local recent = { t = time() - 1, n = "Recent filtered quest", id = 10000 }
+ch.quests[#ch.quests + 1], ch.quests[#ch.quests + 2] = fixture, recent
+local _, csv, count = ns.ExportCSV("quests", false, time() - 7 * 86400)
+eq(csv:find(fixture.n, 1, true), nil, "filtered CSV skips old rows")
+eq(csv:find(recent.n, 1, true) ~= nil, true, "filtered CSV includes recent rows")
+local _, separators = csv:gsub("\n", "")
+eq(count, separators, "filtered CSV count excludes header")
+SlashCmdList.LIFETIMESTATS("export quests days 7")
+eq(ns.backupDialog.eb:GetText(), csv, "slash export applies the date filter")
+
 -- ------------------------------------------------------------ locale
 eq(ns.L["Quest history"], "Quest history", "missing translations fall back to English")
 

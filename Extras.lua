@@ -56,18 +56,14 @@ On("ZONE_CHANGED_NEW_AREA", function() Add("zone_changes"); Places() end)
 On("PLAYER_UPDATE_RESTING", function() if B(IsResting()) then Add("rest_entered") end end)
 
 -- ------------------------------------------------------------ loot uniques & firsts
-On("CHAT_MSG_LOOT", function(_, msg)
-    local P = ns.P
-    if not P then return end
-    local c = ns.Match(P.lootMulti, msg) or ns.Match(P.pushMulti, msg) or ns.Match(P.loot, msg) or ns.Match(P.push, msg)
-    if not c then return end
-    local link = c[1]
+function ns.TrackLootDiscovery(link, quality)
     local id = link and link:match("|Hitem:(%d+)")
     if id then Unique("items", id) end
-    local q = ns.LinkQuality(link)
     local name = link and link:match("%[(.-)%]") or "?"
-    if q == 2 then First("green", name) elseif q == 3 then First("blue", name) elseif q and q >= 4 then First("epic", name) end
-end)
+    if quality == 2 then First("green", name)
+    elseif quality == 3 then First("blue", name)
+    elseif quality and quality >= 4 then First("epic", name) end
+end
 On("LOOT_OPENED", function()
     Add("loot_windows")
     if IsFishingLoot and B(IsFishingLoot()) then First("fish", Zone()) end

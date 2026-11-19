@@ -76,7 +76,7 @@ function ns.Journal(text, kind, eventZone)
     local j = ch.journal
     j[#j + 1] = { time(), text, level, kind = kind, zone = ReadableZone(zone) }
     if #j > JOURNAL_CAP then table.remove(j, 1) end
-    if (ns.activePage == "journal" or ns.activePage == "lists") and ns.RefreshWindow then ns.RefreshWindow() end
+    -- Visible history refreshes on the window tick, coalescing event bursts.
 end
 
 function ns.JournalNote(entry)
@@ -203,6 +203,7 @@ On("ZONE_CHANGED_NEW_AREA", function()
     ns.char.zonelog = ns.char.zonelog or {}
     if not ns.char.zonelog[z] then
         ns.char.zonelog[z] = { time(), UnitLevel("player") or 0 }
+        ns.travelLogRevision = (ns.travelLogRevision or 0) + 1
         ns.Journal("Arrived in " .. z .. " (level " .. (UnitLevel("player") or 0) .. ")", "first", z)
     end
 end)
