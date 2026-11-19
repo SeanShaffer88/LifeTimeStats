@@ -190,8 +190,8 @@ Item tooltips say where you got an item, e.g. "Boss from Taragaman the Hungerer 
 ### Keeping your data safe (1.20)
 
 - `/lts size` shows how big each character's saved data is and what takes the most space. You get a warning at login above 4 MB.
-- A snapshot of your statistics is kept each day you play: the newest three, stored in that character's own saved file. `/lts snapshot` lists them, `/lts snapshot show 2` gives the backup text, and `/lts snapshot restore 2` merges it back, keeping the higher of each value.
-- `/lts export items`, `quests`, `runs` and `deaths` export one log as CSV.
+- A snapshot of your statistics is kept each day you play: up to three, with a combined 4 MiB text budget, stored in that character's own saved file. `/lts snapshot` lists them, `/lts snapshot show 2` gives the backup text, and `/lts snapshot restore 2` previews a merge; confirm to apply it.
+- `/lts export items`, `quests`, `runs` and `deaths` export one log as CSV. Text starting like a spreadsheet formula is prefixed with an apostrophe so it is imported as text.
 - A pinned Dashboard statistic that has a goal shows its progress ("Goal 45% of 1,000,000").
 
 ## Export everything
@@ -278,10 +278,10 @@ Options → AddOns → LifeTimeStats (or right-click the minimap button), in the
 - **Falls:** "survived" means you were still alive 1.5 s after the fall damage. Airtime is measured from leaving the ground to landing.
 - **Corpse runs** go from releasing your spirit to getting your body back (or using the spirit healer).
 - **Session** is since you logged in; a /reload keeps it. **Today** resets at local midnight. 40 days of daily history are kept for the charts.
-- **Your data is stored twice** (account and per-character SavedVariables); if one fails to load the other restores it. A stats-only restore merges records and keeps the newest 200 personal bests. See [Back up and restore](#back-up-and-restore) for the full character option.
+- **Your data is stored twice** (account and per-character SavedVariables). If both current copies are rejected, the addon tries a separate previous generation from the character file. It keeps that generation only for records within its recovery budget. These copies are not disk transactions: WoW controls when SavedVariables are written, and if the character file cannot load, its earlier generation is unavailable. Keep manual backups for recovery outside those files. A stats-only restore merges records and keeps the newest 200 personal bests. See [Back up and restore](#back-up-and-restore) for the full character option.
 - The **How it works** page in the window explains every measurement.
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
-- Unique lists stop growing at 20,000 entries each; top lists keep 400 entries; daily history keeps 40 days, and older days are kept as monthly totals.
+- Unique lists stop growing at 20,000 entries each; tally buckets track up to 400 distinct labels in normal play (existing labels continue counting; new labels may be omitted at the limit; aggregate counters are separate); daily history keeps 40 days, and older days are kept as monthly totals.
 - Nothing is ever sent anywhere unless you press Send in the Share dialog or type `/lts share` with a channel. No chat spam unless you turn on milestones.
 - Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested).
 
@@ -300,6 +300,16 @@ LifeTimeStats/
 ## Support
 Found a bug or have an idea? Open an issue: https://github.com/SeanShaffer88/LifeTimeStats/issues
 Include the output of `/lts debug` and `/lts errors` (both open in a copyable window).
+
+### Release validation matrix
+
+| Target | Locale | Artifact | Validation |
+|---|---|---|---|
+| Forever 1.60.1 / Interface 16001 | English UI and tracking baseline | GitHub `-forever.zip` | CI verifies archive contents and initializes packaged Lua against a stub harness. Record the exact client build and live results separately. |
+| Same client | Non-English clients | Same ZIP | Some tracking paths use localized client strings; full coverage has not been verified. |
+| Other clients / external packaging | — | — | Retail and other Classic clients are unsupported. `.pkgmeta` is not the authoritative GitHub release recipe. |
+
+Before publishing, test the candidate ZIP in Forever: clean install without optional addons, upgrade on a copy of existing saves, `/reload` and logout recovery, restricted combat tracking, backup preview/restore, all skins at different UI scales, and large-data refresh/restore behavior. Record the build, locale, artifact checksum and any unverified cases. Stub timing does not establish in-client frame latency.
 
 ## Development
 - `tests/run.py` runs every Lua file under Lua 5.1 with a stubbed WoW API (needs Python and `pip install lupa`): `python tests/run.py`.

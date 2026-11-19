@@ -2223,8 +2223,14 @@ local function CreateWindow()
     win:Hide()
     local s = Settings().window
     if not s.scale then s.scale = s.size == "fill" and 1 or DefaultScale() end
+    if ns.BadNumber(s.scale) or s.scale < 0.05 or s.scale > 1.5 then s.scale = DefaultScale() end
+    local anchors = { CENTER = true, TOP = true, TOPLEFT = true, TOPRIGHT = true,
+        BOTTOM = true, BOTTOMLEFT = true, BOTTOMRIGHT = true, LEFT = true, RIGHT = true }
+    if not anchors[s.point] then s.point, s.x, s.y = "CENTER", 0, 0 end
+    if ns.BadNumber(s.x) then s.x = 0 end
+    if ns.BadNumber(s.y) then s.y = 0 end
     win:SetScale(s.scale)
-    win:SetPoint(s.point or "CENTER", UIParent, s.point or "CENTER", s.x or 0, s.y or 0)
+    win:SetPoint(s.point, UIParent, s.point, s.x, s.y)
     tinsert(UISpecialFrames, "LifeTimeStatsWindow")
     _G.LifeTimeStatsWindow = win
 
@@ -2706,10 +2712,10 @@ end
 
 -- ------------------------------------------------------------ backup dialog
 local dlg
-local RESTORE_HINT = "Paste a LifeTimeStats backup with Ctrl+V. Stats backups merge. Full character backups require confirmation before replacement."
+local RESTORE_HINT = "Paste a LifeTimeStats backup with Ctrl+V. Review the backup before merging statistics or replacing history."
 
 local function LayoutBackupDialog(mode, width, height)
-    dlg.mode, dlg.previewInput = mode, nil
+    dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = mode, nil, nil, nil
     dlg:SetSize(width, height)
     dlg.eb:SetWidth(width - 70)
     local export, restore = mode == "export", mode == "restore"
@@ -2723,7 +2729,7 @@ local function LayoutBackupDialog(mode, width, height)
     dlg.box:ClearAllPoints()
     dlg.box:SetPoint("TOPLEFT", 12, boxTop); dlg.box:SetPoint("BOTTOMRIGHT", -12, 44)
     dlg.action:SetShown(restore)
-    dlg.action.text:SetText("Restore")
+    dlg.action.text:SetText("Review backup")
     dlg.action.text:SetTextColor(T.text[1], T.text[2], T.text[3])
     dlg.close.text:SetText(restore and "Cancel" or "Close")
     dlg.close:ClearAllPoints()
@@ -2759,7 +2765,7 @@ local function ShowBackupExport(mode)
 end
 
 local function ShowFullBackupPreview(input, snapshot)
-    dlg.previewInput = input
+    dlg.previewInput, dlg.previewSnapshot = input, snapshot
     dlg:SetSize(560, 254)
     dlg.title:SetText("Restore full character backup")
     dlg.hint:SetText("This will replace this character’s statistics and saved history.")
@@ -2791,7 +2797,8 @@ local function ApplyBackup()
         return
     end
     if ns.IsFullBackup(text) then
-        local snapshot, why = ns.DeserializeFullBackup(text)
+        local snapshot, why = dlg.previewSnapshot
+        if not snapshot then snapshot, why = ns.DeserializeFullBackup(text) end
         if not snapshot then
             SetRestoreInput("|cffd9604aCould not read full backup:|r " .. tostring(why))
             return
@@ -2811,15 +2818,40 @@ local function ApplyBackup()
         end
         ns.Print("Full character backup restored.")
     else
-        local data, why = ns.Deserialize(text)
-        if not data then
-            SetRestoreInput("|cffd9604aCould not read backup:|r " .. tostring(why))
+        local legacy = dlg.previewLegacy
+        if not legacy then
+            local parsed, why = ns.Deserialize(text)
+            local count
+            if parsed then count, why = ns.MergeLegacyBackup(parsed, true) end
+            if count == nil then
+                SetRestoreInput("|cffd9604aCould not review backup:|r " .. tostring(why))
+                return
+            end
+            dlg.previewInput, dlg.previewLegacy = text, { data = parsed, char = ns.char }
+            dlg:SetSize(560, 254)
+            dlg.title:SetText("Merge statistics backup")
+            dlg.hint:SetText("This merges into the current character. It does not replace saved history.")
+            dlg.eb:ClearFocus()
+            dlg.box:Hide()
+            dlg.summary.source:SetText("Format: " .. (text:match("LTS[12]") or "legacy") .. "  ·  Source identity not stored")
+            dlg.summary.saved:SetText("Check that this backup belongs to the intended character.")
+            dlg.summary.counts:SetText(string.format("%d proposed updates before retention limits", count))
+            dlg.summary:Show()
+            dlg.editPaste:Show()
+            dlg.action.text:SetText("Merge statistics")
             return
         end
-        local changed = ns.MergeMax(ns.char, data)
-        ns.InvalidateAccount()
-        ns.Save()
-        ns.Print(string.format("Restore complete. Entries updated: %d.", changed))
+        if legacy.char ~= ns.char then
+            SetRestoreInput("The active character changed. Review the backup again.")
+            return
+        end
+        -- Rebase the merge against current stats; tracking may have continued since review.
+        local changed, why = ns.MergeLegacyBackup(legacy.data)
+        if changed == nil then
+            SetRestoreInput("|cffd9604aCould not merge backup:|r " .. tostring(why))
+            return
+        end
+        ns.Print(string.format("Restore applied in memory. Updates before retention limits: %d.", changed))
     end
     dlg:Hide()
     ns.RefreshWindow()
@@ -2827,9 +2859,11 @@ end
 
 local function CreateDialog()
     dlg = W.Window(UIParent)
+    ns.backupDialog = dlg
     dlg:SetSize(480, 320)
     dlg:SetPoint("CENTER")
     dlg:SetFrameStrata("DIALOG")
+    dlg:SetClampedToScreen(true)
     dlg:EnableMouse(true)
     dlg:SetMovable(true)
     dlg:RegisterForDrag("LeftButton")
@@ -2892,10 +2926,9 @@ local function CreateDialog()
     end)
     dlg.editPaste:Hide()
     dlg:SetScript("OnHide", function()
-        local clear = dlg.mode == "export" or dlg.mode == "restore"
-        dlg.mode, dlg.previewInput = nil, nil
+        dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = nil, nil, nil, nil
         eb:ClearFocus()
-        if clear then eb:SetText("") end
+        eb:SetText("")
     end)
 end
 
@@ -2930,12 +2963,12 @@ function ns.ShowSheet()
     dlg.eb:HighlightText()
 end
 
-function ns.ShowImport()
+function ns.ShowImport(text)
     if not dlg then CreateDialog() end
     SetRestoreInput()
-    dlg.eb:SetText("")
+    dlg.eb:SetText(text or "")
     dlg:Show()
-    dlg.eb:SetFocus()
+    if text then ApplyBackup() else dlg.eb:SetFocus() end
 end
 
 -- ------------------------------------------------------------ share dialog
@@ -2945,6 +2978,7 @@ local function CreateShare()
     sd:SetSize(520, 190)
     sd:SetPoint("CENTER", 0, 120)
     sd:SetFrameStrata("DIALOG")
+    sd:SetClampedToScreen(true)
     sd:EnableMouse(true); sd:SetMovable(true); sd:RegisterForDrag("LeftButton")
     sd:SetScript("OnDragStart", sd.StartMoving); sd:SetScript("OnDragStop", sd.StopMovingOrSizing)
     sd:Hide()

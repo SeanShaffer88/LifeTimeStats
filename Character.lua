@@ -214,6 +214,10 @@ local function FactionStanding(i)
         if ok then return N(standing), isHeader and not hasRep end
     end
 end
+function ns.OnFactionStandings(counts, total)
+    ns.src.reputation = total
+    Max("max_friendly", counts[5]); Max("max_honored", counts[6]); Max("max_revered", counts[7]); Max("max_exalted", counts[8])
+end
 local function ScanReputation()
     if not ns.char then return end
     local numFn = (C_Reputation and C_Reputation.GetNumFactions) or GetNumFactions
@@ -227,11 +231,9 @@ local function ScanReputation()
             for s = 5, 8 do if standing >= s then counts[s] = counts[s] + 1 end end
         end
     end
-    ns.src.reputation = total
-    Max("max_friendly", counts[5]); Max("max_honored", counts[6]); Max("max_revered", counts[7]); Max("max_exalted", counts[8])
+    ns.OnFactionStandings(counts, total)
 end
-On("UPDATE_FACTION", function() if C_Timer then C_Timer.After(1, function() pcall(ScanReputation) end) end end)
-On("PLAYER_ENTERING_WORLD", function() if C_Timer then C_Timer.After(5, function() pcall(ScanReputation) end) end end)
+ns.ScanCharacterReputation = ScanReputation
 
 -- ------------------------------------------------------------ battlegrounds
 -- Called by Trackers when a battleground's winner is known.

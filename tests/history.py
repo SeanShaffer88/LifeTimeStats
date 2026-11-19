@@ -128,6 +128,9 @@ eq(#LifeTimeStatsCharDB.snapshots, 3, "only three kept")
 local jumps = ch.c.jumps or 0
 ch.c.jumps = 0
 SlashCmdList.LIFETIMESTATS("snapshot restore 3")
+eq(ch.c.jumps, 0, "preview does not merge immediately")
+local button = ns.backupDialog.action
+button.scripts.OnClick(button)
 eq(ch.c.jumps, jumps, "restore merges the higher value back")
 SlashCmdList.LIFETIMESTATS("snapshot list")
 SlashCmdList.LIFETIMESTATS("snapshot show 1")
