@@ -54,6 +54,25 @@ ns.ToggleWindow()
 local nw, nh = ns.WindowSize()
 eq(nw, 1140, "the default window is normal")
 ns.ShowPage("combat")
+local frame = LifeTimeStatsWindow
+local preferred = ns.settings.window.scale
+local actual, calls
+calls = 0
+frame.SetScale = function(_, scale) actual = scale; calls = calls + 1 end
+local tick = frame:GetScript("OnUpdate")
+tick(frame, 1)
+eq(calls, 0, "unchanged canvas does not reapply scale")
+UIParent.wdt, UIParent.h = 800, 600
+tick(frame, 1)
+eq(actual < preferred and actual * (nw + 118 + 34 + 12 + 46) <= 800.0001, true, "smaller canvas fits decorated window footprint")
+eq(ns.settings.window.scale, preferred, "temporary fit preserves preferred scale")
+UIParent.wdt, UIParent.h = 1920, 1080
+tick(frame, 1)
+eq(actual, preferred, "larger canvas restores preferred scale")
+ns.settings.window.point, ns.settings.window.x = "LEFT", 123
+SlashCmdList.LIFETIMESTATS("resetwindow")
+eq(ns.settings.window.point, "CENTER", "slash reset restores center anchor")
+eq(ns.settings.window.x, 0, "slash reset clears normal-mode offset")
 normalRows = ns.Page("combat").table.visible
 ''')
 print("normal ok:", normal)

@@ -1,15 +1,22 @@
 """Report global calls and C_ members the WoW Forever client does not have.
 
-Usage: python scripts/api_scan.py <forever_api.json> [addon folder]
+Usage: python scripts/api_scan.py <forever_api.json> [addon folder] [--expect-client LABEL]
 
 forever_api.json is the captured Forever API surface (build 1.60.1.69893) published by
 Thunderz96/forever-addon-kit (MIT): data/forever_api.json. It is not bundled here.
-Every name reported must be guarded or have a C_ fallback in the addon.
+Findings require review: this scanner cannot infer guards, payloads, or runtime behavior.
 """
-import json, re, sys, pathlib
-api = json.load(open(sys.argv[1], encoding="utf-8"))
+import argparse, json, re, pathlib
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("dump", type=pathlib.Path)
+parser.add_argument("addon_folder", type=pathlib.Path, nargs="?", default=pathlib.Path(__file__).resolve().parent.parent)
+parser.add_argument("--expect-client", help="Require an exact match for the capture's client label")
+args = parser.parse_args()
+api = json.loads(args.dump.read_text(encoding="utf-8"))
+if args.expect_client is not None and api.get("client") != args.expect_client:
+    parser.error(f"capture client {api.get('client')!r} does not match {args.expect_client!r}")
 funcs = set(api["functions"]); nsp = api["namespaces"]
-root = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else pathlib.Path(__file__).resolve().parent.parent)
+root = args.addon_folder
 LUA = set("assert error ipairs pairs next pcall xpcall print select tonumber tostring type unpack rawget rawset rawequal setmetatable getmetatable loadstring require collectgarbage".split())
 skipwords = set("function if then else elseif end and or not local return for while do repeat until in nil true false break".split())
 missing, nsmiss = {}, {}

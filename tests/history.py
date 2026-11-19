@@ -256,6 +256,49 @@ ch.quests, ch.skills, ch.deathlog = {}, {}, {}
 eq(ns.RestoreFullBackup(snapB), true, "restore")
 eq(ns.char.skills.Herbalism.r, 75, "skills restored")
 
+-- Preferences are separate, allowlisted and never change without review.
+ns.settings.theme, ns.settings.classColor = "ledger", false
+local savedPrefs = ns.SerializePreferences()
+local prefs = assert(ns.DeserializePreferences(savedPrefs))
+eq(prefs.classColor, false, "false preference round trips")
+eq(prefs.window, nil, "geometry excluded")
+eq(prefs.shotLevel, nil, "screenshot setting excluded")
+eq(ns.DeserializePreferences(savedPrefs .. "x"), nil, "changed preference payload fails checksum")
+ns.settings.theme, ns.settings.classColor = "auto", true
+local position = ns.settings.window
+local record = ns.char
+ns.ShowImport(savedPrefs)
+eq(ns.settings.theme, "auto", "review does not change settings")
+eq(#ns.backupDialog.previewPreferences, 2, "review lists only changed settings")
+ns.settings.theme = "notebook"
+button.scripts.OnClick(button)
+eq(ns.settings.theme, "notebook", "settings changed during preview require fresh confirmation")
+button.scripts.OnClick(button)
+eq(ns.settings.theme, "ledger", "confirmed theme restored")
+eq(ns.settings.classColor, false, "confirmed false restored")
+eq(ns.settings.window, position, "restore leaves window settings intact")
+eq(ns.char, record, "restore leaves character record intact")
 eq(#ns.errors, 0, "no handler errors: " .. table.concat(ns.errors, " | "))
 print("HISTORY PASS: " .. checks .. " assertions")
+''')
+
+# Exercise the active locale at load time, not just catalog entries in isolation.
+german = lua51.LuaRuntime(unpack_returned_tuples=True)
+german.execute((ROOT / "tests/harness.lua").read_text(encoding="utf-8"))
+german.execute('ns = {}; function GetLocale() return "deDE" end')
+for name in (ROOT / "LifeTimeStats.toc").read_text(encoding="utf-8").splitlines():
+    name = name.strip()
+    if name.endswith(".lua"):
+        german.execute((ROOT / name).read_text(encoding="utf-8"), "LifeTimeStats", german.globals().ns)
+german.execute('''
+local frame = ns.frame
+frame.scripts.OnEvent(frame, "ADDON_LOADED", "LifeTimeStats")
+ns.ShowImport()
+assert(ns.backupDialog.action.text:GetText() == "Backup prüfen")
+assert(ns.backupDialog.close.text:GetText() == "Abbrechen")
+assert(ns.backupDialog.title:GetText():find(ns.charKey, 1, true))
+assert(ns.L["Quest history"] == "Quest history", "untranslated keys keep the English fallback")
+ns.ShowExport()
+assert(ns.backupDialog.exportModes.buttons[3].text:GetText() == "Kontoeinstellungen")
+assert(ns.backupDialog.eb:GetText():match("^LTS2|"), "localization does not change the backup format")
 ''')

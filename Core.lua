@@ -947,6 +947,9 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         else
             ns.Print("Usage: /lts minimap [toggle|reset|square|round]")
         end
+    elseif msg == "resetwindow" then
+        ns.ResetWindow()
+        ns.Print("Window centered and fitted to the current UI canvas.")
     elseif cmd == "size" or cmd == "fill" or cmd == "normal" then
         local arg = cmd == "size" and msg:match("^%S+%s+(%S+)") or cmd
         if arg == "fill" or arg == "normal" then
@@ -1017,6 +1020,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
         ns.Print("Commands:")
         ns.Print("/lts - open or close the window")
         ns.Print("/lts settings - open settings")
+        ns.Print("/lts resetwindow - center and fit the window, even when it is hidden")
         ns.Print("/lts size fill|normal - fill the screen or use the normal window size (applies after /reload)")
         ns.Print("/lts minimap - show/hide minimap button · /lts minimap reset · /lts minimap square|round")
         ns.Print("/lts session - reset session counters")

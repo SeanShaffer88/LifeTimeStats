@@ -41,13 +41,21 @@ def files_for_archive(root: Path) -> list[Path]:
             files.append(path)
 
     selected = {p.relative_to(root).as_posix() for p in files}
-    toc_files = re.findall(r"(?m)^\s*([A-Za-z0-9_./\\-]+\.lua)\s*$",
-                           (root / TOC).read_text(encoding="utf-8"))
+    toc_files = [line.strip() for line in (root / TOC).read_text(encoding="utf-8").splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
     missing = [name for name in toc_files
                if PurePosixPath(name.replace("\\", "/")).as_posix() not in selected]
     if missing:
         raise ValueError("TOC references files missing from the package: " + ", ".join(missing))
     required_media = {"Media/icon.tga", "Media/dot.tga"}
+    # Static W.MEDIA literals are case-sensitive archive paths. Dynamic icon
+    # and skin lookups are exercised by their separate runtime fixture suites.
+    for source in files:
+        if source.suffix == ".lua":
+            for literal in re.findall(r'\bW\.MEDIA\s*\.\.\s*"([A-Za-z0-9_./\\-]+)"', source.read_text(encoding="utf-8")):
+                path = literal.replace("\\\\", "/")
+                if not path.endswith("/"):
+                    required_media.add("Media/" + (path if PurePosixPath(path).suffix else path + ".tga"))
     missing_media = sorted(required_media - selected)
     if missing_media:
         raise ValueError("The release archive is missing required Media assets: " + ", ".join(missing_media))

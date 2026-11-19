@@ -31,6 +31,18 @@ for _, e in ipairs(ns.errors) do print("ERR", e) end
 eq(ns.char.c.logins, 1, "login")
 eq(ns.char.c.hk_server, 42, "hk")
 
+-- Synthetic localized format: reordered arguments and a literal percent.
+local pattern = ns.MakePattern("%2$d Stück: %1$s (100%%)")
+local captures = ns.Match(pattern, "7 Stück: Testgegenstand (100%)")
+eq(captures[1], "Testgegenstand", "reordered localized text capture")
+eq(captures[2], "7", "reordered localized quantity capture")
+eq(ns.MakePattern("unsupported %f"), nil, "unsupported placeholder declines matching")
+eq(ns.Match(ns.MakePattern("%1$s/%1$s"), "a/b"), nil, "repeated argument must agree")
+
+local oldQuestChat = ns.src.questChat
+ns.src.questChat = 1
+eq(ns.StatSource({ key = "quests_done" }):find("fallback was used", 1, true) ~= nil, true, "quest source reports a fallback")
+ns.src.questChat = oldQuestChat
 -- movement: 10 s at 7 yd/s on foot
 state.speed = 7
 for i = 1, 40 do NOW = NOW + 0.25; ticker.scripts.OnUpdate(ticker, 0.25) end
