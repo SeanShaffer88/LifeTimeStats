@@ -244,6 +244,13 @@ local _, _, emptyCount = ns.ExportCSV("deaths")
 eq(emptyCount, 0, "malformed history list exports header only")
 ch.deathlog = deathsBefore
 
+eq(ns.CSVField(math.huge, true), "", "CSV omits nonfinite cell")
+eq(ns.CSVField({}, true), "", "CSV omits malformed table cell")
+local secretCheck = ns.IsSecret
+ns.IsSecret = function(value) return value == "hidden" end
+eq(ns.CSVField("hidden", true), "", "CSV omits restricted cell")
+ns.IsSecret = secretCheck
+
 -- ------------------------------------------------------------ locale
 eq(ns.L["Quest history"], "Quest history", "missing translations fall back to English")
 

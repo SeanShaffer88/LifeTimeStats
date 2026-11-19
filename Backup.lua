@@ -118,7 +118,8 @@ function ns.Deserialize(str, progress)
         if not path then return nil, "malformed entry" end
         local val = ParseValue(raw)
         if val == nil or (type(val) == "string" and not LegacyString(val)) then return nil, "malformed value" end
-        local a, b, c = path:match("^([^%.]+)%.([^%.]+)%.?([^%.]*)$")
+        local a, b, c = path:match("^([^%.]+)%.([^%.]+)%.([^%.]+)$")
+        if not a then a, b = path:match("^([^%.]+)%.([^%.]+)$"); c = "" end
         if b then b, c = Unesc(b), Unesc(c) end
         if not b or b == "" or not LegacyString(b) or not LegacyString(c) then return nil, "malformed key" end
         if IS_FLAT[a] and c == "" then

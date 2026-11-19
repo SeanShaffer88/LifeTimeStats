@@ -16,7 +16,21 @@ local function Gold(cp)
     return neg and ("-" .. out) or out
 end
 local function Yd(y) return y >= 1760 and string.format("%.1f mi", y / 1760) or (Int(y) .. " yd") end
-local function Strip(s) return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|", "")) end
+local function Strip(s)
+    return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|", "")
+        :gsub("[%z\1-\31\127]+", " "):match("^%s*(.-)%s*$"))
+end
+
+local function CutUTF8(text, limit)
+    if #text <= limit then return text end
+    local boundary = limit + 1
+    while boundary > 1 do
+        local byte = text:byte(boundary)
+        if byte < 128 or byte >= 192 then break end
+        boundary = boundary - 1
+    end
+    return text:sub(1, boundary - 1)
+end
 
 local TOPICS = {}
 TOPICS.dashboard = function(v)
@@ -85,30 +99,38 @@ function ns.ShareText(topic, view)
     local ok, body = pcall(fn, view)
     if not ok then body = TOPICS.dashboard(ns.char) end
     local s = Strip("[LifeTimeStats] " .. who .. ": " .. body)
-    if #s > MAX then s = s:sub(1, MAX - 3) .. "..." end
+    if #s > MAX then s = CutUTF8(s, MAX - 3) .. "..." end
     return s
 end
 
 -- Channels the player can actually use right now.
 function ns.ShareChannels()
     local list = { { "SAY", "Say" } }
-    if IsInGroup and IsInGroup() then list[#list + 1] = { "PARTY", "Party" } end
-    if IsInRaid and IsInRaid() then list[#list + 1] = { "RAID", "Raid" } end
-    if IsInGuild and IsInGuild() then list[#list + 1] = { "GUILD", "Guild" } end
-    if IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then list[#list + 1] = { "INSTANCE_CHAT", "Instance" } end
+    if IsInGroup and ns.Bool(IsInGroup()) then list[#list + 1] = { "PARTY", "Party" } end
+    if IsInRaid and ns.Bool(IsInRaid()) then list[#list + 1] = { "RAID", "Raid" } end
+    if IsInGuild and ns.Bool(IsInGuild()) then list[#list + 1] = { "GUILD", "Guild" } end
+    if IsInGroup and LE_PARTY_CATEGORY_INSTANCE and ns.Bool(IsInGroup(LE_PARTY_CATEGORY_INSTANCE)) then list[#list + 1] = { "INSTANCE_CHAT", "Instance" } end
     return list
 end
 
 local ALIASES = { s = "SAY", say = "SAY", p = "PARTY", party = "PARTY", r = "RAID", raid = "RAID", g = "GUILD", guild = "GUILD", i = "INSTANCE_CHAT", instance = "INSTANCE_CHAT" }
 
 local function Send(text, channel)
-    text = Strip(text or "")
+    if type(text) ~= "string" or ns.IsSecret(text) then return false end
+    text = CutUTF8(Strip(text), 255)
     if text == "" then return false end
-    if #text > 255 then text = text:sub(1, 255) end
+    local available = false
+    for _, entry in ipairs(ns.ShareChannels()) do
+        if entry[1] == channel then available = true; break end
+    end
+    if not available then ns.Print("That chat channel is no longer available."); return false end
     local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
     if not send then return false end
-    local ok, err = pcall(send, text, channel)
-    if not ok then ns.Print("Could not post to " .. channel:lower() .. ": " .. tostring(err)) return false end
+    local ok, result = pcall(send, text, channel)
+    if not ok or result == false then
+        ns.Print("Could not post to " .. channel:lower() .. (not ok and (": " .. tostring(result)) or "."))
+        return false
+    end
     ns.Add("shares")
     return true
 end
@@ -116,7 +138,11 @@ ns.ShareSend = Send
 
 -- /lts share [channel] [topic]   e.g. /lts share p deaths
 function ns.ShareCommand(args)
-    local a, b = (args or ""):match("^(%S*)%s*(%S*)")
+    local a, b = (args or ""):match("^%s*(%S*)%s*(%S*)%s*$")
+    if not a or (b ~= "" and not ALIASES[a:lower()]) then
+        ns.Print("Usage: /lts share [channel] [topic]")
+        return
+    end
     local channel = ALIASES[(a or ""):lower()]
     local topic = channel and b or a
     topic = (topic and topic ~= "") and topic:lower() or "summary"

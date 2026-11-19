@@ -119,7 +119,8 @@ ns.errors = {}
 local lastErr, lastErrCount = nil, 0
 function ns.LogError(where, err)
     local e = ns.errors
-    local msg = tostring(where) .. ": " .. tostring(err)
+    local msg = tostring(where) .. ": " .. (ns.IsSecret(err) and "unreadable error" or tostring(err))
+    if #msg > 2048 then msg = msg:sub(1, 2048) .. "…" end
     if msg == lastErr then
         lastErrCount = lastErrCount + 1
         e[#e] = date("%H:%M:%S") .. " " .. msg .. " (x" .. lastErrCount .. ")"
@@ -186,11 +187,20 @@ local function Ensure(rec)
     for _, k in ipairs(SECTIONS) do
         if type(rec[k]) ~= "table" then rec[k] = {} end
     end
+    for set in pairs(rec.un) do
+        if type(rec.u[set]) ~= "table" then rec.un[set] = nil end
+    end
     for set, t in pairs(rec.u) do
-        local n, numeric = 0, nil
-        if type(t) == "table" then
-            for key in pairs(t) do
-                if type(key) == "number" then
+        if type(set) ~= "string" or set == "" or type(t) ~= "table" then
+            rec.u[set], rec.un[set] = nil, nil
+        else
+            local n, numeric = 0, nil
+            for key, value in pairs(t) do
+                local kind = type(key)
+                if not value or (kind ~= "string" and kind ~= "number") or key == ""
+                    or (kind == "number" and (key == math.huge or key == -math.huge)) then
+                    t[key] = nil
+                elseif kind == "number" then
                     numeric = numeric or {}
                     numeric[#numeric + 1] = key
                 else
@@ -204,10 +214,8 @@ local function Ensure(rec)
                     t[key], t[canonical] = nil, true
                 end
             end
-        else
-            rec.u[set] = nil
+            rec.un[set] = n
         end
-        rec.un[set] = n
     end
     return rec
 end
@@ -504,19 +512,28 @@ function ns.AddRecordHistory(rec, key, value, label, direction)
     return event
 end
 
+local function StatKey(key)
+    return type(key) == "string" and not ns.IsSecret(key) and key ~= ""
+end
+
+local function CounterValue(value)
+    return not ns.IsSecret(value) and not Bad(value) and value or 0
+end
+
 function ns.Add(key, n)
     n = n or 1
     local ch = ns.char
-    if not ch or ns.IsSecret(n) or ns.IsSecret(key) or n == 0 or Bad(n) or key == nil then return end
-    local old = ch.c[key] or 0
+    if not ch or not StatKey(key) or ns.IsSecret(n) or n == 0 or Bad(n) then return end
+    local old = CounterValue(ch.c[key])
     local new = old + n
-    ch.c[key] = new
     local s = ns.session.c
-    s[key] = (s[key] or 0) + n
     local d = ns.Today()
     local day = ch.days[d]
-    if not day then day = {}; ch.days[d] = day end
-    day[key] = (day[key] or 0) + n
+    local sessionValue = CounterValue(s[key]) + n
+    local dayValue = CounterValue(type(day) == "table" and day[key]) + n
+    if Bad(new) or Bad(sessionValue) or Bad(dayValue) then return end
+    if type(day) ~= "table" then day = {}; ch.days[d] = day end
+    ch.c[key], s[key], day[key] = new, sessionValue, dayValue
     if ns.settings.milestones and ns.milestoneKeys and ns.milestoneKeys[key] then
         for i = 1, #milestoneSteps do
             local m = milestoneSteps[i]
@@ -530,23 +547,23 @@ end
 -- ns.quietRecords: the value still updates, but no history entry or Journal moment is made.
 -- Used while a running interval grows, so one long stretch is one record, not one every 10 s.
 function ns.Max(key, v, label)
-    if not ns.char or ns.IsSecret(v) or Bad(v) then return end
+    if not ns.char or not StatKey(key) or ns.IsSecret(v) or Bad(v) then return end
     if ns.IsSecret(label) then label = nil end
     local r = ns.char.r
     local improved = false
-    if v > (r[key] or 0) then
+    if v > CounterValue(r[key]) then
         r[key] = v
         improved = true
-        if label then r[key .. "_what"] = tostring(label) end
+        r[key .. "_what"] = label and tostring(label) or nil
         if not ns.quietRecords then
             local event = ns.AddRecordHistory(ns.char, key, v, label, "max")
             if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
         end
     end
     local s = ns.session.r
-    if v > (s[key] or 0) then
+    if v > CounterValue(s[key]) then
         s[key] = v
-        if label then s[key .. "_what"] = tostring(label) end
+        s[key .. "_what"] = label and tostring(label) or nil
         if not ns.quietRecords then ns.AddRecordHistory(ns.session, key, v, label, "max") end
     end
     return improved
@@ -554,11 +571,11 @@ end
 
 -- Fastest / shortest records: lower is better.
 function ns.Min(key, v, label)
-    if not ns.char or ns.IsSecret(v) or Bad(v) or v <= 0 then return end
+    if not ns.char or not StatKey(key) or ns.IsSecret(v) or Bad(v) or v <= 0 then return end
     if ns.IsSecret(label) then label = nil end
     local lifetime, session = ns.char, ns.session
     local cur = lifetime.f[key]
-    if not cur or v < cur then
+    if CounterValue(cur) <= 0 or v < cur then
         lifetime.f[key] = v
         lifetime.fw[key] = label and tostring(label) or nil
         lifetime.fd[key] = time()
@@ -566,7 +583,7 @@ function ns.Min(key, v, label)
         if event and ns.RecordMoment then pcall(ns.RecordMoment, event) end
     end
     cur = session.f[key]
-    if not cur or v < cur then
+    if CounterValue(cur) <= 0 or v < cur then
         session.f[key] = v
         session.fw[key] = label and tostring(label) or nil
         session.fd[key] = time()
@@ -575,7 +592,7 @@ function ns.Min(key, v, label)
 end
 
 function ns.First(key, label, eventZone)
-    if not ns.char then return end
+    if not ns.char or not StatKey(key) then return end
     if ns.IsSecret(label) then label = nil end
     local ch = ns.char
     if ch.first[key] then return end
@@ -592,17 +609,18 @@ end
 local UNIQUE_CAP = 20000
 ns.UNIQUE_CAP = UNIQUE_CAP
 function ns.Unique(set, key)
-    if not ns.char or key == nil or ns.IsSecret(key) or key == "" then return false end
+    if not ns.char or not StatKey(set) or ns.IsSecret(key) then return false end
+    if not StatKey(key) and Bad(key) then return false end
     key = ns.UniqueKey(key)
     local ch = ns.char
     local u = ch.u[set]
-    if not u then u = {}; ch.u[set] = u end
+    if type(u) ~= "table" then u = {}; ch.u[set], ch.un[set] = u, 0 end
     if u[key] then return false end
-    if (ch.un[set] or 0) >= UNIQUE_CAP then return false end
+    if CounterValue(ch.un[set]) >= UNIQUE_CAP then return false end
     u[key] = true
-    ch.un[set] = (ch.un[set] or 0) + 1
+    ch.un[set] = CounterValue(ch.un[set]) + 1
     local s = ns.session
-    s.un[set] = (s.un[set] or 0) + 1
+    s.un[set] = CounterValue(s.un[set]) + 1
     return true
 end
 
@@ -622,18 +640,20 @@ local function AddTally(bucket, name, n)
         end
         tallySizes[bucket] = size + 1
     end
-    bucket[name] = (bucket[name] or 0) + n
+    local value = CounterValue(bucket[name]) + n
+    if not Bad(value) then bucket[name] = value end
 end
 
 function ns.Tally(tbl, name, n)
-    if not ns.char or not name or ns.IsSecret(name) or ns.IsSecret(n) or name == "" then return end
+    if not ns.char or not StatKey(tbl) or ns.IsSecret(name) or ns.IsSecret(n) then return end
+    if not StatKey(name) and Bad(name) then return end
     n = n or 1
     if Bad(n) then return end
     local t = ns.char.t[tbl]
-    if not t then t = {}; ns.char.t[tbl] = t end
+    if type(t) ~= "table" then t = {}; ns.char.t[tbl] = t end
     AddTally(t, name, n)
     local st = ns.session.t[tbl]
-    if not st then st = {}; ns.session.t[tbl] = st end
+    if type(st) ~= "table" then st = {}; ns.session.t[tbl] = st end
     AddTally(st, name, n)
 end
 
@@ -676,56 +696,84 @@ function ns.RollUpDays(rec)
 end
 
 -- Total of a counter for one month ("YYYYMM"): folded monthly total plus the days still kept.
+local function MonthBucket(view, field)
+    local value = view and view[field]
+    return type(value) == "table" and value or nil
+end
+
+local function AddMonthValue(old, value)
+    old = CounterValue(old)
+    local sum = old + CounterValue(value)
+    return Bad(sum) and old or sum
+end
+
+local function AddMonthBucket(out, source)
+    if type(source) ~= "table" then return end
+    for key, value in pairs(source) do
+        if not ns.IsSecret(value) and not Bad(value) then out[key] = AddMonthValue(out[key], value) end
+    end
+end
+
 function ns.MonthTotal(view, key, month)
-    local total = 0
-    local folded = view and view.months and view.months[month]
-    if folded and type(folded[key]) == "number" then total = folded[key] end
-    for d, day in pairs((view and view.days) or {}) do
-        if type(d) == "string" and d:sub(1, 6) == month and type(day[key]) == "number" then total = total + day[key] end
+    local months = MonthBucket(view, "months")
+    local folded = months and months[month]
+    local total = CounterValue(type(folded) == "table" and folded[key])
+    for d, day in pairs(MonthBucket(view, "days") or {}) do
+        if type(d) == "string" and d:sub(1, 6) == month and type(day) == "table" then
+            total = AddMonthValue(total, day[key])
+        end
     end
     return total
 end
 
--- Every counter for one month: the folded total plus the days still kept.
 function ns.MonthRecord(view, month)
-    local out = {}
-    local folded = view and view.months and view.months[month]
-    if type(folded) == "table" then
-        for k, n in pairs(folded) do if type(n) == "number" then out[k] = n end end
-    end
-    for d, day in pairs((view and view.days) or {}) do
-        if type(d) == "string" and d:sub(1, 6) == month and type(day) == "table" then
-            for k, n in pairs(day) do if type(n) == "number" then out[k] = (out[k] or 0) + n end end
-        end
+    local out, months = {}, MonthBucket(view, "months")
+    AddMonthBucket(out, months and months[month])
+    for d, day in pairs(MonthBucket(view, "days") or {}) do
+        if type(d) == "string" and d:sub(1, 6) == month then AddMonthBucket(out, day) end
     end
     return out
 end
 
--- The last n months as { m = "YYYYMM", v = record } (oldest first, current month last).
+local function MonthKeys(n)
+    local out, now = {}, time()
+    local y, m = tonumber(date("%Y", now)), tonumber(date("%m", now))
+    for i = n - 1, 0, -1 do
+        local index = y * 12 + m - 1 - i
+        out[#out + 1] = string.format("%04d%02d", math.floor(index / 12), index % 12 + 1)
+    end
+    return out
+end
+
+-- Fold retained days into every requested month in a single traversal.
 function ns.MonthRecords(view, n)
-    local out = {}
-    local y, m = tonumber(date("%Y")), tonumber(date("%m"))
-    for i = n - 1, 0, -1 do
-        local mm, yy = m - i, y
-        while mm < 1 do mm = mm + 12; yy = yy - 1 end
-        local k = string.format("%04d%02d", yy, mm)
-        out[#out + 1] = { m = k, v = ns.MonthRecord(view, k) }
+    local out, byMonth, months = {}, {}, MonthBucket(view, "months")
+    for i, key in ipairs(MonthKeys(n)) do
+        local row = {}
+        AddMonthBucket(row, months and months[key])
+        out[i], byMonth[key] = { m = key, v = row }, row
+    end
+    for d, day in pairs(MonthBucket(view, "days") or {}) do
+        local row = type(d) == "string" and byMonth[d:sub(1, 6)]
+        if row then AddMonthBucket(row, day) end
     end
     return out
 end
 
--- Monthly series for the last n months (oldest first), including the current month.
 function ns.MonthSeries(view, key, n)
-    local out = {}
-    local y, m = tonumber(date("%Y")), tonumber(date("%m"))
-    for i = n - 1, 0, -1 do
-        local mm, yy = m - i, y
-        while mm < 1 do mm = mm + 12; yy = yy - 1 end
-        local k = string.format("%04d%02d", yy, mm)
-        out[#out + 1] = { m = k, v = ns.MonthTotal(view, key, k) }
+    local out, byMonth, months = {}, {}, MonthBucket(view, "months")
+    for i, month in ipairs(MonthKeys(n)) do
+        local folded = months and months[month]
+        local row = { m = month, v = CounterValue(type(folded) == "table" and folded[key]) }
+        out[i], byMonth[month] = row, row
+    end
+    for d, day in pairs(MonthBucket(view, "days") or {}) do
+        local row = type(d) == "string" and byMonth[d:sub(1, 6)]
+        if row and type(day) == "table" then row.v = AddMonthValue(row.v, day[key]) end
     end
     return out
 end
+
 function ns.TrimTallyBuckets(rec)
     for _, bucket in pairs(rec.t) do
         if type(bucket) == "table" then
