@@ -97,13 +97,19 @@ function ns.ShouldRegister(event)
     return true
 end
 
+ns.eventStatus = {}
 function ns.On(event, fn)
     local list = ns.events[event]
     if not list then
         list = {}
         ns.events[event] = list
         -- Some events may not exist on every client build; never let that break load.
-        if ns.ShouldRegister(event) then pcall(frame.RegisterEvent, frame, event) end
+        if ns.ShouldRegister(event) then
+            local ok, result = pcall(frame.RegisterEvent, frame, event)
+            ns.eventStatus[event] = ok and result ~= false and "registered" or "rejected"
+        else
+            ns.eventStatus[event] = "restricted"
+        end
     end
     list[#list + 1] = fn
 end
@@ -219,10 +225,61 @@ local function NewSession(rec)
 end
 ns.session = NewSession()
 
+local function Revision(value)
+    if value == nil then return 0 end
+    if type(value) == "number" and value >= 0 and value < 9007199254740991 and value == math.floor(value) then
+        return value
+    end
+end
+
+local function RecoveryCandidate(rec, name, realm)
+    if not Valid(rec) or not Revision(rec.meta.rev) then return false end
+    if rec.meta.name and name and rec.meta.name ~= name then return false end
+    if rec.meta.realm and rec.meta.realm ~= realm then return false end
+    for _, bucket in pairs(rec.t) do
+        if type(bucket) ~= "table" then return false end
+        for _, n in pairs(bucket) do
+            if type(n) ~= "number" or n ~= n or math.abs(n) == math.huge then return false end
+        end
+    end
+    return true
+end
+
+-- Keep one detached generation of the record that successfully loaded, not a
+-- second reference to the live table. This budget bounds the additional copy;
+-- it is an estimate, not the size of WoW's serialized file.
+local RECOVERY_BYTES, RECOVERY_NODES = 2 * 1024 * 1024, 50000
+local function CopyRecoveryRecord(rec)
+    local bytes, nodes, active = 0, 0, {}
+    local function Copy(value, depth)
+        local kind = type(value)
+        if kind == "string" or kind == "number" or kind == "boolean" then return value end
+        if kind ~= "table" or depth > 12 or active[value] or getmetatable(value) then error("invalid recovery data", 0) end
+        active[value] = true
+        local result = {}
+        for key, item in pairs(value) do
+            local kt = type(key)
+            if kt ~= "string" and kt ~= "number" and kt ~= "boolean" then error("invalid recovery key", 0) end
+            nodes = nodes + 1
+            bytes = bytes + 24 + (kt == "string" and #key or 0) + (type(item) == "string" and #item or 0)
+            if bytes > RECOVERY_BYTES or nodes > RECOVERY_NODES then error("recovery budget exceeded", 0) end
+            result[key] = Copy(item, depth + 1)
+        end
+        active[value] = nil
+        return result
+    end
+    local ok, copy = pcall(Copy, rec, 0)
+    if ok then return copy end
+end
+
 function ns.InitDB()
     if type(LifeTimeStatsDB) ~= "table" then LifeTimeStatsDB = {} end
     local db = LifeTimeStatsDB
-    db.schema = 2
+    local schema = db.schema
+    if type(schema) == "number" and schema > 2 then
+        ns.Print("This save was written by a newer LifeTimeStats version. Install that version to use it.")
+        return
+    end
     if type(db.settings) ~= "table" then db.settings = {} end
     CopyDefaults(DEFAULTS, db.settings)
     if type(db.chars) ~= "table" then db.chars = {} end
@@ -237,21 +294,33 @@ function ns.InitDB()
     -- not wipe lifetime totals.
     local primary = db.chars[ns.charKey]
     local backup = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.data or nil
-    if not Valid(primary) then primary = nil end
-    if not Valid(backup) then backup = nil end
+    ns.restoredFromBackup = nil
+    if not RecoveryCandidate(primary, name, realm) then primary = nil end
+    if not RecoveryCandidate(backup, name, realm) then backup = nil end
     local rec
     if primary and backup then
-        rec = ((backup.meta.rev or 0) > (primary.meta.rev or 0)) and backup or primary
+        rec = (Revision(backup.meta.rev) > Revision(primary.meta.rev)) and backup or primary
         if rec == backup and rec ~= primary then ns.restoredFromBackup = true end
     else
         rec = primary or backup
         if rec == backup and backup then ns.restoredFromBackup = true end
     end
-    if not rec then rec = NewCharRecord() end
+    local charDB = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB or {}
+    local previous = charDB.previousGood
+    if not rec and RecoveryCandidate(previous, name, realm) then
+        rec = CopyRecoveryRecord(previous)
+        if rec then ns.restoredFromBackup = true end
+    end
+    if rec then
+        local generation = CopyRecoveryRecord(rec)
+        if generation then charDB.previousGood = generation end
+    else
+        rec = NewCharRecord()
+    end
     Ensure(rec)
     for _, other in pairs(db.chars) do if Valid(other) then Ensure(other) end end
     db.chars[ns.charKey] = rec
-    if type(LifeTimeStatsCharDB) ~= "table" then LifeTimeStatsCharDB = {} end
+    LifeTimeStatsCharDB = charDB
     LifeTimeStatsCharDB.data = rec
 
     -- Session survives /reload: restored here, reset on a real login (PLAYER_ENTERING_WORLD isLogin).
@@ -288,6 +357,7 @@ function ns.InitDB()
     meta.level = UnitLevel("player")
     meta.created = meta.created or time()
     ns.char = rec
+    db.schema = 2
 end
 
 local function RecapText(c, elapsed, top)
@@ -325,7 +395,7 @@ function ns.Save()
             elapsed = GetTime() - s.start, savedAt = time(),
             fightCorrelation = ns.SaveFightCorrelation and ns.SaveFightCorrelation() }
     end
-    ns.char.meta.rev = (ns.char.meta.rev or 0) + 1
+    ns.char.meta.rev = (Revision(ns.char.meta.rev) or 0) + 1
     ns.char.meta.saved = time()
     ns.char.meta.level = UnitLevel("player")
     if type(LifeTimeStatsCharDB) == "table" then LifeTimeStatsCharDB.data = ns.char end
@@ -532,20 +602,38 @@ function ns.Unique(set, key)
     return true
 end
 
+local TALLY_CAP, DAY_KEEP = 400, 40
+local tallySizes = setmetatable({}, { __mode = "k" })
+
+local function AddTally(bucket, name, n)
+    if bucket[name] == nil then
+        local size = tallySizes[bucket]
+        if not size then
+            size = 0
+            for _ in pairs(bucket) do size = size + 1 end
+        end
+        if size >= TALLY_CAP then
+            tallySizes[bucket] = size
+            return
+        end
+        tallySizes[bucket] = size + 1
+    end
+    bucket[name] = (bucket[name] or 0) + n
+end
+
 function ns.Tally(tbl, name, n)
     if not ns.char or not name or ns.IsSecret(name) or ns.IsSecret(n) or name == "" then return end
     n = n or 1
     if Bad(n) then return end
     local t = ns.char.t[tbl]
     if not t then t = {}; ns.char.t[tbl] = t end
-    t[name] = (t[name] or 0) + n
+    AddTally(t, name, n)
     local st = ns.session.t[tbl]
     if not st then st = {}; ns.session.t[tbl] = st end
-    st[name] = (st[name] or 0) + n
+    AddTally(st, name, n)
 end
 
--- Keep tally tables and day history bounded (performance + SavedVariables size).
-local TALLY_CAP, DAY_KEEP = 400, 40
+-- Keep day history bounded (performance + SavedVariables size).
 ns.DAY_KEEP = DAY_KEEP
 
 -- Days older than the newest DAY_KEEP are folded into monthly totals instead of being
@@ -634,7 +722,7 @@ function ns.MonthSeries(view, key, n)
     end
     return out
 end
-function ns.PruneTallies(rec)
+function ns.TrimTallyBuckets(rec)
     for _, t in pairs(rec.t) do
         if type(t) == "table" then
             local n, list = 0, {}
@@ -642,9 +730,14 @@ function ns.PruneTallies(rec)
             if n > TALLY_CAP then
                 table.sort(list, function(a, b) return a[2] > b[2] end)
                 for i = TALLY_CAP + 1, n do t[list[i][1]] = nil end
+                tallySizes[t] = TALLY_CAP
             end
         end
     end
+end
+
+function ns.PruneTallies(rec)
+    ns.TrimTallyBuckets(rec)
     ns.RollUpDays(rec)
     rec.qa = rec.qa or {}
     local cutoff = time() - 30 * 86400
@@ -655,10 +748,10 @@ end
 local EMPTY = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {} }
 
 local function MergeAccount()
+    local empty = {}
     local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {}, ach = {}, achr = {}, meta = {}, rh = {}, bestiary = {} }
     for _, rec in pairs(ns.db.chars) do
         if Valid(rec) then
-            Ensure(rec)
             for k, n in pairs(rec.c) do
                 if type(n) == "number" then v.c[k] = (v.c[k] or 0) + n end
             end
@@ -673,32 +766,33 @@ local function MergeAccount()
                 v.t[tn] = dst
                 for k, n in pairs(t) do dst[k] = (dst[k] or 0) + n end
             end
-            for set, t in pairs(rec.u) do
+            for set, t in pairs(type(rec.u) == "table" and rec.u or empty) do
                 local dst = v.u[set] or {}
                 v.u[set] = dst
-                for k in pairs(t) do
+                for k in pairs(type(t) == "table" and t or empty) do
+                    k = ns.UniqueKey(k)
                     if not dst[k] then dst[k] = true; v.un[set] = (v.un[set] or 0) + 1 end
                 end
             end
-            for k, n in pairs(rec.f) do
+            for k, n in pairs(type(rec.f) == "table" and rec.f or empty) do
                 if not v.f[k] or n < v.f[k] then
-                    v.f[k], v.fw[k], v.fd[k] = n, rec.fw[k], rec.fd[k]
+                    v.f[k], v.fw[k], v.fd[k] = n, (rec.fw or empty)[k], (rec.fd or empty)[k]
                 end
             end
-            for k, when in pairs(rec.firstd) do
+            for k, when in pairs(type(rec.firstd) == "table" and rec.firstd or empty) do
                 if not v.firstd[k] or when < v.firstd[k] then
-                    v.firstd[k], v.first[k] = when, rec.first[k]
+                    v.firstd[k], v.first[k] = when, (rec.first or empty)[k]
                 end
             end
-            for k, when in pairs(rec.ach) do
+            for k, when in pairs(type(rec.ach) == "table" and rec.ach or empty) do
                 if not v.ach[k] or when < v.ach[k] then v.ach[k] = when end
             end
-            for d, day in pairs(rec.days) do
+            for d, day in pairs(type(rec.days) == "table" and rec.days or empty) do
                 local dst = v.days[d] or {}
                 v.days[d] = dst
                 for k, n in pairs(day) do dst[k] = (dst[k] or 0) + n end
             end
-            for name, e in pairs(rec.bestiary) do
+            for name, e in pairs(type(rec.bestiary) == "table" and rec.bestiary or empty) do
                 if type(e) == "table" and type(e.k) == "number" then
                     local dst = v.bestiary[name]
                     if not dst then
@@ -711,7 +805,7 @@ local function MergeAccount()
                     end
                 end
             end
-            for m, month in pairs(rec.months) do
+            for m, month in pairs(type(rec.months) == "table" and rec.months or empty) do
                 local dst = v.months[m] or {}
                 v.months[m] = dst
                 for k, n in pairs(month) do if type(n) == "number" then dst[k] = (dst[k] or 0) + n end end
@@ -796,6 +890,7 @@ end
 ns.On("ADDON_LOADED", function(_, name)
     if name ~= ADDON then return end
     ns.InitDB()
+    if not ns.char then return end
     if ns.ApplyTheme then ns.ApplyTheme() else ns.ApplyAccent() end
     if ns.OnInit then ns.OnInit() end
 end)
@@ -830,13 +925,14 @@ SLASH_LIFETIMESTATS1 = "/lts"
 SLASH_LIFETIMESTATS2 = "/lifetimestats"
 SlashCmdList.LIFETIMESTATS = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")
+    if not ns.char then ns.Print("Character data is not available."); return end
     local cmd = msg:match("^(%S*)")
     if cmd == "" or cmd == "show" then
         ns.ToggleWindow()
     elseif cmd == "settings" or cmd == "options" or cmd == "config" then
         ns.OpenOptions()
     elseif cmd == "minimap" then
-        local arg = msg:match("^%S+%s+(%S+)")
+        local arg = msg:match("^%S+%s+(.+)$")
         if arg == "reset" then
             ns.ResetMinimapButton()
             ns.Print("Minimap button shown again at the bottom-left of the minimap.")
@@ -844,10 +940,12 @@ SlashCmdList.LIFETIMESTATS = function(msg)
             ns.settings.minimap.square = arg == "square"
             ns.UpdateMinimapButton()
             ns.Print("Minimap button placed for a " .. arg .. " minimap.")
-        else
+        elseif not arg or arg == "toggle" then
             ns.settings.minimap.hide = not ns.settings.minimap.hide
             ns.UpdateMinimapButton()
             ns.Print("Minimap button " .. (ns.settings.minimap.hide and "hidden" or "shown") .. ". /lts minimap reset brings it back; /lts minimap square or round sets the shape.")
+        else
+            ns.Print("Usage: /lts minimap [toggle|reset|square|round]")
         end
     elseif cmd == "size" or cmd == "fill" or cmd == "normal" then
         local arg = cmd == "size" and msg:match("^%S+%s+(%S+)") or cmd
@@ -941,6 +1039,12 @@ function ns.PrintDebug()
     local src = ns.src
     local function yn(v) return v and (ns.GREEN .. "yes|r") or (ns.GREY .. "no|r") end
     ns.Print("Data sources this session:")
+    local unavailable = {}
+    for event, status in pairs(ns.eventStatus) do
+        if status ~= "registered" then unavailable[#unavailable + 1] = event .. " (" .. status .. ")" end
+    end
+    table.sort(unavailable)
+    if #unavailable > 0 then ns.Print("  Events not registered: " .. table.concat(unavailable, ", ")) end
     ns.Print("  Combat log events: " .. (src.cleu or 0) .. (ns.CombatLogRestricted() and "  (not registered: Forever forbids it for addons)" or ""))
     ns.Print("  Kills from XP messages: " .. (src.xpKills or 0) .. " · from watched units: " .. (src.unitKills or 0) .. " · honor kills: " .. (src.honorKills or 0) .. " · critters: " .. (src.critterKills or 0))
     ns.Print("  UNIT_COMBAT on you: " .. (src.ucPlayer or 0) .. " · on your target: " .. (src.ucTarget or 0) .. " (target only counted while solo)")

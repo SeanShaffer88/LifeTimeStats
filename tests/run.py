@@ -242,6 +242,28 @@ LifeTimeStatsDB.chars["Forever-Malikor"] = nil  -- simulate lost account file
 ns.InitDB()
 eq(ns.char.meta.rev, rev, "restored from char backup")
 eq(ns.restoredFromBackup, true, "flag restore")
+local intact = ns.char
+local badPrimary = ns.NewCharRecord()
+badPrimary.meta.rev = "broken"
+LifeTimeStatsDB.chars[ns.charKey] = badPrimary
+ns.InitDB()
+eq(ns.char, intact, "malformed primary revision does not displace healthy mirror")
+local badMirror = ns.NewCharRecord()
+badMirror.meta.rev = rev + 10
+badMirror.t.creatures = { Boar = "broken" }
+LifeTimeStatsCharDB.data = badMirror
+ns.InitDB()
+eq(ns.char, intact, "higher mirror revision does not override healthy tally data")
+
+local checkpoint = LifeTimeStatsCharDB.previousGood
+local initialJumps = intact.c.jumps
+intact.c.jumps = initialJumps + 1
+eq(checkpoint.c.jumps, initialJumps, "recovery generation is detached from live stats")
+LifeTimeStatsDB.chars[ns.charKey] = badPrimary
+LifeTimeStatsCharDB.data = badMirror
+ns.InitDB()
+eq(ns.char.c.jumps, initialJumps, "recover previous generation when both current copies fail")
+eq(ns.char == checkpoint, false, "recovery does not alias its saved input")
 
 -- ===== v1.2 hardening =====
 -- help page + reset window
@@ -268,17 +290,31 @@ eq(ns.session.c.jumps, sessJ, "reload keeps session")
 fire("PLAYER_ENTERING_WORLD", true, false)
 eq(ns.session.c.jumps, nil, "real login resets session")
 eq(ns.session.c.logins, 1, "login counted after reset")
--- migration: a 1.0 record (only meta/c/r/t) upgrades in place
+-- Aggregating a legacy record is read-only; initialization handles migration.
 LifeTimeStatsDB.chars["Forever-Oldtimer"] = { meta = { rev = 3, name = "Oldtimer" }, c = { jumps = 500, kills_npc = 20 }, r = { max_hit = 99 }, t = { creatures = { Boar = 20 } } }
 ns.InvalidateAccount()
 local acc2 = ns.GetView("account", "lifetime")
 eq(acc2.c.kills_npc >= 20, true, "old record merged into account view")
-eq(type(LifeTimeStatsDB.chars["Forever-Oldtimer"].u), "table", "old record upgraded with new sections")
+eq(LifeTimeStatsDB.chars["Forever-Oldtimer"].u, nil, "account view does not mutate a legacy record")
 -- LTS1 backup (1.0 format) still restores
 local v1 = "c.jumps=777;r.max_hit=1234;t.creatures.Wolf=5"
 local function cs(str) local sum = 0 for i = 1, #str do sum = (sum * 31 + str:byte(i)) % 16777213 end return string.format("%06x", sum) end
 local d1 = ns.Deserialize("LTS1|" .. cs(v1) .. "|" .. v1)
 eq(d1 and d1.c.jumps, 777, "LTS1 import"); eq(d1 and d1.t.creatures.Wolf, 5, "LTS1 tally")
+-- A checksummed but invalid backup must not partially update the destination.
+local badLegacy = "c.jumps=999999;f.quest_fast=-1"
+local beforeRestore = ns.char.c.jumps
+eq(ns.RestoreLegacyBackup("LTS2|" .. cs(badLegacy) .. "|" .. badLegacy), nil, "negative duration rejected")
+eq(ns.char.c.jumps, beforeRestore, "bad restore leaves counters intact")
+local hidden = ns.settings.minimap.hide
+SlashCmdList.LIFETIMESTATS("minimap typo")
+eq(ns.settings.minimap.hide, hidden, "invalid minimap command does not toggle visibility")
+for i = 1, 450 do ns.Tally("budget_test", "item" .. i, 1) end
+ns.Tally("budget_test", "item1", 2)
+eq(ns.char.t.budget_test.item1, 3, "existing lifetime tally can grow at cap")
+eq(ns.char.t.budget_test.item401, nil, "lifetime tally cannot exceed cap")
+eq(ns.session.t.budget_test.item401, nil, "session tally cannot exceed cap")
+ns.char.t.budget_test, ns.session.t.budget_test = nil, nil
 -- early events before the DB exists are ignored safely
 local saveChar = ns.char; ns.char = nil
 fire("PLAYER_MONEY"); fire("GOSSIP_SHOW"); fire("COMBAT_LOG_EVENT_UNFILTERED")
@@ -302,9 +338,15 @@ local monthsN = 0 for _ in pairs(ns.char.months) do monthsN = monthsN + 1 end
 eq(monthsN > 0, true, "pruned days kept as monthly totals")
 local creaturesN = 0 for _ in pairs(ns.char.t.creatures) do creaturesN = creaturesN + 1 end
 eq(creaturesN <= 400, true, "tallies pruned to 400")
+-- Remove stress-only labels before checking subsequent trackers for new names.
+local creatures = {}
+for label, count in pairs(ns.char.t.creatures) do
+    if not label:match("^Mob%d+$") then creatures[label] = count end
+end
 local sz = #ns.Serialize(ns.char)
 print(string.format("SIZE heavy character backup: %.0f KB", sz / 1024))
 eq(sz < 400 * 1024, true, "heavy character under 400 KB")
+ns.char.t.creatures = creatures
 local t1 = os.clock()
 ns.settings.scope = "char"; ns.settings.range = "lifetime"
 for _, cdef in ipairs(ns.CATEGORIES) do ns.ShowPage(cdef.id) end

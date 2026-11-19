@@ -75,8 +75,14 @@ local function ParseValue(raw)
 end
 
 -- Returns a record-like table, entry count — or nil, error.
+local MAX_LEGACY_INPUT, MAX_LEGACY_ENTRIES = 8 * 1024 * 1024, 250000
+local function LegacyString(value)
+    return #value <= 4096 and not value:find("[%z\1-\8\11\12\14-\31\127]")
+end
+
 function ns.Deserialize(str)
-    if type(str) ~= "string" then return nil, "empty" end
+    if type(str) ~= "string" or ns.IsSecret(str) then return nil, "empty" end
+    if #str > MAX_LEGACY_INPUT then return nil, "backup is too large" end
     str = str:gsub("%s", "")
     local head, sum, body = str:match("^(LTS%d+)|(%x+)|(.*)$")
     if head ~= "LTS1" and head ~= "LTS2" then return nil, "not a LifeTimeStats backup" end
@@ -86,18 +92,27 @@ function ns.Deserialize(str)
     for _, k in ipairs(NESTED) do out[k] = {} end
     local n = 0
     for entry in body:gmatch("[^;]+") do
+        if n >= MAX_LEGACY_ENTRIES then return nil, "too many backup entries" end
         local path, raw = entry:match("^([^=]+)=(.+)$")
         if not path then return nil, "malformed entry" end
         local val = ParseValue(raw)
-        if val == nil then return nil, "malformed value" end
+        if val == nil or (type(val) == "string" and not LegacyString(val)) then return nil, "malformed value" end
         local a, b, c = path:match("^([^%.]+)%.([^%.]+)%.?([^%.]*)$")
+        if b then b, c = Unesc(b), Unesc(c) end
+        if not b or b == "" or not LegacyString(b) or not LegacyString(c) then return nil, "malformed key" end
         if IS_FLAT[a] and c == "" then
-            out[a][Unesc(b)] = val
+            if a == "f" and (type(val) ~= "number" or val <= 0) then return nil, "invalid duration" end
+            if (a == "c" or a == "fd" or a == "firstd" or a == "ach") and type(val) ~= "number" then
+                return nil, "invalid numeric field"
+            end
+            out[a][b] = val
         elseif IS_NESTED[a] and c ~= "" then
-            local g = Unesc(b)
+            if (a == "days" or a == "t" or a == "u") and type(val) ~= "number" then return nil, "invalid numeric entry" end
+            if a == "days" and not b:match("^%d%d%d%d%d%d%d%d$") then return nil, "invalid day" end
+            local g = b
             if a == "rh" and g:match("^%d+$") then g = tonumber(g) end
             out[a][g] = out[a][g] or {}
-            out[a][g][Unesc(c)] = val
+            out[a][g][c] = val
         else
             return nil, "malformed entry"
         end
@@ -193,12 +208,48 @@ function ns.MergeMax(dst, src)
     for d, day in pairs(src.days or {}) do
         dst.days[d] = dst.days[d] or {}
         for k, v in pairs(day) do
-            if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v end
+            if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v; changed = changed + 1 end
         end
     end
     changed = changed + MergeHistory(dst, src)
     ns.EnsureRecord(dst) -- recount unique sets
     return changed
+end
+
+-- Legacy restores prepare a private copy of only the fields the merge can change.
+function ns.MergeLegacyBackup(parsed, preview)
+    if type(parsed) ~= "table" then return nil, "invalid backup" end
+    local dst = ns.char
+    if not dst then return nil, "no active character" end
+    local function Copy(value, depth)
+        if type(value) ~= "table" then return value end
+        if depth == 0 then error("invalid existing record structure", 0) end
+        local copy = {}
+        for k, v in pairs(value) do copy[k] = Copy(v, depth - 1) end
+        return copy
+    end
+    local fields = { "c", "r", "f", "fw", "fd", "first", "firstd", "ach", "achr", "t", "u", "days", "rh", "un" }
+    local staged = {}
+    local ok, changed = pcall(function()
+        for _, key in ipairs(fields) do staged[key] = Copy(dst[key], 4) end
+        local result = ns.MergeMax(staged, parsed)
+        ns.TrimTallyBuckets(staged)
+        for _, count in pairs(staged.un) do
+            if count > ns.UNIQUE_CAP then error("merged unique set exceeds the retention limit", 0) end
+        end
+        return result
+    end)
+    if not ok then return nil, changed end
+    if preview then return changed end
+    for _, key in ipairs(fields) do dst[key] = staged[key] end
+    ns.InvalidateAccount()
+    return changed
+end
+
+function ns.RestoreLegacyBackup(text)
+    local parsed, why = ns.Deserialize(text)
+    if not parsed then return nil, why end
+    return ns.MergeLegacyBackup(parsed)
 end
 
 -- LTS3 full snapshots use an ASCII-only, length-prefixed tree of maps, text,

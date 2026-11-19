@@ -19,18 +19,22 @@ local function Level() return N(UnitLevel("player")) or 0 end
 -- ------------------------------------------------------------ reputation history
 -- rec.reps[faction] = { s = standing 1-8, c = progress in it, m = size of it, f = first seen,
 -- u = last change, h = { [standing] = time first reached } }
-function ns.ScanFactions()
+function ns.ScanFactions(onStandings)
     local ch = ns.char
     if not ch or not C_Reputation or not C_Reputation.GetNumFactions or not C_Reputation.GetFactionDataByIndex then return 0 end
     ch.reps = ch.reps or {}
     local ok, n = pcall(C_Reputation.GetNumFactions)
     if not ok or not N(n) then return 0 end
     local seen, now = 0, time()
+    local counts = onStandings and { [5] = 0, [6] = 0, [7] = 0, [8] = 0 }
     for i = 1, n do
         local okI, d = pcall(C_Reputation.GetFactionDataByIndex, i)
-        if okI and type(d) == "table" and not S(d) and Str(d.name) and not (d.isHeader and not d.isHeaderWithRep) then
+        if okI and type(d) == "table" and not S(d) and not (B(d.isHeader) and not B(d.isHeaderWithRep)) then
             local s = N(d.reaction)
-            if s and s >= 1 and s <= 8 then
+            if counts and s then
+                for level = 5, 8 do if s >= level then counts[level] = counts[level] + 1 end end
+            end
+            if Str(d.name) and s and s >= 1 and s <= 8 then
                 seen = seen + 1
                 local r = ch.reps[d.name]
                 if not r then
@@ -61,10 +65,31 @@ function ns.ScanFactions()
             end
         end
     end
-    return seen
+    if onStandings then onStandings(counts, n) end
+    return seen, true
 end
-On("UPDATE_FACTION", function() if C_Timer then C_Timer.After(0.5, function() pcall(ns.ScanFactions) end) end end)
-On("PLAYER_ENTERING_WORLD", function() if C_Timer then C_Timer.After(6, function() pcall(ns.ScanFactions) end) end end)
+-- Coalesce faction bursts. A world-entry refresh can be superseded by an
+-- earlier update; the old timer then exits without walking the faction list.
+local factionGeneration, factionDue = 0, nil
+local function QueueFactions(delay)
+    if not C_Timer or not C_Timer.After then return end
+    local due = GetTime() + delay
+    if factionDue and factionDue <= due then return end
+    factionGeneration = factionGeneration + 1
+    local generation = factionGeneration
+    factionDue = due
+    C_Timer.After(delay, function()
+        if generation ~= factionGeneration then return end
+        factionDue = nil
+        local ok, count, scanned = pcall(ns.ScanFactions, ns.OnFactionStandings)
+        if not ok then ns.LogError("factions", count) end
+        if (not ok or not scanned) and ns.ScanCharacterReputation then
+            ns.Guard("reputation", ns.ScanCharacterReputation)()
+        end
+    end)
+end
+On("UPDATE_FACTION", function() QueueFactions(0.5) end)
+On("PLAYER_ENTERING_WORLD", function() QueueFactions(5) end)
 
 -- ------------------------------------------------------------ currencies
 -- Kept on the snapshot (rebuilt every login): rec.snap.cur = { { n, q, m, icon } ... }

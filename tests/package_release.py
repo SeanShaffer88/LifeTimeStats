@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import tempfile
 import zipfile
+from lupa import lua51
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -94,5 +95,15 @@ with tempfile.TemporaryDirectory() as temporary:
             reference = line.strip().replace("\\", "/")
             if reference and not reference.startswith("#"):
                 assert zf.read(f"LifeTimeStats/{reference}") == (REPO / reference).read_bytes()
+        lua = lua51.LuaRuntime()
+        lua.execute((REPO / "tests" / "harness.lua").read_text(encoding="utf-8"))
+        namespace = lua.table()
+        for reference in source_toc.decode("utf-8").splitlines():
+            reference = reference.strip().replace("\\", "/")
+            if reference and not reference.startswith("#") and reference.endswith(".lua"):
+                lua.execute(zf.read(f"LifeTimeStats/{reference}").decode("utf-8"), "LifeTimeStats", namespace)
+        lua.eval('function(ns) ns.frame.scripts.OnEvent(ns.frame, "ADDON_LOADED", "LifeTimeStats") end')(namespace)
+        assert namespace.char is not None, "the packaged addon must initialize against the offline API harness"
+        assert len(namespace.errors) == 0
 
 print("PACKAGE PASS: deterministic fixture, actual checkout layout, TOC references and SHA-256 verified")
