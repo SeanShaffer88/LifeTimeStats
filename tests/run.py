@@ -319,6 +319,20 @@ ns.char.t.budget_test, ns.session.t.budget_test = nil, nil
 local saveChar = ns.char; ns.char = nil
 fire("PLAYER_MONEY"); fire("GOSSIP_SHOW"); fire("COMBAT_LOG_EVENT_UNFILTERED")
 ns.char = saveChar
+-- Top-N keeps the exact full-sort order, including the cutoff tie-break.
+local rankView, expected = { t = { examples = {} } }, {}
+for i = 1, 501 do
+    local name, count = string.format("label%03d", i), i % 13
+    rankView.t.examples[name] = count
+    expected[i] = {name, count}
+end
+table.sort(expected, function(a, b) return a[2] == b[2] and a[1] < b[1] or a[2] > b[2] end)
+for _, limit in ipairs({1, 25, 100, 600}) do
+    local rows = ns.TopList(rankView, "examples", limit)
+    eq(#rows, math.min(limit, #expected), "top list respects limit")
+    for i, row in ipairs(rows) do eq(row[1], expected[i][1], "top list matches full sort") end
+end
+eq(#ns.TopList(rankView, "examples", 0), 0, "zero limit selects nothing")
 -- stress: 20k combat events + 2k zone ticks, and saved data size with heavy synthetic data
 local t0c = os.clock()
 for i = 1, 20000 do

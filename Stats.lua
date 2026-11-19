@@ -1012,16 +1012,42 @@ function ns.ToggleDashboardPin(id)
     return true
 end
 
+local function RankBefore(aKey, aValue, bKey, bValue)
+    if aValue ~= bValue then return aValue > bValue end
+    return tostring(aKey) < tostring(bKey)
+end
+
 function ns.TopList(view, id, n)
     local t = view.t and view.t[id]
     local out = {}
-    if not t then return out end
-    for k, v in pairs(t) do out[#out + 1] = { k, v } end
-    table.sort(out, function(a, b)
-        if a[2] == b[2] then return tostring(a[1]) < tostring(b[1]) end
-        return a[2] > b[2]
-    end)
-    for i = #out, (n or 25) + 1, -1 do out[i] = nil end
+    n = math.floor(n or 25)
+    if not t or n < 1 then return out end
+    local function Better(a, b) return RankBefore(a[1], a[2], b[1], b[2]) end
+    -- Keep the weakest retained row at the root. Only the requested rows
+    -- are allocated and sorted, even for a large merged account bucket.
+    for k, v in pairs(t) do
+        if #out < n then
+            local i = #out + 1
+            local row = { k, v }
+            while i > 1 do
+                local p = math.floor(i / 2)
+                if not Better(out[p], row) then break end
+                out[i], i = out[p], p
+            end
+            out[i] = row
+        elseif RankBefore(k, v, out[1][1], out[1][2]) then
+            local i, row = 1, out[1]
+            row[1], row[2] = k, v
+            while 2 * i <= #out do
+                local child = 2 * i
+                if child < #out and Better(out[child], out[child + 1]) then child = child + 1 end
+                if not Better(row, out[child]) then break end
+                out[i], i = out[child], child
+            end
+            out[i] = row
+        end
+    end
+    table.sort(out, Better)
     return out
 end
 

@@ -620,6 +620,10 @@ On("CHAT_MSG_LOOT", function(_, msg)
             if q >= 4 then Tally("epics", link:match("%[(.-)%]") or link, qty) end
         end
         if ns.OnLootItem then pcall(ns.OnLootItem, link, qty, q) end
+        if ns.TrackLootDiscovery then
+            local ok, err = pcall(ns.TrackLootDiscovery, link, q)
+            if not ok then ns.LogError("loot discovery", err) end
+        end
         return
     end
     c = Match(P.createMulti, msg)

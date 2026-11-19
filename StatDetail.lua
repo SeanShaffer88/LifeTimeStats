@@ -73,6 +73,21 @@ function ns.FindStat(id)
     end
 end
 
+-- Describe only sources verified for this statistic. Session diagnostics
+-- do not establish how a lifetime value from older sessions was collected.
+function ns.StatSource(st)
+    local key, src = st.key, ns.src
+    if key == "dist_foot" or key == "dist_total" or key == "dist_mounted" then
+        if src.speedReadable or (src.posDistance or 0) > 0 then return "Sampled movement; a readable source was seen this session." end
+        return "Sampled movement; no readable source seen yet this session."
+    end
+    if key == "items_looted" then
+        if (src.loot or 0) > 0 then return "Self-loot chat; matching messages were seen this session." end
+        return "Self-loot chat; no matching messages seen yet this session."
+    end
+    if key == "time_online" then return "Sampled elapsed time; long gaps are capped." end
+end
+
 -- Everything the detail card shows, for one statistic and one character record.
 function ns.StatHistory(st, rec, n)
     rec = rec or ns.char
@@ -80,6 +95,7 @@ function ns.StatHistory(st, rec, n)
     local h = { stat = st, kind = st.rec and "record" or (st.key and "counter" or "computed") }
     h.value, h.what = SafeValue(st, rec)
     h.home = ns.StatHome(st)
+    h.source = ns.StatSource(st)
     if ns.session then h.session = SafeValue(st, ns.session) end
 
     -- daily history: counters are kept per day for the last 40 days

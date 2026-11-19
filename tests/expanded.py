@@ -287,7 +287,7 @@ local originalRefresh, liveRefreshes = ns.RefreshWindow, 0
 ns.RefreshWindow = function(...) liveRefreshes = liveRefreshes + 1; return originalRefresh(...) end
 ns.activePage = "journal"
 ns.Journal("Live-zone refresh fixture")
-eq(liveRefreshes, 1, "open chronicle refreshes when the player acts")
+eq(liveRefreshes, 0, "journal writes do not rebuild the window inside the event handler")
 ns.activePage = "dashboard"
 ns.RefreshWindow = originalRefresh
 local sessionHighlights = ns.SessionRecordHighlights(ns.session.rh, 3)

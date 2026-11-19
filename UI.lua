@@ -469,7 +469,8 @@ function ns.ShowStatDetail(st)
     local F = function(v) return ns.FormatStat(st, v) end
     L.title:SetText(st.label)
     L.home:SetText(h.home or "")
-    L.tip:SetText(st.tip or (st.rec and "A personal record: the best value ever reached." or ""))
+    local tip = st.tip or (st.rec and "A personal record: the best value ever reached." or "")
+    L.tip:SetText(h.source and (tip ~= "" and (tip .. "\n" .. h.source) or h.source) or tip)
 
     local facts
     if h.kind == "record" then
@@ -1213,11 +1214,13 @@ local function BuildSearch()
         if #q >= 2 then
             local found = 0
             for _, l in ipairs(ns.LISTS) do
+                if found >= 80 then break end
                 local t = base.t and base.t[l.id]
                 if t then
                     local f = ns.FMT[l.fmt] or Int
                     for name, v in pairs(t) do
-                        if found < 80 and tostring(name):lower():find(q, 1, true) then
+                        if found >= 80 then break end
+                        if tostring(name):lower():find(q, 1, true) then
                             found = found + 1
                             local sv = sess.t and sess.t[l.id] and sess.t[l.id][name]
                             rows[#rows + 1] = { tostring(name) .. "  " .. ns.GREY .. "(" .. l.name .. ")|r", catName.lists or "Top Lists", f(v), sv and ("+" .. f(sv)) or "",
@@ -1935,9 +1938,10 @@ end
 
 local function BuildJournal()
     local p = NewPage("journal")
+    p.characterOnly = true
     KpiRow(p, {
         { label = "Journal entries", icon = "scroll", value = function(v) return #(ns.char.journal or {}) end, sub = function() return "written for you as you play" end },
-        { label = "Zones in travel log", icon = "travel", value = function() local n = 0 for _ in pairs(ns.char.zonelog or {}) do n = n + 1 end return n end, sub = function() return "first visit and level" end },
+        { label = "Zones in travel log", icon = "travel", value = function() return p.zoneCount or 0 end, sub = function() return "first visit and level" end },
         { label = "Days adventured", icon = "clock", value = function() return (ns.char.un and ns.char.un.days_played) or 0 end, sub = function() return "days you logged in" end },
         { label = "Titles earned", icon = "crown", value = function() return #ns.EarnedTitles() end, sub = function() return ns.TitledName() end },
     })
@@ -1948,7 +1952,19 @@ local function BuildJournal()
     p.lvT = W.Table(rc.body, rc.bw, rc.bh, { { "LV", 34, kind = "num" }, { "TIME", 70, kind = "dim" }, { "KILLS", 52, kind = "num" }, { "DEATHS", 52, kind = "num" }, { "STEPS", 0, kind = "num" } })
     local zc = Panel(p, "Travel log", "travel", lw + GAP, BODY_Y + 300, CW - lw - GAP, BODY_H - 300, "Every zone, when you first arrived and at what level.")
     p.zT = W.Table(zc.body, zc.bw, zc.bh, { { "ZONE", 170, kind = "text" }, { "LV", 34, kind = "num" }, { "ARRIVED", 0, kind = "dim" } })
-    function p:Update(view, base, sess)
+    function p:Update(view, base, sess, liveTick)
+        local zones, revision = ns.char.zonelog, ns.travelLogRevision or 0
+        if not liveTick or not self.travelCache or self.travelCache.source ~= zones or self.travelCache.revision ~= revision then
+            local rows = {}
+            for z, e in pairs(zones or {}) do rows[#rows + 1] = { z, tostring(e[2] or ""), date("%b %d %H:%M", e[1]), when = e[1] } end
+            table.sort(rows, function(a, b)
+                if a.when == b.when then return a[1] < b[1] end
+                return a.when > b.when
+            end)
+            self.zT:SetData(rows, true)
+            self.zoneCount = #rows
+            self.travelCache = { source = zones, revision = revision }
+        end
         UpdateKpis(self, view, base, sess)
         self.story:SetEntries(ns.char.journal or self.emptyStory)
         local snaps, levels = ns.char.lvlsnap or {}, {}
@@ -1971,10 +1987,7 @@ local function BuildJournal()
             end
         end
         self.lvT:SetData(lr, true)
-        local zr = {}
-        for z, e in pairs(ns.char.zonelog or {}) do zr[#zr + 1] = { z, tostring(e[2] or ""), date("%b %d %H:%M", e[1]), when = e[1] } end
-        table.sort(zr, function(a, b) return a.when > b.when end)
-        self.zT:SetData(zr, true)
+
     end
     p.emptyStory = {}
 end
@@ -2009,6 +2022,7 @@ ns.HELP = {
 
 local function BuildHelp()
     local p = NewPage("help")
+    p.staticPage = true
     local card = Panel(p, "How it works", "scroll", 0, 0, CW, CH)
     local sf = CreateFrame("ScrollFrame", nil, card.body)
     sf:SetPoint("TOPLEFT"); sf:SetSize(card.bw, card.bh)
@@ -2096,15 +2110,23 @@ function ns.UpdateNavBadge()
     end
 end
 
-function ns.RefreshWindow()
+local function RefreshWindow(liveTick)
     if not win or not win:IsShown() or not current then return end
-    local s = Settings()
-    win.scopeSeg:Select(s.scope)
-    win.rangeSeg:Select(s.range)
-    local view, base, sess = Views()
-    local ok, err = pcall(current.Update, current, view, base, sess)
-    if not ok then ns.LogError("ui:" .. tostring(current.id), err) end
-    ns.UpdateSectionTabs()
+    if not liveTick then
+        local s = Settings()
+        win.scopeSeg:Select(s.scope)
+        win.rangeSeg:Select(s.range)
+    end
+    if not rawget(current, "staticPage") then
+        local view, base, sess
+        if rawget(current, "characterOnly") then view, base, sess = ns.char, ns.char, ns.session
+        else view, base, sess = Views() end
+        local ok, err = pcall(current.Update, current, view, base, sess, liveTick)
+        if not ok then ns.LogError("ui:" .. tostring(current.id), err) end
+        ns.UpdateSectionTabs()
+    elseif not liveTick then
+        ns.UpdateSectionTabs()
+    end
     local since = ns.char.meta.created and date("%b %d, %Y", ns.char.meta.created) or "?"
     win.footer:SetText(string.format("Counting since %s   ·   %d statistics tracked   ·   %d character%s",
         since, ns.CountStats(), ns.CharCount(), ns.CharCount() == 1 and "" or "s"))
@@ -2119,6 +2141,23 @@ function ns.RefreshWindow()
     win.level:SetText(string.format("Level %d%s", UnitLevel("player") or 0,
         ns.Score and ("  ·  " .. ns.FormatInt((ns.Score(ns.char))) .. " pts") or ""))
 end
+
+local VIEW_SCOPES = { char = true, account = true }
+local VIEW_RANGES = { lifetime = true, session = true, today = true, week = true, month = true }
+function ns.SelectViewScope(id)
+    if not VIEW_SCOPES[id] or Settings().scope == id then return end
+    Settings().scope = id
+    ns.InvalidateAccount()
+    ns.RefreshWindow()
+end
+
+function ns.SelectViewRange(id)
+    if not VIEW_RANGES[id] or Settings().range == id then return end
+    Settings().range = id
+    ns.RefreshWindow()
+end
+
+function ns.RefreshWindow() RefreshWindow(false) end
 
 local function DefaultScale()
     local w, h = UIParent:GetWidth() or WIN_W, UIParent:GetHeight() or WIN_H
@@ -2315,12 +2354,12 @@ local function CreateWindow()
         { id = "today", label = "Today", tip = "Since midnight, local time." },
         { id = "week", label = "Week", tip = "The last 7 days, today included. Records and lists show lifetime values." },
         { id = "month", label = "Month", tip = "The last 30 days, today included. Records and lists show lifetime values." },
-    }, function(id) Settings().range = id; ns.RefreshWindow() end)
+    }, ns.SelectViewRange)
     win.rangeSeg:SetPoint("RIGHT", gear, "LEFT", -10, 0)
     win.scopeSeg = W.Segmented(head, {
         { id = "char", label = "Character", tip = "Only this character." },
         { id = "account", label = "Account", tip = "Every character on this account that has logged in with LifeTimeStats. Hover a value to see each character's part." },
-    }, function(id) Settings().scope = id; ns.InvalidateAccount(); ns.RefreshWindow() end)
+    }, ns.SelectViewScope)
     win.scopeSeg:SetPoint("RIGHT", win.rangeSeg, "LEFT", -8, 0)
     win.headParts = { logo = logo, t1 = t1, t2 = t2, rule = rule, sb = sb, close = close, portrait = portrait, ring = ring, gear = gear }
 
@@ -2480,13 +2519,14 @@ local function CreateWindow()
         ns.ShowPage(Settings().lastCategory)
     end)
     win:SetScript("OnHide", function()
+        ns.InvalidateAccount()
         if pinLayer then pinLayer:Hide() end
         if noteLayer then noteLayer:Hide() end
     end)
     local acc = 0
     win:SetScript("OnUpdate", function(_, el)
         acc = acc + el
-        if acc >= 1 then acc = 0; ns.RefreshWindow() end
+        if acc >= 1 then acc = 0; RefreshWindow(true) end
     end)
 end
 
