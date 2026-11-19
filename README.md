@@ -231,6 +231,10 @@ Open **Backup** or run `/lts export` and copy the text for safekeeping.
 - **Stats only** is the default. It copies character statistics and personal-best history. **Restore** or `/lts import` accepts LTS1 and LTS2 backups and merges those records with your current data.
 - **Full character** includes saved statistics, Journal entries and personal notes, level and travel history, and saved session history. Keep this text private if it contains personal notes. A full restore previews the snapshot and asks you to confirm replacing the saved record for the same character.
 
+Large backup pastes show checksum and entry-reading progress; full character backups also report character-data validation. Cancel or change the paste to stop pending reads without changing your stats. The merge preview still requires confirmation, and the final merge is applied in memory before WoW writes SavedVariables.
+
+Large backup exports show progress while encoding full-character data and computing checksums. Closing the dialog or switching formats cancels pending work. The export captures the character state when requested; later tracking changes do not alter that backup.
+
 Full character backups cover one character's saved record. Account settings, other characters, Dashboard pins, the active session, and in-progress tracking are outside that snapshot.
 
 ## Commands

@@ -132,6 +132,75 @@ eq(ch.c.jumps, 0, "preview does not merge immediately")
 local button = ns.backupDialog.action
 button.scripts.OnClick(button)
 eq(ch.c.jumps, jumps, "restore merges the higher value back")
+-- A large preview reports progress, can be canceled, and never applies by itself.
+local source = ns.NewCharRecord()
+source.c.jumps = jumps + 100
+for i = 1, 1600 do source.u.quests = source.u.quests or {}; source.u.quests[tostring(i)] = true end
+local largeText = ns.Serialize(source)
+local queued = {}
+local originalAfter = C_Timer.After
+C_Timer.After = function(_, fn) queued[#queued + 1] = fn end
+ns.ShowImport(largeText)
+local dialog = ns.backupDialog
+eq(#queued, 1, "large read yields and queues its next batch")
+eq(dialog.hint:GetText():find("checksum", 1, true) ~= nil, true, "read reports progress")
+dialog:Hide()
+dialog.scripts.OnHide(dialog)
+queued[1]()
+eq(dialog.previewLegacy, false, "canceled batch cannot publish a preview")
+eq(ch.c.jumps, jumps, "canceled job leaves stats unchanged")
+queued = {}
+ns.ShowImport(largeText)
+for _, resume in ipairs(queued) do resume() end
+eq(dialog.previewLegacy ~= nil, true, "resumed read produces a preview")
+eq(ch.c.jumps, jumps, "finished parse still requires confirmation")
+button.scripts.OnClick(button)
+eq(ch.c.jumps, jumps + 100, "confirmed staged import applies")
+local full = assert(ns.SerializeFullBackup())
+queued = {}
+ns.ShowImport(full)
+eq(#queued, 1, "large full backup queues its next batch")
+local phases = {}
+for _, resume in ipairs(queued) do
+    phases[dialog.hint:GetText():match("^([^:]+)")] = true
+    resume()
+end
+eq(phases["Reading character backup"], true, "full decode reports progress")
+eq(phases["Validating character data"], true, "full validation reports progress")
+eq(dialog.previewSnapshot.character, ns.charKey, "full preview uses decoded snapshot")
+ch.c.jumps = jumps + 150
+button.scripts.OnClick(button)
+eq(ch.c.jumps, jumps + 100, "confirmed full restore replaces stats")
+queued = {}
+ns.ShowImport(full)
+dialog:Hide()
+dialog.scripts.OnHide(dialog)
+queued[1]()
+eq(dialog.previewSnapshot, false, "canceled full read cannot publish a preview")
+queued = {}
+ns.ShowExport()
+eq(#queued, 1, "large stats export schedules checksum batches")
+local statsBatch = queued[1]
+local fullButton = dialog.exportModes.buttons[2]
+fullButton.scripts.OnClick(fullButton)
+eq(#queued, 2, "switching format starts a full export")
+statsBatch()
+eq(dialog.eb:GetText(), "", "superseded export cannot publish text")
+local capturedJumps = ch.c.jumps
+ch.c.jumps = capturedJumps + 77
+for i = 2, 1000 do
+    if not queued[i] then break end
+    queued[i]()
+end
+local exported = assert(ns.DeserializeFullBackup(dialog.eb:GetText()))
+eq(exported.record.c.jumps, capturedJumps, "export uses the snapshot at request time")
+queued = {}
+ns.ShowExport()
+dialog:Hide()
+dialog.scripts.OnHide(dialog)
+queued[1]()
+eq(dialog.eb:GetText(), "", "closed export does not publish text")
+C_Timer.After = originalAfter
 SlashCmdList.LIFETIMESTATS("snapshot list")
 SlashCmdList.LIFETIMESTATS("snapshot show 1")
 for _, kind in ipairs({ "items", "quests", "runs", "deaths" }) do
