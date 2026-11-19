@@ -388,6 +388,57 @@ eq(ns.GetView("char", "month").c.jumps, nil, "range skips nonnumeric daily value
 eq(ns.DaySeries(ns.char, "jumps", 1)[1].v, 0, "chart skips nonnumeric daily values")
 ns.char.days = days
 
+-- Isolate malformed live values so tracking can continue for unaffected stats.
+local day = ns.char.days[ns.Today()] or {}
+ns.char.days[ns.Today()] = day
+ns.char.c.audit_counter, ns.session.c.audit_counter, day.audit_counter = "bad", false, math.huge
+ns.Add("audit_counter", 2)
+eq(ns.char.c.audit_counter, 2, "counter repairs malformed lifetime value")
+eq(ns.session.c.audit_counter, 2, "counter repairs malformed session value")
+eq(day.audit_counter, 2, "counter repairs malformed day value")
+ns.char.c.audit_counter = 1e308
+ns.Add("audit_counter", 1e308)
+eq(ns.char.c.audit_counter, 1e308, "overflow cannot poison lifetime counter")
+eq(day.audit_counter, 2, "rejected overflow does not partially change day counter")
+ns.Add({}, 3); ns.Max(nil, 3); ns.Min({}, 3); ns.First(false, "Invalid")
+eq(ns.char.first[false], nil, "invalid first key rejected")
+ns.Max("audit_max", 10, "Old label")
+ns.Max("audit_max", 20)
+eq(ns.char.r.audit_max_what, nil, "unlabelled record does not inherit old label")
+ns.char.f.audit_min, ns.session.f.audit_min = "bad", -1
+ns.Min("audit_min", 5)
+eq(ns.char.f.audit_min, 5, "valid time replaces malformed fastest record")
+eq(ns.session.f.audit_min, 5, "valid time replaces negative session record")
+ns.char.u.audit_unique, ns.char.un.audit_unique = false, "bad"
+eq(ns.Unique("audit_unique", {}), false, "unique key rejects table")
+eq(ns.Unique("audit_unique", 42), true, "valid ID repairs malformed unique bucket")
+eq(ns.char.un.audit_unique, 1, "repaired unique count starts at one")
+ns.char.t.audit_tally, ns.session.t.audit_tally = { entry = "bad" }, false
+ns.Tally("audit_tally", "entry", 3)
+eq(ns.char.t.audit_tally.entry, 3, "tally repairs malformed count")
+eq(ns.session.t.audit_tally.entry, 3, "tally repairs malformed session bucket")
+local invalidPath = "c.jumps.=3"
+eq(ns.Deserialize("LTS2|" .. cs(invalidPath) .. "|" .. invalidPath), nil, "trailing backup path segment rejected")
+ns.LogError("fixture", string.rep("x", 5000))
+eq(#ns.errors[#ns.errors] < 2100, true, "retained error length is bounded")
+ns.errors[#ns.errors] = nil
+for _, values in ipairs({ns.char.c, ns.session.c, day}) do values.audit_counter = nil end
+
+local discovery = ns.NewCharRecord()
+discovery.un.orphan = 5
+discovery.u.good = { [42] = true, ["42"] = true, excluded = false, [true] = true }
+ns.EnsureRecord(discovery)
+eq(discovery.un.orphan, nil, "orphaned unique total removed")
+eq(discovery.un.good, 1, "unique repair excludes invalid keys and deduplicates IDs")
+eq(discovery.u.good.excluded, nil, "false discovery marker removed")
+local currentMonth = date("%Y%m")
+local monthly = { months = { [currentMonth] = { jumps = 7, bad = math.huge } },
+    days = { [currentMonth .. "01"] = { jumps = 5, bad = "x" }, [currentMonth .. "02"] = false } }
+eq(ns.MonthTotal(monthly, "jumps", currentMonth), 12, "monthly total skips corrupt day bucket")
+eq(ns.MonthRecord(monthly, currentMonth).bad, nil, "monthly record skips invalid numeric fields")
+eq(ns.MonthRecords(monthly, 3)[3].v.jumps, 12, "multi-month records add retained days once")
+eq(ns.MonthSeries(monthly, "jumps", 3)[3].v, 12, "multi-month series matches individual total")
+
 -- early events before the DB exists are ignored safely
 local saveChar = ns.char; ns.char = nil
 fire("PLAYER_MONEY"); fire("GOSSIP_SHOW"); fire("COMBAT_LOG_EVENT_UNFILTERED")
@@ -502,6 +553,24 @@ local sharesBefore = ns.char.c.shares or 0
 SlashCmdList.LIFETIMESTATS("share g wealth")
 eq(#sent, 1, "share command sends once"); eq(sent[1] and sent[1][2], "GUILD", "guild channel")
 eq((ns.char.c.shares or 0), sharesBefore + 1, "share counted")
+SlashCmdList.LIFETIMESTATS("share g deaths extra")
+eq(#sent, 1, "malformed share command does not send")
+local originalGuild = IsInGuild
+IsInGuild = function() return false end
+eq(ns.ShareSend("text", "GUILD"), false, "send rechecks channel membership")
+eq(#sent, 1, "unavailable channel not called")
+IsInGuild = originalGuild
+local originalSend = SendChatMessage
+SendChatMessage = function() return false end
+eq(ns.ShareSend("text", "SAY"), false, "explicit API failure reported")
+eq(ns.char.c.shares, sharesBefore + 1, "failed sends not counted")
+local payload
+SendChatMessage = function(text) payload = text end
+eq(ns.ShareSend("one\ntwo\tthree", "SAY"), true, "safe edited text sent")
+eq(payload, "one two three", "chat controls flattened")
+eq(ns.ShareSend(string.rep("x", 254) .. "é", "SAY"), true, "multibyte text sent")
+eq(#payload, 254, "UTF-8 code point not cut in half")
+SendChatMessage = originalSend
 SlashCmdList.LIFETIMESTATS("share deaths")
 eq(#sent, 1, "no channel = preview only, nothing sent")
 eq(LifeTimeStatsShareDialog and LifeTimeStatsShareDialog:IsShown(), true, "share preview dialog shown")

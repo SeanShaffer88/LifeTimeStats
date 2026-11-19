@@ -182,7 +182,7 @@ end
 
 -- ------------------------------------------------------------ more CSV exports
 function ns.CSVField(v, spreadsheetSafe)
-    if v == nil then return "" end
+    if ns.IsSecret(v) or (type(v) ~= "string" and type(v) ~= "boolean" and ns.BadNumber(v)) then return "" end
     if spreadsheetSafe and type(v) == "string" and (v:find("^%s*[=+@%-]") or v:find("^[\t\r\n]")) then
         v = "'" .. v
     end
@@ -193,7 +193,7 @@ end
 local function Rows(header, list, fn, spreadsheetSafe, since, timeKey)
     local out = { table.concat(header, ",") }
     for _, e in ipairs(type(list) == "table" and list or {}) do
-        if type(e) == "table" and (not since or (type(e[timeKey]) == "number" and e[timeKey] >= since)) then
+        if type(e) == "table" and (not since or (not ns.IsSecret(e[timeKey]) and not ns.BadNumber(e[timeKey]) and e[timeKey] >= since)) then
             local row, cells = fn(e), {}
             -- empty fields are nil, so walk every column instead of ipairs
             for i = 1, #header do cells[i] = ns.CSVField(row[i], spreadsheetSafe) end
@@ -203,11 +203,11 @@ local function Rows(header, list, fn, spreadsheetSafe, since, timeKey)
     return table.concat(out, "\n"), #out - 1
 end
 local function Day(t)
-    if ns.BadNumber(t) or t < 0 or t > 4102444800 then return "" end
+    if ns.IsSecret(t) or ns.BadNumber(t) or t < 0 or t > 4102444800 then return "" end
     local ok, label = pcall(date, "%Y-%m-%d %H:%M", t)
     return ok and label or ""
 end
-local function Coordinate(value) return not ns.BadNumber(value) and string.format("%.4f", value) or "" end
+local function Coordinate(value) return not ns.IsSecret(value) and not ns.BadNumber(value) and string.format("%.4f", value) or "" end
 ns.EXPORTS = {
     items = { "Item log", function(ch, safe, since)
         return Rows({ "date", "item", "item_id", "quality", "item_level", "source", "from", "zone", "level", "count" }, ch.items,
