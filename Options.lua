@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Malikor. Licensed under GPL-3.0-or-later (see LICENSE).
 local _, ns = ...
 
-local T = ns.THEME
+local T, Lang = ns.THEME, ns.L
 local panel, category
 
 StaticPopupDialogs["LIFETIMESTATS_RESET_CHAR"] = {
@@ -51,10 +51,10 @@ local function Toggle(parent, x, y, w, label, desc, get, set)
     r.hl = W.Fill(r, T.tileHi); r.hl:SetAllPoints(); r.hl:Hide()
     local box = W.Panel(r, T.bg, T.edge); box:SetSize(14, 14); box:SetPoint("TOPLEFT", 6, -4)
     local fill = W.Fill(box, T.amber, "ARTWORK"); fill:SetPoint("TOPLEFT", 3, -3); fill:SetPoint("BOTTOMRIGHT", -3, 3)
-    local l = W.Text(r, 12, T.text); l:SetPoint("TOPLEFT", 28, -4); l:SetText(label)
+    local l = W.Text(r, 12, T.text); l:SetPoint("TOPLEFT", 28, -4); l:SetText(Lang[label])
     local d = W.Text(r, 10, T.dim); d:SetPoint("TOPLEFT", 28, -20); d:SetPoint("RIGHT", -4, 0); d:SetJustifyH("LEFT")
     d:SetJustifyV("TOP"); d:SetWordWrap(true); if d.SetMaxLines then d:SetMaxLines(2) end
-    d:SetText(desc)
+    d:SetText(Lang[desc])
     function r:Sync() fill:SetShown(get() and true or false) end
     r:SetScript("OnClick", function(self) set(not get()); self:Sync() end)
     r:SetScript("OnEnter", function() r.hl:Show() end)
@@ -66,9 +66,9 @@ end
 
 -- Label on the left, control on the right.
 local function RowLabel(parent, x, y, label, desc)
-    local l = W.Text(parent, 12, T.text); l:SetPoint("TOPLEFT", x + 6, -Y(y) - 4); l:SetText(label)
+    local l = W.Text(parent, 12, T.text); l:SetPoint("TOPLEFT", x + 6, -Y(y) - 4); l:SetText(Lang[label])
     if desc then
-        local d = W.Text(parent, 10, T.dim); d:SetPoint("TOPLEFT", x + 6, -Y(y) - 20); d:SetText(desc)
+        local d = W.Text(parent, 10, T.dim); d:SetPoint("TOPLEFT", x + 6, -Y(y) - 20); d:SetText(Lang[desc])
         return l, d
     end
     return l
@@ -132,7 +132,7 @@ local function FlatSlider(parent, w, minV, maxV, stepV, get, set, fmt)
 end
 
 local function Button(parent, label, w, tip, fn, danger)
-    local b = W.FlatButton(parent, label, w, 24, label, tip)
+    local b = W.FlatButton(parent, Lang[label], w, 24, Lang[label], tip and Lang[tip])
     if danger then b.text:SetTextColor(W.C.rust[1], W.C.rust[2], W.C.rust[3]); W.Color(b.edge, W.C.rust) end
     b:SetScript("OnClick", fn)
     return b
@@ -201,7 +201,7 @@ function ns.CreateOptions()
     local function Track(r) rows[#rows + 1] = r return r end
 
     -- APPEARANCE (left) -----------------------------------------------
-    local ap = W.Card(c, "Appearance", "dashboard", L, y0, colW, Y(296))
+    local ap = W.Card(c, Lang["Appearance"], "dashboard", L, y0, colW, Y(296))
     local b = ap.body
     RowLabel(b, 0, 0, "Theme", "Applies after /reload")
     local sw = Swatches(b); sw:SetPoint("TOPLEFT", 6, -Y(36) - 2)
@@ -226,16 +226,17 @@ function ns.CreateOptions()
     Track(Toggle(b, 0, 56, ap.bw, "Class colour accent", "Use your class colour for numbers and charts. Applies after /reload.",
         function() return S.classColor end, function(v) S.classColor = v; reload:Show() end))
     RowLabel(b, 0, 98, "Window size", "Fill screen shows more rows; applies after /reload")
-    local sizeSeg = W.Segmented(b, {
-        { id = "normal", label = "Normal", tip = "1140 x 740, scaled to fit your screen." },
-        { id = "fill", label = "Fill screen", tip = "As large as your screen allows: taller tables and wider pages. Window scale still makes the text bigger or smaller." },
+    local sizeSeg
+    sizeSeg = W.Segmented(b, {
+        { id = "normal", label = Lang["Normal"], tip = "1140 x 740, scaled to fit your screen." },
+        { id = "fill", label = Lang["Fill screen"], tip = "As large as your screen allows: taller tables and wider pages. Window scale still makes the text bigger or smaller." },
     }, function(id) ns.SetWindowSize(id); sizeSeg:Select(S.window.size or "normal") end)
     sizeSeg:SetPoint("TOPRIGHT", -2, -Y(98))
     sizeSeg:Select(S.window.size or "normal")
     sizeSeg.Sync = function(self) self:Select(S.window.size or "normal") end
     Track(sizeSeg)
     RowLabel(b, 0, 132, "Window scale")
-    local sl = FlatSlider(b, 130, 0.6, 1.6, 0.05, function() return S.window.scale or 1 end,
+    local sl = FlatSlider(b, 130, 0.6, 1.5, 0.05, function() return S.window.scale or 1 end,
         function(v) S.window.scale = math.floor(v * 100 + 0.5) / 100; ns.ApplyWindowSettings() end, function(v) return string.format("%d%%", v * 100 + 0.5) end)
     sl:SetPoint("TOPRIGHT", -52, -Y(134))
     Track(sl)
@@ -245,7 +246,7 @@ function ns.CreateOptions()
         function() return not S.minimap.hide end, function(v) S.minimap.hide = not v; ns.UpdateMinimapButton() end))
 
     -- SCREENSHOTS (left) ----------------------------------------------
-    local ss = W.Card(c, "Screenshots", "star", L, y0 + Y(306), colW, Y(150))
+    local ss = W.Card(c, Lang["Screenshots"], "star", L, y0 + Y(306), colW, Y(150))
     b = ss.body
     Track(Toggle(b, 0, 0, ss.bw, "On level-up", "A moment after each new level.",
         function() return S.shotLevel end, function(v) S.shotLevel = v end))
@@ -255,7 +256,7 @@ function ns.CreateOptions()
         function() return S.shotAch end, function(v) S.shotAch = v end))
 
     -- CHAT & DISPLAY (right) ------------------------------------------
-    local cd = W.Card(c, "Chat and display", "social", R, y0, colW, Y(298))
+    local cd = W.Card(c, Lang["Chat and display"], "social", R, y0, colW, Y(298))
     b = cd.body
     Track(Toggle(b, 0, 0, cd.bw, "Session column", "Show how much each value grew this session.",
         function() return S.showSession end, function(v) S.showSession = v; ns.RefreshWindow() end))
@@ -270,11 +271,12 @@ function ns.CreateOptions()
     Track(Toggle(b, 0, 170, cd.bw, "Record new highs in the journal", "Add meaningful new records to your local adventure chronicle; no live chat spam.",
         function() return S.recordMoments end, function(v) S.recordMoments = v end))
     RowLabel(b, 0, 205, "Achievement alerts", nil)
-    local alerts = W.Segmented(b, {
-        { id = "off", label = "Off", tip = "Only a 'new' count on the sidebar." },
-        { id = "chat", label = "Chat", tip = "A chat line." },
-        { id = "toast", label = "Toast", tip = "A small pop-up you can click to open the page." },
-        { id = "both", label = "Both", tip = "Chat line and toast." },
+    local alerts
+    alerts = W.Segmented(b, {
+        { id = "off", label = Lang["Off"], tip = "Only a 'new' count on the sidebar." },
+        { id = "chat", label = Lang["Chat"], tip = "A chat line." },
+        { id = "toast", label = Lang["Toast"], tip = "A small pop-up you can click to open the page." },
+        { id = "both", label = Lang["Both"], tip = "Chat line and toast." },
     }, function(id) S.achAnnounce = id; alerts:Select(id) end)
     alerts:SetPoint("TOPLEFT", 6, -Y(225))
     alerts:Select(S.achAnnounce or "off")
@@ -283,7 +285,7 @@ function ns.CreateOptions()
 
     -- TRACKING (right) ------------------------------------------------
     -- below Chat and display (298 tall), so the alerts row is not covered
-    local tr = W.Card(c, "Tracking and title", "records", R, y0 + Y(308), colW, Y(114))
+    local tr = W.Card(c, Lang["Tracking and title"], "records", R, y0 + Y(308), colW, Y(114))
     b = tr.body
     Track(Toggle(b, 0, 0, tr.bw, "Count pet and guardian damage", "Include your pet's damage, kills and misses.",
         function() return S.countPet end, function(v) S.countPet = v end))
@@ -295,7 +297,7 @@ function ns.CreateOptions()
     Track(titleCyc)
 
     -- DATA (full width) -----------------------------------------------
-    local da = W.Card(c, "Your data", "chest", 0, y0 + Y(466), CW, 160)
+    local da = W.Card(c, Lang["Your data"], "chest", 0, y0 + Y(466), CW, 160)
     b = da.body
     local info = W.Text(b, 12, T.text); info:SetPoint("TOPLEFT", 6, -2)
     local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -24); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)

@@ -2,6 +2,24 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.27.0-forever] - 2026-11-19
+
+Prerelease for WoW: Forever 1.60.1 (Interface 16001). Offline regression suites pass; live client testing is pending.
+
+### Added
+- Portable account preference backups with a confirmation preview, separate from character history and window placement.
+- Progress and cancellation for large backup reads and exports, and a preview before applying stats-only restores.
+- Date-filtered history CSV exports, `/lts resetwindow`, and German translations for selected controls and backup progress messages.
+
+### Changed
+- Window scale adapts to a smaller UI canvas without replacing the saved preference.
+- Search, section tabs, Top Lists, and pooled table rows avoid repeated work when their data or presentation is unchanged.
+- Full-character restore validates and counts discoveries before confirmation rather than repeating that work on apply.
+
+### Fixed
+- More resilient save recovery, session continuity, malformed history handling, and legacy backup validation.
+- Safer chat sharing and spreadsheet exports, and stricter release checks for TOC and media references.
+
 ## [1.26.1-forever] - 2026-11-17
 
 Prerelease. Offline regression suites pass; not yet checked in the live client. From in-game screenshots of 1.26.0.

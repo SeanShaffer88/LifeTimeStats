@@ -171,5 +171,21 @@ ns.ShowPage("deaths")
 ns.ShowPage("combat")
 eq(rawget(cp, "focus"), nil, "the highlight clears when the page is opened normally")
 
+local bar = LifeTimeStatsWindow.sectionBar
+local first = bar.tabs[1]
+local originalText, writes = first.text.SetText, 0
+first.text.SetText = function(self, value) writes = writes + 1; originalText(self, value) end
+local originalTabs, tabUpdates = ns.UpdateSectionTabs, 0
+ns.UpdateSectionTabs = function(...) tabUpdates = tabUpdates + 1; return originalTabs(...) end
+ns.RefreshWindow()
+eq(tabUpdates, 1, "page rebuild updates section tabs once")
+eq(writes, 0, "unchanged section label is not redrawn")
+cp.table:ScrollTo(cp.sections[#cp.sections].index)
+eq(tabUpdates, 2, "direct scrolling still refreshes section tabs")
+local active = 1
+for i, section in ipairs(cp.sections) do if section.index <= cp.table.offset + 2 then active = i end end
+eq(bar.tabs[active].def.active, true, "scroll updates active section after clamping")
+first.text.SetText, ns.UpdateSectionTabs = originalText, originalTabs
+
 print("SECTIONS PASS: " .. checks .. " assertions")
 ''')

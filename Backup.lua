@@ -44,12 +44,16 @@ local function SortedKeys(t)
     return keys
 end
 
-local function CaptureLegacyBody(rec)
+local function CaptureLegacyBody(rec, progress)
     local parts = {}
+    local function Emit(part)
+        parts[#parts + 1] = part
+        if progress and #parts % 512 == 0 then progress("Encoding statistics", #parts) end
+    end
     for _, sec in ipairs(FLAT) do
         local t = rec[sec] or {}
         for _, k in ipairs(SortedKeys(t)) do
-            if type(t[k]) ~= "table" then parts[#parts + 1] = sec .. "." .. Esc(k) .. "=" .. Val(t[k]) end
+            if type(t[k]) ~= "table" then Emit(sec .. "." .. Esc(k) .. "=" .. Val(t[k])) end
         end
     end
     for _, sec in ipairs(NESTED) do
@@ -59,7 +63,7 @@ local function CaptureLegacyBody(rec)
             if type(inner) == "table" then
                 for _, k in ipairs(SortedKeys(inner)) do
                     if type(inner[k]) ~= "table" then
-                        parts[#parts + 1] = sec .. "." .. Esc(g) .. "." .. Esc(k) .. "=" .. Val(inner[k])
+                        Emit(sec .. "." .. Esc(g) .. "." .. Esc(k) .. "=" .. Val(inner[k]))
                     end
                 end
             end
@@ -176,10 +180,27 @@ function ns.ReadLegacyBackup(text, finished, status)
 end
 
 function ns.WriteLegacyBackup(rec, finished, status)
-    -- Capture without yielding so counters cannot change during collection.
-    local ok, body = pcall(CaptureLegacyBody, rec)
-    if not ok then finished(nil, body); return end
-    return RunBackupJob(body, EncodeLegacyBody, EncodeLegacyBody, finished, status)
+    local function CopyScalars(source)
+        local out = {}
+        for k, v in pairs(type(source) == "table" and source or {}) do
+            local kind = type(v)
+            if kind == "number" or kind == "string" or kind == "boolean" then out[k] = v end
+        end
+        return out
+    end
+    local captured = {}
+    for _, field in ipairs(FLAT) do captured[field] = CopyScalars(rec[field]) end
+    for _, field in ipairs(NESTED) do
+        local out = {}
+        for group, bucket in pairs(rec[field] or {}) do
+            if type(bucket) == "table" then out[group] = CopyScalars(bucket) end
+        end
+        captured[field] = out
+    end
+    local function Encode(input, progress)
+        return EncodeLegacyBody(CaptureLegacyBody(input, progress), progress)
+    end
+    return RunBackupJob(captured, Encode, Encode, finished, status)
 end
 
 local function MergeHistory(dst, src)
@@ -791,7 +812,7 @@ function ns.IsFullBackup(text)
     return type(text) == "string" and not IsSecret(text) and text:match("^%s*LTS3|") ~= nil
 end
 
-local function CaptureFullSnapshot()
+local function FullSnapshotSource()
     Require(ns.ValidRecord(ns.char) and Key(ns.charKey), "The active character is unavailable.")
     local record = { meta = {} }
     for _, field in ipairs(FULL_FIELDS) do
@@ -801,7 +822,11 @@ local function CaptureFullSnapshot()
         end
     end
     for field in pairs(FULL_META) do record.meta[field] = ns.char.meta[field] end
-    local snapshot = StageFullSnapshot({ character = ns.charKey, savedAt = time(), record = record }, true)
+    return { character = ns.charKey, savedAt = time(), record = record }
+end
+
+local function ValidateExport(source, progress)
+    local snapshot = StageFullSnapshot(source, true, progress)
     snapshot.noteCount = nil -- Derived during preview, never trusted from a pasted backup.
     return snapshot
 end
@@ -812,15 +837,37 @@ local function EncodeFullSnapshot(snapshot, progress)
 end
 
 function ns.SerializeFullBackup()
-    return Attempt(function() return EncodeFullSnapshot(CaptureFullSnapshot()) end)
+    return Attempt(function() return EncodeFullSnapshot(ValidateExport(FullSnapshotSource())) end)
 end
 
 function ns.WriteFullBackup(finished, status)
-    -- Validation makes a detached snapshot. Only encoding that copy may yield.
-    local snapshot, why = Attempt(CaptureFullSnapshot)
-    if not snapshot then finished(nil, why); return end
-    return RunBackupJob(snapshot, EncodeFullSnapshot, function(input)
-        return Attempt(function() return EncodeFullSnapshot(input) end)
+    -- Only copy mutable tables in the click handler. Validate and format the
+    -- detached values later, so events cannot change an export mid-job.
+    local captured, why = Attempt(function()
+        local count, active = 0, {}
+        local function Copy(value, depth)
+            Require(not IsSecret(value), "The full backup contains unreadable data.")
+            if type(value) ~= "table" then return value end
+            Require(PlainTable(value) and not active[value] and depth <= MAX_FULL_DEPTH,
+                "The full backup contains invalid data.")
+            active[value] = true
+            local out = {}
+            for key, item in pairs(value) do
+                count = count + 1
+                Require(count <= MAX_FULL_NODES, "The full backup contains too many entries.")
+                out[key] = Copy(item, depth + 1)
+            end
+            active[value] = nil
+            return out
+        end
+        return Copy(FullSnapshotSource(), 1)
+    end)
+    if not captured then finished(nil, why); return end
+    local function Encode(input, progress)
+        return EncodeFullSnapshot(ValidateExport(input, progress), progress)
+    end
+    return RunBackupJob(captured, Encode, function(input)
+        return Attempt(function() return Encode(input) end)
     end, finished, status)
 end
 
@@ -843,25 +890,23 @@ function ns.DeserializeFullBackup(text)
     return Attempt(function() return ReadFullSnapshot(text) end)
 end
 
-function ns.ReadFullBackup(text, finished, status)
-    return RunBackupJob(text, ReadFullSnapshot, ns.DeserializeFullBackup, finished, status)
+local function CountFullUniques(record, progress)
+    local uniqueCounts, total = {}, 0
+    for set, values in pairs(record.u) do
+        local count = 0
+        for _ in pairs(values) do
+            count, total = count + 1, total + 1
+            if progress and total % 512 == 0 then progress("Counting discoveries", total) end
+        end
+        uniqueCounts[set] = count
+    end
+    return uniqueCounts
 end
 
-function ns.RestoreFullBackup(snapshot)
-    local destination, character = ns.char, ns.charKey
-    local staged, reason = Attempt(function()
-        Require(ns.ValidRecord(destination) and Key(character) and type(ns.db) == "table"
-            and type(ns.db.chars) == "table" and type(LifeTimeStatsCharDB) == "table", "The active character is unavailable.")
-        Require(PlainTable(snapshot) and snapshot.character == character, "This full backup belongs to a different character.")
-        return StageFullSnapshot(snapshot).record
-    end)
-    if not staged then return false, reason end
-
-    local uniqueCounts = {}
-    for set, values in pairs(staged.u) do
-        local count = 0
-        for _ in pairs(values) do count = count + 1 end
-        uniqueCounts[set] = count
+local function CommitFullBackup(destination, character, staged, uniqueCounts)
+    if not ns.ValidRecord(destination) or ns.char ~= destination or ns.charKey ~= character
+        or type(ns.db) ~= "table" or type(ns.db.chars) ~= "table" or type(LifeTimeStatsCharDB) ~= "table" then
+        return false, "The active character changed or is unavailable."
     end
     local session = ns.session
     local liveID = session and ID(session.id) and session.id
@@ -894,6 +939,42 @@ function ns.RestoreFullBackup(snapshot)
     LifeTimeStatsCharDB.data = destination
     ns.InvalidateAccount()
     return true
+end
+
+-- The preview holds a summary and a one-shot closure, not a mutable record.
+-- The closure privately owns the validated record; confirmation therefore
+-- need not copy or revalidate it. Session collision checks still use live data.
+function ns.ReadFullBackup(text, finished, status)
+    local destination, character = ns.char, ns.charKey
+    local function Prepare(input, progress)
+        local snapshot = ReadFullSnapshot(input, progress)
+        local record = snapshot.record
+        local counts = CountFullUniques(record, progress)
+        return {
+            character = snapshot.character, savedAt = snapshot.savedAt,
+            noteCount = snapshot.noteCount, journalCount = #record.journal, sessionCount = #record.sessionlog,
+            apply = function()
+                if not record then return false, "This preview has already been used." end
+                local staged = record
+                record = nil
+                return CommitFullBackup(destination, character, staged, counts)
+            end,
+        }
+    end
+    return RunBackupJob(text, Prepare, function(input)
+        return Attempt(function() return Prepare(input) end)
+    end, finished, status)
+end
+
+function ns.RestoreFullBackup(snapshot)
+    local destination, character = ns.char, ns.charKey
+    local staged, reason = Attempt(function()
+        Require(Key(character) and PlainTable(snapshot) and snapshot.character == character,
+            "This full backup belongs to a different character.")
+        return StageFullSnapshot(snapshot).record
+    end)
+    if not staged then return false, reason end
+    return CommitFullBackup(destination, character, staged, CountFullUniques(staged))
 end
 
 -- Portable account preferences, deliberately separate from character backups.

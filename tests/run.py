@@ -457,6 +457,114 @@ for _, limit in ipairs({1, 25, 100, 600}) do
     for i, row in ipairs(rows) do eq(row[1], expected[i][1], "top list matches full sort") end
 end
 eq(#ns.TopList(rankView, "examples", 0), 0, "zero limit selects nothing")
+-- Ranking work follows its specific data rather than unrelated clock ticks.
+do
+    local previousScope = ns.settings.scope
+    ns.settings.scope = "char"
+    ns.OpenPage("lists")
+    local page, selected = ns.Page("lists"), nil
+    for _, def in ipairs(ns.LISTS) do if not def.rows then selected = def.id; break end end
+    page.selected = selected
+    ns.RefreshWindow()
+    local originalRank, calls = ns.TopList, 0
+    local originalCatalog, catalogUpdates = page.nameT.SetData, 0
+    page.nameT.SetData = function(...) catalogUpdates = catalogUpdates + 1; return originalCatalog(...) end
+    ns.TopList = function(...) calls = calls + 1; return originalRank(...) end
+    local window = LifeTimeStatsWindow
+    local function tick() window:GetScript("OnUpdate")(window, 1) end
+    tick()
+    eq(calls, 0, "unchanged ranking skips work")
+    eq(catalogUpdates, 0, "unchanged catalog skips redraw")
+    ns.Tally("audit_other_rank", "unrelated", 1)
+    tick()
+    eq(calls, 0, "different tally bucket does not dirty ranking")
+    ns.Tally(selected, "Audit tracked rank", 1)
+    tick()
+    eq(calls, 1, "changed tally invalidates rank")
+    tick()
+    eq(calls, 1, "ranking settles after refresh")
+    eq(catalogUpdates, 1, "adding a label refreshes catalog count once")
+    ns.Tally(selected, "Audit tracked rank", 1)
+    tick()
+    eq(catalogUpdates, 1, "changing only a tally value does not redraw the catalog")
+    page.nameT.SetData = originalCatalog
+    ns.TopList, ns.settings.scope = originalRank, previousScope
+    ns.char.t[selected]["Audit tracked rank"] = nil
+    ns.session.t[selected]["Audit tracked rank"] = nil
+end
+
+-- Search keeps metadata for one query but reads current counter values.
+do
+    local previousScope, previousRange = ns.settings.scope, ns.settings.range
+    ns.settings.scope, ns.settings.range = "char", "lifetime"
+    local originalSection, calls = ns.StatSection, 0
+    ns.StatSection = function(...) calls = calls + 1; return originalSection(...) end
+    local window = LifeTimeStatsWindow
+    window.search:SetText("items looted")
+    ns.OpenPage("search")
+    eq(calls > 0, true, "search resolves sections for a new query")
+    local page = ns.Page("search")
+    local before = page.table.data[1][3]
+    calls = 0
+    ns.Add("items_looted", 3)
+    window:GetScript("OnUpdate")(window, 1)
+    eq(calls, 0, "steady query reuses section metadata")
+    eq(page.table.data[1][3] ~= before, true, "cached query still shows live values")
+    window.search:SetText("dodge")
+    ns.ShowPage("search")
+    eq(calls > 0, true, "changed query rebuilds metadata")
+    ns.StatSection, ns.settings.scope, ns.settings.range = originalSection, previousScope, previousRange
+end
+
+do
+    local previousScope = ns.settings.scope
+    ns.settings.scope = "char"
+    local list = ns.LISTS[1].id
+    local window = LifeTimeStatsWindow
+    window.search:SetText("fixture tally needle")
+    ns.Tally(list, "Fixture tally needle alpha", 1)
+    ns.OpenPage("search")
+    local page, bucket = ns.Page("search"), ns.char.t[list]
+    local membership = ns.TallyMembershipVersion(bucket)
+    local before = page.table.data[1][3]
+    ns.Tally(list, "Fixture tally needle alpha", 2)
+    eq(ns.TallyMembershipVersion(bucket), membership, "value change preserves search membership revision")
+    window:GetScript("OnUpdate")(window, 1)
+    eq(page.table.data[1][3] ~= before, true, "cached tally search shows current total")
+    ns.Tally(list, "Fixture tally needle beta", 1)
+    window:GetScript("OnUpdate")(window, 1)
+    eq(#page.table.data, 2, "new tally key invalidates search matches")
+    ns.settings.scope = previousScope
+    for _, row in ipairs({ ns.char.t[list], ns.session.t[list] }) do
+        row["Fixture tally needle alpha"], row["Fixture tally needle beta"] = nil, nil
+        ns.MarkTallyChanged(row, true)
+    end
+end
+
+-- Shared table renderer suppresses unchanged drawing calls, not new row data.
+do
+    local list = ns.W.Table(UIParent, 280, 108, { { "Name", 120, kind = "text" }, { "Bar", 0, kind = "bar" } })
+    local row = list.rows[1]
+    local text, width, shown = 0, 0, 0
+    row.cells[1].SetText = function(_, value) text = text + 1; row.testText = value end
+    row.cells[2].bar.SetWidth = function() width = width + 1 end
+    row.cells[2].bar.SetShown = function() shown = shown + 1 end
+    list:SetData({ { "Alpha", 0.5, tip = "Old tooltip" } })
+    local nextData = { "Alpha", 0.5, tip = "Updated tooltip" }
+    list:SetData({ nextData }, true)
+    eq(text, 1, "identical table text not repainted")
+    eq(width, 1, "unchanged bar width not repainted")
+    eq(shown, 1, "unchanged bar visibility not repainted")
+    eq(row.data, nextData, "pooled row references current tooltip data")
+    list:SetData({ { "Section", header = true } })
+    eq(row.testText, "", "section row clears pooled data text")
+    eq(shown, 2, "section row hides pooled bar")
+    list:SetData({ { "Beta", 0.75 } })
+    eq(row.testText, "Beta", "reused row restores data text")
+    eq(width, 2, "changed bar geometry applied")
+    eq(shown, 3, "reused row restores bar visibility")
+end
+
 -- stress: 20k combat events + 2k zone ticks, and saved data size with heavy synthetic data
 local t0c = os.clock()
 for i = 1, 20000 do

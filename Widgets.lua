@@ -390,8 +390,16 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
         if configuredIcon ~= ic then self.icon:SetTexture(W.MEDIA .. "icons\\" .. ic); configuredIcon = ic end
         self.tipTitle, self.tipBody = lbl, tp
     end
+    local lastValue, lastSub
     function f:SetValue(v, sub, exact)
         v = math.max(0, math.floor((v or 0) + 0.5))
+        sub = sub or ""
+        if not formattedMode and lastValue == v then
+            if lastSub ~= sub then self.sub:SetText(sub); lastSub = sub end
+            self.exact = exact
+            return
+        end
+        lastValue, lastSub = v, sub
         if number then
             if formattedMode then number:SetFont(W.NUM, 23, "") end
             number:SetText(ns.FormatInt(v))
@@ -427,7 +435,8 @@ function W.Odometer(parent, x, y, w, h, label, icon, tip, allowFormatted)
                 formatted:Show()
             end
             formattedMode = true
-            self.sub:SetText(sub or "")
+            sub = sub or ""
+            if lastSub ~= sub then self.sub:SetText(sub); lastSub = sub end
             self.exact = text
         end
     end
@@ -821,45 +830,74 @@ function W.Table(body, bw, bh, cols, onClick, emptyText)
     local empty = W.Text(f, 11, T.dim); empty:SetPoint("TOP", 0, -HH - 12); empty:SetText(emptyText or "Nothing recorded yet")
     f.offset = 0
     f.data = {}
+    local function SetText(widget, text)
+        if rawget(widget, "ltsTableText") ~= text then
+            widget.ltsTableText = text
+            widget:SetText(text)
+        end
+    end
+    local function SetShown(widget, shown)
+        if rawget(widget, "ltsTableShown") ~= shown then
+            widget.ltsTableShown = shown
+            widget:SetShown(shown)
+        end
+    end
+    local scrollCount, scrollOffset
     function f:Render()
         local n = #self.data
         self.offset = math.max(0, math.min(self.offset, n - visible))
         for r = 1, visible do
             local row = self.rows[r]
             local d = self.data[r + self.offset]
-            row.data = d
-            local head = d and d.header
-            row.zebra:SetShown(not head and ((r + self.offset) % 2) == 0)
-            row.rule:SetShown(head and true or false)
-            row.heading:SetShown(head and true or false)
-            if head then row.heading:SetText((W.SmallCaps or string.upper)(d[1])) end
+            row.data = d -- Tooltips and click callbacks always see the newest row.
+            local head = d and d.header and true or false
+            SetShown(row.zebra, not head and ((r + self.offset) % 2) == 0)
+            SetShown(row.rule, head)
+            SetShown(row.heading, head)
+            if head then SetText(row.heading, (W.SmallCaps or string.upper)(d[1])) end
             for i, c in ipairs(cols) do
                 local cell = row.cells[i]
-                if head then
-                    if c.kind == "bar" then cell.track:Hide(); cell.bar:Hide() else cell:SetText("") end
-                elseif c.kind == "bar" then
-                    local v = d and d[i] or nil
-                    cell.track:SetShown(v ~= nil); cell.bar:SetShown(v ~= nil)
-                    if v then cell.bar:SetWidth(math.max(1, cell.w * math.max(0, math.min(1, v)))) end
-                else
-                    cell:SetText(d and d[i] ~= nil and tostring(d[i]) or "")
-                    if book and cell.SetShadowOffset then
-                        if d and d.head and i == 2 then W.Bold(cell, T.amber) elseif c.kind ~= "num" then cell:SetShadowOffset(0, 0) end
+                if c.kind == "bar" then
+                    local v = not head and d and d[i] or nil
+                    SetShown(cell.track, v ~= nil); SetShown(cell.bar, v ~= nil)
+                    if v then
+                        local width = math.max(1, cell.w * math.max(0, math.min(1, v)))
+                        if cell.lastWidth ~= width then
+                            cell.bar:SetWidth(width)
+                            cell.lastWidth = width
+                        end
                     end
-                    if d and d.color and i == 1 then cell:SetTextColor(d.color[1], d.color[2], d.color[3])
-                    elseif i == 1 and c.kind == "text" then cell:SetTextColor(T.text[1], T.text[2], T.text[3]) end
+                else
+                    SetText(cell, not head and d and d[i] ~= nil and tostring(d[i]) or "")
+                    if not head then
+                        if book and cell.SetShadowOffset then
+                            local bold = d and d.head and i == 2 and true or false
+                            if rawget(cell, "ltsTableBold") ~= bold then
+                                if bold then W.Bold(cell, T.amber) elseif c.kind ~= "num" then cell:SetShadowOffset(0, 0) end
+                                cell.ltsTableBold = bold
+                            end
+                        end
+                        if i == 1 then
+                            local color = d and d.color or (c.kind == "num" and T.amber or (c.kind == "dim" and T.dim or T.text))
+                            if rawget(cell, "ltsRed") ~= color[1] or rawget(cell, "ltsGreen") ~= color[2] or rawget(cell, "ltsBlue") ~= color[3] then
+                                cell:SetTextColor(color[1], color[2], color[3])
+                                cell.ltsRed, cell.ltsGreen, cell.ltsBlue = color[1], color[2], color[3]
+                            end
+                        end
+                    end
                 end
             end
         end
-        empty:SetShown(n == 0)
-        if n > visible then
-            sb:Show(); thumb:Show()
-            local th = math.max(16, visible * RH * visible / n)
-            thumb:SetHeight(th)
-            thumb:ClearAllPoints()
-            thumb:SetPoint("TOPRIGHT", sb, "TOPRIGHT", 0, -(visible * RH - th) * (self.offset / (n - visible)))
-        else
-            sb:Hide(); thumb:Hide()
+        SetShown(empty, n == 0)
+        if scrollCount ~= n or scrollOffset ~= self.offset then
+            scrollCount, scrollOffset = n, self.offset
+            SetShown(sb, n > visible); SetShown(thumb, n > visible)
+            if n > visible then
+                local th = math.max(16, visible * RH * visible / n)
+                thumb:SetHeight(th)
+                thumb:ClearAllPoints()
+                thumb:SetPoint("TOPRIGHT", sb, "TOPRIGHT", 0, -(visible * RH - th) * (self.offset / (n - visible)))
+            end
         end
         if self.onScroll then pcall(self.onScroll, self) end
     end
