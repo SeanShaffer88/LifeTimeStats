@@ -88,6 +88,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_kind=(--latest)
+          if grep -q "^Prerelease\b" "$RUNNER_TEMP/lifetimestats-release/release-notes.md"; then
+            release_kind=(--prerelease)
+          fi
           gh release create "$GITHUB_REF_NAME" \
             "$RUNNER_TEMP/lifetimestats-release/LifeTimeStats-${GITHUB_REF_NAME#v}.zip" \
             "$RUNNER_TEMP/lifetimestats-release/LifeTimeStats-${GITHUB_REF_NAME#v}.zip.sha256" \
@@ -95,4 +99,4 @@ jobs:
             --title "LifeTimeStats $GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/lifetimestats-release/release-notes.md" \
             --verify-tag \
-            --latest
+            "${release_kind[@]}"
