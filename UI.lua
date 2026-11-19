@@ -2714,8 +2714,14 @@ end
 local dlg
 local RESTORE_HINT = "Paste a LifeTimeStats backup with Ctrl+V. Review the backup before merging statistics or replacing history."
 
+local function CancelBackupJob()
+    if dlg.cancelBackupJob then dlg.cancelBackupJob() end
+    dlg.cancelBackupJob, dlg.backupJob = false, false
+end
+
 local function LayoutBackupDialog(mode, width, height)
-    dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = mode, nil, nil, nil
+    CancelBackupJob()
+    dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = mode, false, false, false
     dlg:SetSize(width, height)
     dlg.eb:SetWidth(width - 70)
     local export, restore = mode == "export", mode == "restore"
@@ -2746,22 +2752,42 @@ local function SetRestoreInput(hint)
     dlg.hint:SetText(hint or RESTORE_HINT)
 end
 
+local function BackupProgress(phase, count, total)
+    dlg.hint:SetText(total and string.format("%s: %d / %d bytes", phase, count, total)
+        or string.format("%s: %d processed", phase, count))
+end
+
 local function ShowBackupExport(mode)
+    CancelBackupJob()
     local full = mode == "full"
     dlg.exportModes:Select(mode)
     dlg.title:SetText("Backup - " .. ns.charKey)
-    if full then
-        local payload, why = ns.SerializeFullBackup()
-        dlg.hint:SetText(payload
+    dlg.eb:ClearFocus()
+    dlg.eb:SetText("")
+    dlg.hint:SetText("Preparing backup…")
+    local job = {}
+    dlg.backupJob = job
+    local function Finished(payload, why)
+        if dlg.backupJob ~= job then return end
+        CancelBackupJob()
+        if not payload then
+            dlg.hint:SetText("|cffd9604aCould not create backup:|r " .. tostring(why))
+            return
+        end
+        dlg.hint:SetText(full
             and "Copy manually with Ctrl+A and Ctrl+C. Contains private Journal notes. Restore on this character only. Account settings and the active session are outside this backup."
-            or ("|cffd9604aCould not create full backup:|r " .. tostring(why)))
-        dlg.eb:SetText(payload or "")
-    else
-        dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
-        dlg.eb:SetText(ns.Serialize(ns.char))
+            or "Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
+        dlg.eb:SetText(payload)
+        dlg.eb:SetFocus()
+        dlg.eb:HighlightText()
     end
-    dlg.eb:SetFocus()
-    dlg.eb:HighlightText()
+    local function Status(phase, count, total)
+        if dlg.backupJob == job then BackupProgress(phase, count, total) end
+    end
+    local cancel
+    if full then cancel = ns.WriteFullBackup(Finished, Status)
+    else cancel = ns.WriteLegacyBackup(ns.char, Finished, Status) end
+    if dlg.backupJob == job then dlg.cancelBackupJob = cancel end
 end
 
 local function ShowFullBackupPreview(input, snapshot)
@@ -2789,16 +2815,33 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.action.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
 end
 
-local function ApplyBackup()
-    if dlg.mode ~= "restore" then return end
+local function ApplyBackup(parsed, readError, readingFinished)
+    if dlg.mode ~= "restore" or dlg.backupJob then return end
     local text = dlg.eb:GetText() or ""
     if dlg.previewInput and dlg.previewInput ~= text then
         SetRestoreInput("The pasted text changed. Review the backup again.")
         return
     end
-    if ns.IsFullBackup(text) then
-        local snapshot, why = dlg.previewSnapshot
-        if not snapshot then snapshot, why = ns.DeserializeFullBackup(text) end
+    local full = ns.IsFullBackup(text)
+    if not dlg.previewInput and not readingFinished then
+        local reader = full and ns.ReadFullBackup or ns.ReadLegacyBackup
+        local job = {}
+        dlg.backupJob = job
+        dlg.action:Hide()
+        local cancel = reader(text, function(result, why)
+            if dlg.backupJob ~= job then return end
+            CancelBackupJob()
+            dlg.action:Show()
+            ApplyBackup(result, why, true)
+        end, function(phase, count, total)
+            if dlg.backupJob ~= job then return end
+            BackupProgress(phase, count, total)
+        end)
+        if dlg.backupJob == job then dlg.cancelBackupJob = cancel end
+        return
+    end
+    if full then
+        local snapshot, why = dlg.previewSnapshot or parsed, readError
         if not snapshot then
             SetRestoreInput("|cffd9604aCould not read full backup:|r " .. tostring(why))
             return
@@ -2820,7 +2863,7 @@ local function ApplyBackup()
     else
         local legacy = dlg.previewLegacy
         if not legacy then
-            local parsed, why = ns.Deserialize(text)
+            local why = readError
             local count
             if parsed then count, why = ns.MergeLegacyBackup(parsed, true) end
             if count == nil then
@@ -2892,6 +2935,7 @@ local function CreateDialog()
     eb:SetWidth(410)
     eb:SetScript("OnEscapePressed", function() dlg:Hide() end)
     eb:SetScript("OnTextChanged", function(self)
+        if dlg.mode == "restore" and dlg.backupJob then SetRestoreInput("The pasted text changed. Review the backup again.") end
         if dlg.mode == "restore" and dlg.previewInput and self:GetText() ~= dlg.previewInput then
             SetRestoreInput("The pasted text changed. Review the backup again.")
         end
@@ -2916,7 +2960,7 @@ local function CreateDialog()
     dlg.close:SetScript("OnClick", function() dlg:Hide() end)
     dlg.action = W.FlatButton(dlg, "Restore", 128, 22)
     dlg.action:SetPoint("BOTTOMRIGHT", -12, 12)
-    dlg.action:SetScript("OnClick", ApplyBackup)
+    dlg.action:SetScript("OnClick", function() ApplyBackup() end)
     dlg.action:Hide()
     dlg.editPaste = W.FlatButton(dlg, "Edit paste", 93, 22)
     dlg.editPaste:SetPoint("BOTTOMLEFT", 12, 12)
@@ -2926,7 +2970,8 @@ local function CreateDialog()
     end)
     dlg.editPaste:Hide()
     dlg:SetScript("OnHide", function()
-        dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = nil, nil, nil, nil
+        CancelBackupJob()
+        dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy = nil, false, false, false
         eb:ClearFocus()
         eb:SetText("")
     end)

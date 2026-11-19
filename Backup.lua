@@ -18,9 +18,12 @@ local function Unesc(s)
     return (s:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end))
 end
 
-local function Checksum(s)
+local function Checksum(s, progress)
     local sum = 0
-    for i = 1, #s do sum = (sum * 31 + s:byte(i)) % 16777213 end
+    for i = 1, #s do
+        sum = (sum * 31 + s:byte(i)) % 16777213
+        if progress and i % 16384 == 0 then progress("Checking checksum", i, #s) end
+    end
     return string.format("%06x", sum)
 end
 
@@ -41,7 +44,7 @@ local function SortedKeys(t)
     return keys
 end
 
-function ns.Serialize(rec)
+local function CaptureLegacyBody(rec)
     local parts = {}
     for _, sec in ipairs(FLAT) do
         local t = rec[sec] or {}
@@ -62,8 +65,15 @@ function ns.Serialize(rec)
             end
         end
     end
-    local body = table.concat(parts, ";")
-    return "LTS2|" .. Checksum(body) .. "|" .. body
+    return table.concat(parts, ";")
+end
+
+local function EncodeLegacyBody(body, progress)
+    return "LTS2|" .. Checksum(body, progress) .. "|" .. body
+end
+
+function ns.Serialize(rec)
+    return EncodeLegacyBody(CaptureLegacyBody(rec))
 end
 
 local function ParseValue(raw)
@@ -80,13 +90,13 @@ local function LegacyString(value)
     return #value <= 4096 and not value:find("[%z\1-\8\11\12\14-\31\127]")
 end
 
-function ns.Deserialize(str)
+function ns.Deserialize(str, progress)
     if type(str) ~= "string" or ns.IsSecret(str) then return nil, "empty" end
     if #str > MAX_LEGACY_INPUT then return nil, "backup is too large" end
     str = str:gsub("%s", "")
     local head, sum, body = str:match("^(LTS%d+)|(%x+)|(.*)$")
     if head ~= "LTS1" and head ~= "LTS2" then return nil, "not a LifeTimeStats backup" end
-    if Checksum(body) ~= sum then return nil, "checksum mismatch (text was cut off or edited)" end
+    if Checksum(body, progress) ~= sum then return nil, "checksum mismatch (text was cut off or edited)" end
     local out = {}
     for _, k in ipairs(FLAT) do out[k] = {} end
     for _, k in ipairs(NESTED) do out[k] = {} end
@@ -112,15 +122,52 @@ function ns.Deserialize(str)
             local g = b
             if a == "rh" and g:match("^%d+$") then g = tonumber(g) end
             out[a][g] = out[a][g] or {}
-            out[a][g][c] = val
+            if a == "u" then out[a][g][c] = val ~= 0 and true or nil
+            else out[a][g][c] = val end
         else
             return nil, "malformed entry"
         end
         n = n + 1
+        if progress and n % 512 == 0 then progress("Reading entries", n) end
     end
-    -- Unique sets are stored as 1/true.
-    for set, t in pairs(out.u) do for k, v in pairs(t) do t[k] = (v ~= 0) or nil end end
     return out, n
+end
+
+-- The coroutine owns only private backup state and never mutates the character. A
+-- canceled job releases that state immediately, even if a timer is still queued.
+local function RunBackupJob(input, operation, sync, finished, status)
+    local worker = coroutine.create(function()
+        return operation(input, coroutine.yield)
+    end)
+    local function Step()
+        if not worker then return end
+        local ok, value, count, total = coroutine.resume(worker)
+        if not ok or coroutine.status(worker) == "dead" then
+            worker = nil
+            if ok then finished(value, count) else finished(nil, value) end
+            return
+        end
+        if status then status(value, count, total) end
+        C_Timer.After(0, Step)
+    end
+    if not C_Timer or not C_Timer.After then
+        worker = nil
+        finished(sync(input))
+    else
+        Step()
+    end
+    return function() worker = nil end
+end
+
+function ns.ReadLegacyBackup(text, finished, status)
+    return RunBackupJob(text, ns.Deserialize, ns.Deserialize, finished, status)
+end
+
+function ns.WriteLegacyBackup(rec, finished, status)
+    -- Capture without yielding so counters cannot change during collection.
+    local ok, body = pcall(CaptureLegacyBody, rec)
+    if not ok then finished(nil, body); return end
+    return RunBackupJob(body, EncodeLegacyBody, EncodeLegacyBody, finished, status)
 end
 
 local function MergeHistory(dst, src)
@@ -416,7 +463,7 @@ local PERSON_ROW = {
     f = Timestamp, l = Timestamp, n = Nonnegative, t = Nonnegative, cls = Key, lvl = Level, z = Text,
 }
 
-local function StageFullSnapshot(snapshot, exportLegacy)
+local function StageFullSnapshot(snapshot, exportLegacy, progress)
     Require(PlainTable(snapshot) and Key(snapshot.character) and Timestamp(snapshot.savedAt)
         and PlainTable(snapshot.record), "The full backup has an invalid header.")
     for key in pairs(snapshot) do
@@ -435,6 +482,7 @@ local function StageFullSnapshot(snapshot, exportLegacy)
     end
     local function CountField()
         fields = fields + 1
+        if progress and fields % 512 == 0 then progress("Validating character data", fields) end
         Require(fields <= MAX_FULL_NODES, "The full backup contains too many entries.")
     end
     local function Map(input, validKey, convertValue)
@@ -590,11 +638,12 @@ local function StageFullSnapshot(snapshot, exportLegacy)
     return { character = snapshot.character, savedAt = snapshot.savedAt, record = record, noteCount = noteCount }
 end
 
-local function FullChecksum(body)
+local function FullChecksum(body, progress)
     local a, b = 1, 0
     for i = 1, #body do
         a = (a + body:byte(i)) % 65521
         b = (b + a) % 65521
+        if progress and i % 16384 == 0 then progress("Checking checksum", i, #body) end
     end
     -- Format two safe 16-bit values so the result is independent of C int size.
     return string.format("%04x%04x", b, a)
@@ -629,7 +678,7 @@ local function FullKeyLess(a, b)
     return #a < #b
 end
 
-local function EncodeFull(root)
+local function EncodeFull(root, progress)
     local parts, active, size, nodes = {}, {}, 0, 0
     local function Emit(part)
         size = size + #part
@@ -638,6 +687,7 @@ local function EncodeFull(root)
     end
     local function Value(value, depth)
         nodes = nodes + 1
+        if progress and nodes % 512 == 0 then progress("Encoding character backup", nodes) end
         Require(nodes <= MAX_FULL_NODES and depth <= MAX_FULL_DEPTH, "The full backup contains too many entries.")
         local kind = type(value)
         if kind == "table" then
@@ -671,7 +721,7 @@ local function EncodeFull(root)
     return table.concat(parts)
 end
 
-local function DecodeFull(body)
+local function DecodeFull(body, progress)
     local position, nodes = 1, 0
     local malformed = "The full backup text is malformed."
     local function Size(limit)
@@ -687,6 +737,7 @@ local function DecodeFull(body)
     local function Value(depth)
         nodes = nodes + 1
         Require(nodes <= MAX_FULL_NODES and depth <= MAX_FULL_DEPTH, "The full backup contains too many entries.")
+        if progress and nodes % 512 == 0 then progress("Reading character backup", position - 1, #body) end
         local tag = body:sub(position, position)
         position = position + 1
         if tag == "m" then
@@ -733,37 +784,60 @@ function ns.IsFullBackup(text)
     return type(text) == "string" and not IsSecret(text) and text:match("^%s*LTS3|") ~= nil
 end
 
-function ns.SerializeFullBackup()
-    return Attempt(function()
-        Require(ns.ValidRecord(ns.char) and Key(ns.charKey), "The active character is unavailable.")
-        local record = { meta = {} }
-        for _, field in ipairs(FULL_FIELDS) do
-            if field ~= "meta" then
-                local value = ns.char[field]
-                record[field] = value == nil and {} or value
-            end
+local function CaptureFullSnapshot()
+    Require(ns.ValidRecord(ns.char) and Key(ns.charKey), "The active character is unavailable.")
+    local record = { meta = {} }
+    for _, field in ipairs(FULL_FIELDS) do
+        if field ~= "meta" then
+            local value = ns.char[field]
+            record[field] = value == nil and {} or value
         end
-        for field in pairs(FULL_META) do record.meta[field] = ns.char.meta[field] end
-        local snapshot = StageFullSnapshot({ character = ns.charKey, savedAt = time(), record = record }, true)
-        snapshot.noteCount = nil -- Derived during preview, never trusted from a pasted backup.
-        local body = EncodeFull(snapshot)
-        return FULL_HEADER .. FullChecksum(body) .. "|" .. body
-    end)
+    end
+    for field in pairs(FULL_META) do record.meta[field] = ns.char.meta[field] end
+    local snapshot = StageFullSnapshot({ character = ns.charKey, savedAt = time(), record = record }, true)
+    snapshot.noteCount = nil -- Derived during preview, never trusted from a pasted backup.
+    return snapshot
+end
+
+local function EncodeFullSnapshot(snapshot, progress)
+    local body = EncodeFull(snapshot, progress)
+    return FULL_HEADER .. FullChecksum(body, progress) .. "|" .. body
+end
+
+function ns.SerializeFullBackup()
+    return Attempt(function() return EncodeFullSnapshot(CaptureFullSnapshot()) end)
+end
+
+function ns.WriteFullBackup(finished, status)
+    -- Validation makes a detached snapshot. Only encoding that copy may yield.
+    local snapshot, why = Attempt(CaptureFullSnapshot)
+    if not snapshot then finished(nil, why); return end
+    return RunBackupJob(snapshot, EncodeFullSnapshot, function(input)
+        return Attempt(function() return EncodeFullSnapshot(input) end)
+    end, finished, status)
+end
+
+-- Do not yield through Attempt/pcall on Lua 5.1. The job runner catches
+-- decoder errors at coroutine.resume; synchronous callers still use Attempt.
+local function ReadFullSnapshot(text, progress)
+    Require(type(text) == "string" and not IsSecret(text) and #text <= MAX_FULL_INPUT, "The full backup is missing or too large.")
+    local checksum, body = text:gsub("%s", ""):match("^LTS3|(%x%x%x%x%x%x%x%x)|(.+)$")
+    Require(checksum and #body <= MAX_FULL_BYTES and not body:find("[^!-~]")
+        and not body:find("|", 1, true), "The full backup text is malformed.")
+    Require(FullChecksum(body, progress) == checksum:lower(), "The full backup checksum does not match.")
+    local decoded = DecodeFull(body, progress)
+    Require(PlainTable(decoded) and decoded.noteCount == nil, "The full backup has unexpected header fields.")
+    local snapshot = StageFullSnapshot(decoded, nil, progress)
+    Require(snapshot.character == ns.charKey, "This full backup belongs to a different character.")
+    return snapshot
 end
 
 function ns.DeserializeFullBackup(text)
-    return Attempt(function()
-        Require(type(text) == "string" and not IsSecret(text) and #text <= MAX_FULL_INPUT, "The full backup is missing or too large.")
-        local checksum, body = text:gsub("%s", ""):match("^LTS3|(%x%x%x%x%x%x%x%x)|(.+)$")
-        Require(checksum and #body <= MAX_FULL_BYTES and not body:find("[^!-~]")
-            and not body:find("|", 1, true), "The full backup text is malformed.")
-        Require(FullChecksum(body) == checksum:lower(), "The full backup checksum does not match.")
-        local decoded = DecodeFull(body)
-        Require(PlainTable(decoded) and decoded.noteCount == nil, "The full backup has unexpected header fields.")
-        local snapshot = StageFullSnapshot(decoded)
-        Require(snapshot.character == ns.charKey, "This full backup belongs to a different character.")
-        return snapshot
-    end)
+    return Attempt(function() return ReadFullSnapshot(text) end)
+end
+
+function ns.ReadFullBackup(text, finished, status)
+    return RunBackupJob(text, ReadFullSnapshot, ns.DeserializeFullBackup, finished, status)
 end
 
 function ns.RestoreFullBackup(snapshot)
