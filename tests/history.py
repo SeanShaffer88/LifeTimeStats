@@ -180,9 +180,12 @@ end
 eq(phases["Reading character backup"], true, "full decode reports progress")
 eq(phases["Validating character data"], true, "full validation reports progress")
 eq(dialog.previewSnapshot.character, ns.charKey, "full preview uses decoded snapshot")
+eq(dialog.previewSnapshot.record, nil, "preview does not expose validated record")
+local applyPreview = dialog.previewSnapshot.apply
 ch.c.jumps = jumps + 150
 button.scripts.OnClick(button)
 eq(ch.c.jumps, jumps + 100, "confirmed full restore replaces stats")
+eq(applyPreview(), false, "full preview is single use")
 queued = {}
 ns.ShowImport(full)
 dialog:Hide()
@@ -191,11 +194,13 @@ queued[1]()
 eq(dialog.previewSnapshot, false, "canceled full read cannot publish a preview")
 queued = {}
 ns.ShowExport()
-eq(#queued, 1, "large stats export schedules checksum batches")
+eq(#queued, 1, "large stats export schedules encoding batches")
+eq(dialog.hint:GetText():find("Encoding statistics", 1, true) ~= nil, true, "stats format work runs in slices")
 local statsBatch = queued[1]
 local fullButton = dialog.exportModes.buttons[2]
 fullButton.scripts.OnClick(fullButton)
 eq(#queued, 2, "switching format starts a full export")
+eq(dialog.hint:GetText():find("Validating character data", 1, true) ~= nil, true, "full export validation runs in slices")
 statsBatch()
 eq(dialog.eb:GetText(), "", "superseded export cannot publish text")
 local capturedJumps = ch.c.jumps

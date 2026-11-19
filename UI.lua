@@ -171,6 +171,12 @@ end
 
 -- Section tabs for a page whose table has heading rows: one tab per section, the active one
 -- being the section at the top of the visible rows. Clicking scrolls the table there.
+local updatingPage = false
+local function RefreshTabsAfterScroll()
+    -- The window updates tabs after the page has finished rebuilding its rows.
+    if not updatingPage and ns.UpdateSectionTabs then ns.UpdateSectionTabs() end
+end
+
 local function TableSectionTabs(tbl, sections)
     local out = {}
     local top = (tbl.offset or 0) + 1
@@ -735,7 +741,7 @@ local function CategoryPage(id, kpis, panels, cols)
         ns.RefreshWindow()
         FocusRow(self, self.table, label)
     end
-    p.table.onScroll = function() if ns.UpdateSectionTabs then ns.UpdateSectionTabs() end end
+    p.table.onScroll = RefreshTabsAfterScroll
     return p
 end
 
@@ -1001,40 +1007,76 @@ local function BuildLists()
         ns.RefreshWindow()
     end)
     function p:SectionTabs() return TableSectionTabs(self.nameT, self.sections) end
-    p.nameT.onScroll = function() if ns.UpdateSectionTabs then ns.UpdateSectionTabs() end end
+    p.nameT.onScroll = RefreshTabsAfterScroll
     local rc = Panel(p, "Top 100", "star", lw + GAP, 0, CW - lw - GAP, CH)
     p.title = rc.title
     p.rankT = W.Table(rc.body, rc.bw, rc.bh, {
         { "#", 36, kind = "dim" }, { "NAME", 240, kind = "text" }, { "", 170, kind = "bar" }, { "TOTAL", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
     })
-    function p:Update(view, base, sess)
-        local names, sections = {}, {}
-        for _, group in ipairs(ns.SectionedLists()) do
-            names[#names + 1] = { group.name, "", header = true }
-            sections[#sections + 1] = { name = group.name, index = #names }
-            for _, l in ipairs(group.lists) do
-                local n = 0
-                if l.count then n = l.count(base) else for _ in pairs(base.t[l.id] or {}) do n = n + 1 end end
-                names[#names + 1] = { l.name, n, id = l.id, color = (l.id == self.selected) and T.amber or nil }
+    local groups, definitions = ns.SectionedLists(), {}
+    for _, def in ipairs(ns.LISTS) do definitions[def.id] = def end
+    local bucketCounts = setmetatable({}, { __mode = "k" })
+    local displayedCounts, shownSelection = {}, nil
+    local function CountList(def, base, liveTick)
+        if def.count then return def.count(base) end
+        local bucket = base.t[def.id]
+        if not bucket then return 0 end
+        local revision = ns.TallyMembershipVersion(bucket)
+        local cached = bucketCounts[bucket]
+        if liveTick and cached and cached.revision == revision then return cached.count end
+        local count = 0
+        for _ in pairs(bucket) do count = count + 1 end
+        bucketCounts[bucket] = { revision = revision, count = count }
+        return count
+    end
+    function p:Update(view, base, sess, liveTick)
+        local dirty = not liveTick or shownSelection ~= self.selected
+        for _, group in ipairs(groups) do
+            for _, def in ipairs(group.lists) do
+                local count = CountList(def, base, liveTick)
+                if count ~= displayedCounts[def.id] then
+                    displayedCounts[def.id], dirty = count, true
+                end
             end
         end
-        self.sections = sections
-        self.nameT:SetData(names, true)
-        if self.revealSelected then
-            self.revealSelected = nil
-            for i, d in ipairs(names) do if d.id == self.selected then self.nameT:Reveal(i) end end
+        if dirty then
+            local names, sections = {}, {}
+            for _, group in ipairs(groups) do
+                names[#names + 1] = { group.name, "", header = true }
+                sections[#sections + 1] = { name = group.name, index = #names }
+                for _, def in ipairs(group.lists) do
+                    names[#names + 1] = { def.name, displayedCounts[def.id], id = def.id,
+                        color = def.id == self.selected and T.amber or nil }
+                end
+            end
+            self.sections = sections
+            self.nameT:SetData(names, true)
         end
-        local def
-        for _, l in ipairs(ns.LISTS) do if l.id == self.selected then def = l end end
-        self.title:SetText(def.name:upper())
+        if rawget(self, "revealSelected") then
+            self.revealSelected = nil
+            for i, row in ipairs(self.nameT.data) do if row.id == self.selected then self.nameT:Reveal(i); break end end
+        end
+        local def = definitions[self.selected]
+        if shownSelection ~= self.selected then
+            self.title:SetText(def.name:upper())
+            shownSelection = self.selected
+        end
         if def.rows then
             self.rankT:SetData(def.rows(base, sess), self.lastSel == self.selected)
             self.lastSel = self.selected
             return
         end
+        local bucket, sessionBucket = base.t[def.id], sess.t[def.id]
+        local version, sessionVersion = ns.TallyVersion(bucket), ns.TallyVersion(sessionBucket)
+        local rank = rawget(self, "rankSource")
+        if liveTick and rank and self.lastSel == self.selected and rank.bucket == bucket
+            and rank.version == version and rank.sessionBucket == sessionBucket and rank.sessionVersion == sessionVersion then
+            return
+        end
         local top = ns.TopList(base, def.id, 100)
+        self.rankSource = { bucket = bucket, version = version, sessionBucket = sessionBucket, sessionVersion = sessionVersion }
         local maxv = top[1] and top[1][2] or 0
-        local st = sess.t[def.id] or {}
+        local st = sessionBucket or {}
         local f = ns.FMT[def.fmt] or Int
         local rows = {}
         for i, e in ipairs(top) do
@@ -1181,34 +1223,57 @@ local function BuildSearch()
             if pg and pg.FocusStat and d.stat then pg:FocusStat(d.stat) end
         end
     end)
-    function p:Update(view, base, sess)
-        local q = (win.search:GetText() or ""):lower()
-        local rows = {}
-        local catName = {}
-        for _, cdef in ipairs(ns.CATEGORIES) do catName[cdef.id] = cdef.name end
+    -- Definitions are fixed after load. Keep only the current query's
+    -- metadata; values still come from the current view and session.
+    local catName = {}
+    for _, def in ipairs(ns.CATEGORIES) do catName[def.id] = def.name end
+    local function Matches(q)
+        local matches = {}
         for cat, list in pairs(ns.STATS) do
             for _, st in ipairs(list) do
                 if st.label:lower():find(q, 1, true) then
-                    local v, what = ns.StatValue(st, view)
-                    local sv = ns.StatValue(st, sess)
-                    local where = catName[cat] or cat
+                    local name = catName[cat] or cat
                     local sec = ns.StatSection and ns.StatSection(cat, st)
-                    if sec then where = where .. " › " .. sec end
-                    rows[#rows + 1] = { st.label, where, ns.FormatStat(st, v), (sv and sv > 0) and ("+" .. ns.FormatStat(st, sv)) or "",
-                        tip = (st.tip or "") .. "\nClick to open " .. (catName[cat] or cat) .. ".", what = what, cat = cat, stat = st.label }
+                    matches[#matches + 1] = { stat = st, cat = cat, label = st.label,
+                        where = sec and (name .. " › " .. sec) or name,
+                        tip = (st.tip or "") .. "\nClick to open " .. name .. "." }
                 end
             end
         end
         for _, u in ipairs(ns.UNIQUES) do
             if u.label:lower():find(q, 1, true) then
-                rows[#rows + 1] = { "Unique: " .. u.label, catName.fastest, Int((base.un or {})[u.set] or 0), "", cat = "fastest" }
+                matches[#matches + 1] = { label = "Unique: " .. u.label, unique = u.set, cat = "fastest", where = catName.fastest }
             end
         end
         for _, f in ipairs(ns.FASTEST) do
             if f.label:lower():find(q, 1, true) then
-                local fv = (base.f or {})[f.key]
-                rows[#rows + 1] = { "Fastest: " .. f.label, catName.fastest, fv and Time(fv) or "—", "", cat = "fastest" }
+                matches[#matches + 1] = { label = "Fastest: " .. f.label, fastest = f.key, cat = "fastest", where = catName.fastest }
             end
+        end
+        return matches
+    end
+    local lastQuery, matches, tallyMatches = nil, nil, {}
+    function p:ClearTallySearch() tallyMatches = {} end
+    function p:Update(view, base, sess, liveTick)
+        local q = (win.search:GetText() or ""):lower()
+        if lastQuery ~= q then lastQuery, matches, tallyMatches = q, Matches(q), {}
+        elseif not liveTick then tallyMatches = {} end
+        local rows = {}
+        for _, match in ipairs(matches) do
+            local v, sv, what
+            if match.stat then
+                v, what = ns.StatValue(match.stat, view)
+                sv = ns.StatValue(match.stat, sess)
+                v = ns.FormatStat(match.stat, v)
+                sv = sv and sv > 0 and ("+" .. ns.FormatStat(match.stat, sv)) or ""
+            elseif match.unique then
+                v = Int((base.un or {})[match.unique] or 0)
+            else
+                local fv = (base.f or {})[match.fastest]
+                v = fv and Time(fv) or "—"
+            end
+            rows[#rows + 1] = { match.label, match.where, v, sv or "", tip = match.tip, what = what,
+                cat = match.cat, stat = match.stat and match.label }
         end
         -- entries inside the top lists (spells, creatures, zones, people...)
         if #q >= 2 then
@@ -1217,16 +1282,32 @@ local function BuildSearch()
                 if found >= 80 then break end
                 local t = base.t and base.t[l.id]
                 if t then
+                    local revision = ns.TallyMembershipVersion(t)
+                    local cached = tallyMatches[l.id]
+                    if not cached or cached.bucket ~= t or cached.revision ~= revision then
+                        local names = {}
+                        for name in pairs(t) do
+                            if tostring(name):lower():find(q, 1, true) then
+                                names[#names + 1] = name
+                                if #names >= 80 then break end
+                            end
+                        end
+                        cached = { bucket = t, revision = revision, names = names }
+                        tallyMatches[l.id] = cached
+                    end
                     local f = ns.FMT[l.fmt] or Int
-                    for name, v in pairs(t) do
+                    for _, name in ipairs(cached.names) do
                         if found >= 80 then break end
-                        if tostring(name):lower():find(q, 1, true) then
+                        local v = t[name]
+                        if v ~= nil then
                             found = found + 1
                             local sv = sess.t and sess.t[l.id] and sess.t[l.id][name]
                             rows[#rows + 1] = { tostring(name) .. "  " .. ns.GREY .. "(" .. l.name .. ")|r", catName.lists or "Top Lists", f(v), sv and ("+" .. f(sv)) or "",
                                 tip = l.name .. "\nClick to open Top Lists.", cat = "lists", list = l.id }
                         end
                     end
+                else
+                    tallyMatches[l.id] = nil
                 end
             end
         end
@@ -2101,6 +2182,8 @@ end
 function ns.UpdateNavBadge()
     if not win then return end
     local n = ns.AchNewCount and ns.AchNewCount() or 0
+    if rawget(win, "badgeCount") == n then return end
+    win.badgeCount = n
     for _, b in ipairs(win.navButtons) do
         if b.id == "achievements" then
             b.badge:SetText(n > 0 and (n > 99 and "99" or tostring(n)) or "")
@@ -2121,15 +2204,22 @@ local function RefreshWindow(liveTick)
         local view, base, sess
         if rawget(current, "characterOnly") then view, base, sess = ns.char, ns.char, ns.session
         else view, base, sess = Views() end
+        updatingPage = true
         local ok, err = pcall(current.Update, current, view, base, sess, liveTick)
+        updatingPage = false
         if not ok then ns.LogError("ui:" .. tostring(current.id), err) end
         ns.UpdateSectionTabs()
     elseif not liveTick then
         ns.UpdateSectionTabs()
     end
-    local since = ns.char.meta.created and date("%b %d, %Y", ns.char.meta.created) or "?"
-    win.footer:SetText(string.format("Counting since %s   ·   %d statistics tracked   ·   %d character%s",
-        since, ns.CountStats(), ns.CharCount(), ns.CharCount() == 1 and "" or "s"))
+    if not liveTick or rawget(win, "footerCreated") ~= ns.char.meta.created then
+        local created = ns.char.meta.created
+        local since = not ns.BadNumber(created) and date("%b %d, %Y", created) or "?"
+        local characters = ns.CharCount()
+        win.footer:SetText(string.format("Counting since %s   ·   %d statistics tracked   ·   %d character%s",
+            since, ns.CountStats(), characters, characters == 1 and "" or "s"))
+        win.footerCreated = created
+    end
     ns.UpdateNavBadge()
     if win.nameText and ns.TitledName then win.nameText:SetText(ns.TitledName()) end
     if win.today then
@@ -2242,30 +2332,35 @@ function ns.UpdateSectionTabs()
     if not defs or #defs < 2 then bar:Hide(); return end
     local book = bar.book
     local J = W.JOURNAL
+    local paper, framed = book or ns.Paper(), ns.Framed()
     for i, b in ipairs(bar.tabs) do
         local d = defs[i]
-        b.def = d
+        local previous = rawget(b, "def")
+        b.def = d -- Click always uses the latest callback and row position.
         if d then
-            local text = book and W.SmallCaps(d.name) or d.name
-            b.text:SetText(text)
-            local col = d.active and T.amber or ((book or ns.Paper()) and T.text or T.dim)
-            b.text:SetTextColor(col[1], col[2], col[3])
-            if book then
-                if d.active then W.Bold(b.text, T.amber) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
-                local c = d.active and J.page or J.tab
-                b.bg:SetVertexColor(c[1], c[2], c[3], 1)
-                b:SetPoint("TOPLEFT", d.active and 6 or 0, -(i - 1) * (SECTION_TAB_H + SECTION_GAP))
-            else
-                -- opaque, so the tabs read cleanly over the game world
-                W.Color(b.bg, d.active and T.tileHi or T.tile, ns.Framed() and 0.97 or nil)
-                b.edge:SetShown(d.active)
+            local active = d.active and true or false
+            if not previous or previous.name ~= d.name then
+                b.text:SetText(book and W.SmallCaps(d.name) or d.name)
             end
-            b:Show()
-        else
+            if not previous or (previous.active and true or false) ~= active then
+                local col = active and T.amber or (paper and T.text or T.dim)
+                b.text:SetTextColor(col[1], col[2], col[3])
+                if book then
+                    if active then W.Bold(b.text, T.amber) elseif b.text.SetShadowOffset then b.text:SetShadowOffset(0, 0) end
+                    local c = active and J.page or J.tab
+                    b.bg:SetVertexColor(c[1], c[2], c[3], 1)
+                    b:SetPoint("TOPLEFT", active and 6 or 0, -(i - 1) * (SECTION_TAB_H + SECTION_GAP))
+                else
+                    W.Color(b.bg, active and T.tileHi or T.tile, framed and 0.97 or nil)
+                    b.edge:SetShown(active)
+                end
+            end
+            if not previous then b:Show() end
+        elseif previous then
             b:Hide()
         end
     end
-    bar:Show()
+    if not bar:IsShown() then bar:Show() end
 end
 
 local function CreateWindow()
@@ -2373,16 +2468,16 @@ local function CreateWindow()
     gear:SetScript("OnClick", function() ns.OpenOptions() end)
 
     win.rangeSeg = W.Segmented(head, {
-        { id = "lifetime", label = "Lifetime", tip = "Everything since LifeTimeStats was installed." },
-        { id = "session", label = "Session", tip = "Since you logged in (or reset the session)." },
-        { id = "today", label = "Today", tip = "Since midnight, local time." },
-        { id = "week", label = "Week", tip = "The last 7 days, today included. Records and lists show lifetime values." },
-        { id = "month", label = "Month", tip = "The last 30 days, today included. Records and lists show lifetime values." },
+        { id = "lifetime", label = ns.L["Lifetime"], tip = "Everything since LifeTimeStats was installed." },
+        { id = "session", label = ns.L["Session"], tip = "Since you logged in (or reset the session)." },
+        { id = "today", label = ns.L["Today"], tip = "Since midnight, local time." },
+        { id = "week", label = ns.L["Week"], tip = "The last 7 days, today included. Records and lists show lifetime values." },
+        { id = "month", label = ns.L["Month"], tip = "The last 30 days, today included. Records and lists show lifetime values." },
     }, ns.SelectViewRange)
     win.rangeSeg:SetPoint("RIGHT", gear, "LEFT", -10, 0)
     win.scopeSeg = W.Segmented(head, {
-        { id = "char", label = "Character", tip = "Only this character." },
-        { id = "account", label = "Account", tip = "Every character on this account that has logged in with LifeTimeStats. Hover a value to see each character's part." },
+        { id = "char", label = ns.L["Character"], tip = "Only this character." },
+        { id = "account", label = ns.L["Account"], tip = "Every character on this account that has logged in with LifeTimeStats. Hover a value to see each character's part." },
     }, ns.SelectViewScope)
     win.scopeSeg:SetPoint("RIGHT", win.rangeSeg, "LEFT", -8, 0)
     win.headParts = { logo = logo, t1 = t1, t2 = t2, rule = rule, sb = sb, close = close, portrait = portrait, ring = ring, gear = gear }
@@ -2545,6 +2640,8 @@ local function CreateWindow()
     end)
     win:SetScript("OnHide", function()
         ns.InvalidateAccount()
+        if pages.lists then pages.lists.rankSource = nil end
+        if pages.search then pages.search:ClearTallySearch() end
         if pinLayer then pinLayer:Hide() end
         if noteLayer then noteLayer:Hide() end
     end)
@@ -2866,18 +2963,10 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.hint:SetText("This will replace this character’s statistics and saved history.")
     dlg.eb:ClearFocus()
     dlg.box:Hide()
-    local journal, sessions = snapshot.record.journal or {}, snapshot.record.sessionlog or {}
-    local noteCount = snapshot.noteCount
-    if not noteCount then
-        noteCount = 0
-        for _, entry in ipairs(journal) do
-            if ns.JournalNote(entry) then noteCount = noteCount + 1 end
-        end
-    end
     local validDate, saved = pcall(date, "%b %d, %Y at %H:%M", snapshot.savedAt)
     dlg.summary.source:SetText("Source: " .. snapshot.character:gsub("|", "||") .. "  ·  This character")
     dlg.summary.saved:SetText(validDate and type(saved) == "string" and "Backed up " .. saved or "Backup date unavailable")
-    dlg.summary.counts:SetText(string.format("%d Journal entries  ·  %d personal notes  ·  %d saved sessions", #journal, noteCount, #sessions))
+    dlg.summary.counts:SetText(string.format("%d Journal entries  ·  %d personal notes  ·  %d saved sessions", snapshot.journalCount, snapshot.noteCount or 0, snapshot.sessionCount))
     dlg.summary:Show()
     dlg.editPaste:Show()
     dlg.action.text:SetText(L["Replace history"])
@@ -2960,7 +3049,7 @@ local function ApplyBackup(parsed, readError, readingFinished)
             ShowFullBackupPreview(text, snapshot)
             return
         end
-        local ok, reason = ns.RestoreFullBackup(snapshot)
+        local ok, reason = snapshot.apply()
         if not ok then
             SetRestoreInput("|cffd9604aCould not restore full backup:|r " .. tostring(reason))
             return

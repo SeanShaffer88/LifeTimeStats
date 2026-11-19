@@ -42,7 +42,7 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.26.1 prerelease archive, `LifeTimeStats-1.26.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.27.0 prerelease archive, `LifeTimeStats-1.27.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## The window
 
@@ -218,7 +218,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.26.1-forever.zip`.
+1. Download `LifeTimeStats-1.27.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -233,7 +233,7 @@ Open **Backup** or run `/lts export` and copy the text for safekeeping.
 
 Large backup pastes show checksum and entry-reading progress; full character backups also report character-data validation. Cancel or change the paste to stop pending reads without changing your stats. The merge preview still requires confirmation, and the final merge is applied in memory before WoW writes SavedVariables.
 
-Large backup exports show progress while encoding full-character data and computing checksums. Closing the dialog or switching formats cancels pending work. The export captures the character state when requested; later tracking changes do not alter that backup.
+Large backup exports show progress while validating full-character data, encoding statistics or full-character data, and computing checksums. The initial copy of mutable values remains synchronous so the backup reflects one consistent point in time. Closing the dialog or switching formats cancels pending work. The export captures the character state when requested; later tracking changes do not alter that backup.
 
 Choose **Account preferences** in the backup window to copy a separate preferences backup. It includes an allowlist of appearance and tracking options, not character data, window positions, or screenshot settings. Paste it into Restore to review the settings that would change, then confirm to apply them account-wide. Use `/reload` to apply appearance changes.
 
@@ -291,7 +291,7 @@ If the WoW UI canvas shrinks, the main window temporarily scales down to make ro
 - The **Journal** records new personal bests as local adventure moments by default; turn this off under Settings → Chat and display. No new record is sent to another player.
 - Unique lists stop growing at 20,000 entries each; tally buckets track up to 400 distinct labels in normal play (existing labels continue counting; new labels may be omitted at the limit; aggregate counters are separate); daily history keeps 40 days, and older days are kept as monthly totals.
 - Nothing is ever sent anywhere unless you press Send in the Share dialog or type `/lts share` with a channel. No chat spam unless you turn on milestones.
-- Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested for live tracking). Selected backup controls and progress messages have a German translation; untranslated text falls back to English.
+- Loot, duel, roll, reputation and skill messages are read with the client's own text, so other languages should work (only English has been tested for live tracking). Selected backup controls, progress messages, Options labels, and main view selectors have a German translation; untranslated text falls back to English.
 
 ## Files
 

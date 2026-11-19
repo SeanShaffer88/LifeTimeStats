@@ -627,8 +627,24 @@ end
 local TALLY_CAP, DAY_KEEP = 400, 40
 local tallySizes = setmetatable({}, { __mode = "k" })
 
+local tallyVersions = setmetatable({}, { __mode = "k" })
+local tallyMembership = setmetatable({}, { __mode = "k" })
+function ns.TallyVersion(bucket)
+    return bucket and tallyVersions[bucket] or 0
+end
+
+function ns.TallyMembershipVersion(bucket)
+    return bucket and tallyMembership[bucket] or 0
+end
+
+function ns.MarkTallyChanged(bucket, membershipChanged)
+    tallyVersions[bucket] = (tallyVersions[bucket] or 0) + 1
+    if membershipChanged then tallyMembership[bucket] = (tallyMembership[bucket] or 0) + 1 end
+end
+
 local function AddTally(bucket, name, n)
-    if bucket[name] == nil then
+    local isNew = bucket[name] == nil
+    if isNew then
         local size = tallySizes[bucket]
         if not size then
             size = 0
@@ -641,7 +657,10 @@ local function AddTally(bucket, name, n)
         tallySizes[bucket] = size + 1
     end
     local value = CounterValue(bucket[name]) + n
-    if not Bad(value) then bucket[name] = value end
+    if not Bad(value) and bucket[name] ~= value then
+        bucket[name] = value
+        ns.MarkTallyChanged(bucket, isNew)
+    end
 end
 
 function ns.Tally(tbl, name, n)
@@ -777,11 +796,12 @@ end
 function ns.TrimTallyBuckets(rec)
     for _, bucket in pairs(rec.t) do
         if type(bucket) == "table" then
-            local count = 0
+            local count, changed = 0, false
             for key, value in pairs(bucket) do
-                if Bad(value) then bucket[key] = nil else count = count + 1 end
+                if Bad(value) then bucket[key], changed = nil, true else count = count + 1 end
             end
             if count > TALLY_CAP then
+                changed = true
                 local list = {}
                 for key, value in pairs(bucket) do list[#list + 1] = { key, value } end
                 table.sort(list, function(a, b)
@@ -791,6 +811,7 @@ function ns.TrimTallyBuckets(rec)
                 for i = TALLY_CAP + 1, count do bucket[list[i][1]] = nil end
             end
             tallySizes[bucket] = math.min(count, TALLY_CAP)
+            if changed then ns.MarkTallyChanged(bucket, true) end
         end
     end
 end

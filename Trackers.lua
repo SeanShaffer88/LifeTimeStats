@@ -185,6 +185,7 @@ function ns.FinalizeRun(run)
     if run.bosses < best then return end
     ch.t.instbosses = ch.t.instbosses or {}
     ch.t.instbosses[run.name] = run.bosses
+    ns.MarkTallyChanged(ch.t.instbosses, true)
     local key = "run:" .. run.name
     if run.bosses > best then ch.f[key] = nil end
     ns.Min(key, run.lastBoss - run.start, run.bosses .. (run.bosses == 1 and " boss" or " bosses"))
@@ -550,6 +551,7 @@ local function LevelUp(level)
         Max("level_slow", dur, label)
         ns.char.t.leveltime = ns.char.t.leveltime or {}
         ns.char.t.leveltime["Level " .. label] = dur
+        ns.MarkTallyChanged(ns.char.t.leveltime, true)
     end
     m.levelMark, m.levelMarkLevel, m.levelMarkPartial = online, level, nil
     if ns.LevelSnapshot then ns.LevelSnapshot(level) end
