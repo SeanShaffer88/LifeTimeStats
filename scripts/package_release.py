@@ -43,8 +43,12 @@ def files_for_archive(root: Path) -> list[Path]:
     selected = {p.relative_to(root).as_posix() for p in files}
     toc_files = [line.strip() for line in (root / TOC).read_text(encoding="utf-8").splitlines()
                  if line.strip() and not line.lstrip().startswith("#")]
-    missing = [name for name in toc_files
-               if PurePosixPath(name.replace("\\", "/")).as_posix() not in selected]
+    def valid_reference(name: str) -> bool:
+        normalized = name.replace("\\", "/")
+        path = PurePosixPath(normalized)
+        return not path.is_absolute() and all(part not in {"", ".", ".."} for part in normalized.split("/")) and normalized in selected
+
+    missing = [name for name in toc_files if not valid_reference(name)]
     if missing:
         raise ValueError("TOC references files missing from the package: " + ", ".join(missing))
     required_media = {"Media/icon.tga", "Media/dot.tga"}

@@ -2169,6 +2169,7 @@ end
 -- The cap is temporary: the preferred scale is restored on a larger canvas.
 function ns.FitWindowScale(width, height, preferred, canvasWidth, canvasHeight, decorated)
     if ns.BadNumber(preferred) or preferred <= 0 then preferred = 1 end
+    preferred = math.min(preferred, 1.5)
     if ns.BadNumber(canvasWidth) or ns.BadNumber(canvasHeight) or canvasWidth <= 0 or canvasHeight <= 0 then return preferred end
     local footprintW = width + TAB_ROOM + (decorated and 46 or 0)
     local footprintH = height + (decorated and 60 or 0)

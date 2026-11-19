@@ -90,13 +90,24 @@ local function LegacyString(value)
     return #value <= 4096 and not value:find("[%z\1-\8\11\12\14-\31\127]")
 end
 
+local MONTH_LENGTH = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+local function DayKey(value)
+    if type(value) ~= "string" or ns.IsSecret(value) then return false end
+    local year, month, day = value:match("^(%d%d%d%d)(%d%d)(%d%d)$")
+    year, month, day = tonumber(year), tonumber(month), tonumber(day)
+    if not year or year < 1970 or year > 2100 or month < 1 or month > 12 or day < 1 then return false end
+    local days = MONTH_LENGTH[month]
+    if month == 2 and year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0) then days = 29 end
+    return day <= days
+end
+
 function ns.Deserialize(str, progress)
     if type(str) ~= "string" or ns.IsSecret(str) then return nil, "empty" end
     if #str > MAX_LEGACY_INPUT then return nil, "backup is too large" end
     str = str:gsub("%s", "")
-    local head, sum, body = str:match("^(LTS%d+)|(%x+)|(.*)$")
+    local head, sum, body = str:match("^(LTS[12])|(%x%x%x%x%x%x)|(.*)$")
     if head ~= "LTS1" and head ~= "LTS2" then return nil, "not a LifeTimeStats backup" end
-    if Checksum(body, progress) ~= sum then return nil, "checksum mismatch (text was cut off or edited)" end
+    if Checksum(body, progress) ~= sum:lower() then return nil, "checksum mismatch (text was cut off or edited)" end
     local out = {}
     for _, k in ipairs(FLAT) do out[k] = {} end
     for _, k in ipairs(NESTED) do out[k] = {} end
@@ -118,7 +129,7 @@ function ns.Deserialize(str, progress)
             out[a][b] = val
         elseif IS_NESTED[a] and c ~= "" then
             if (a == "days" or a == "t" or a == "u") and type(val) ~= "number" then return nil, "invalid numeric entry" end
-            if a == "days" and not b:match("^%d%d%d%d%d%d%d%d$") then return nil, "invalid day" end
+            if a == "days" and not DayKey(b) then return nil, "invalid day" end
             local g = b
             if a == "rh" and g:match("^%d+$") then g = tonumber(g) end
             out[a][g] = out[a][g] or {}
@@ -252,10 +263,14 @@ function ns.MergeMax(dst, src)
             changed = changed + 1
         end
     end
+    local folded = type(dst.meta) == "table" and dst.meta.monthsThrough
+    if not DayKey(folded) then folded = nil end
     for d, day in pairs(src.days or {}) do
-        dst.days[d] = dst.days[d] or {}
-        for k, v in pairs(day) do
-            if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v; changed = changed + 1 end
+        if DayKey(d) and (not folded or d > folded) then
+            dst.days[d] = dst.days[d] or {}
+            for k, v in pairs(day) do
+                if type(v) == "number" and v > (dst.days[d][k] or 0) then dst.days[d][k] = v; changed = changed + 1 end
+            end
         end
     end
     changed = changed + MergeHistory(dst, src)
@@ -276,7 +291,7 @@ function ns.MergeLegacyBackup(parsed, preview)
         return copy
     end
     local fields = { "c", "r", "f", "fw", "fd", "first", "firstd", "ach", "achr", "t", "u", "days", "rh", "un" }
-    local staged = {}
+    local staged = { meta = { monthsThrough = dst.meta.monthsThrough } }
     local ok, changed = pcall(function()
         for _, key in ipairs(fields) do staged[key] = Copy(dst[key], 4) end
         local result = ns.MergeMax(staged, parsed)
@@ -385,15 +400,6 @@ local function MonthKey(value)
     return year ~= nil and year >= 1970 and year <= 2100 and month >= 1 and month <= 12
 end
 
-local function DayKey(value)
-    if type(value) ~= "string" or IsSecret(value) then return false end
-    local year, month, day = value:match("^(%d%d%d%d)(%d%d)(%d%d)$")
-    year, month, day = tonumber(year), tonumber(month), tonumber(day)
-    if not year or year < 1970 or year > 2100 or month < 1 or month > 12 or day < 1 then return false end
-    local days = ({ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 })[month]
-    if month == 2 and year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0) then days = 29 end
-    return day <= days
-end
 
 local FULL_META = {
     created = Timestamp, achInit = Boolean, achUnseen = Nonnegative, levelMark = Nonnegative,

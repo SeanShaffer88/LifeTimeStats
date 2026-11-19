@@ -109,6 +109,13 @@ end)
 -- in this character's own SavedVariables file, so it survives a broken account-wide file.
 local KEEP, SNAPSHOT_BYTES = 3, 4 * 1024 * 1024
 ns.SNAPSHOT_KEEP = KEEP
+local function ValidSnapshot(entry)
+    return type(entry) == "table" and type(entry.d) == "string" and entry.d:match("^%d%d%d%d%d%d%d%d$")
+        and not ns.BadNumber(entry.t) and entry.t >= 0 and entry.t <= 4102444800
+        and type(entry.text) == "string" and #entry.text <= SNAPSHOT_BYTES
+        and entry.text:match("^LTS[12]|") ~= nil
+end
+
 function ns.TakeDailySnapshot(force)
     if not ns.char or type(LifeTimeStatsCharDB) ~= "table" or not ns.Serialize then return nil end
     local list = LifeTimeStatsCharDB.snapshots
@@ -126,7 +133,7 @@ function ns.TakeDailySnapshot(force)
     local kept = {}
     for i = #list, math.max(1, #list - KEEP + 1), -1 do
         local entry = list[i]
-        if type(entry) == "table" and type(entry.text) == "string" and type(entry.t) == "number" then
+        if ValidSnapshot(entry) then
             local size = #entry.text
             if bytes + size > SNAPSHOT_BYTES then break end
             bytes, count = bytes + size, count + 1
@@ -144,31 +151,37 @@ On("PLAYER_ENTERING_WORLD", function(_, isLogin)
 end)
 
 function ns.SnapshotCommand(args)
-    local sub, n = (args or ""):match("^(%S*)%s*(%d*)")
-    local list = (type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.snapshots) or {}
-    n = tonumber(n)
-    if sub == "" or sub == "list" then
-        if #list == 0 then ns.Print("No snapshots yet; one is kept each day you play (the newest " .. KEEP .. ").") return end
-        for i, s in ipairs(list) do
-            ns.Print(i .. ". " .. date("%b %d, %Y %H:%M", s.t or 0) .. " · " .. KB(#(s.text or "")))
+    args = (args or ""):match("^%s*(.-)%s*$")
+    local list = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.snapshots
+    if type(list) ~= "table" then list = {} end
+    local help = "/lts snapshot list · show <n> · restore <n>"
+    if args == "" or args == "list" then
+        local count = 0
+        for i = 1, math.min(#list, KEEP) do
+            local entry = list[i]
+            if ValidSnapshot(entry) then
+                ns.Print(i .. ". " .. date("%b %d, %Y %H:%M", entry.t) .. " · " .. KB(#entry.text))
+                count = count + 1
+            end
         end
-        ns.Print("/lts snapshot show <n> copies it as a backup text · /lts snapshot restore <n> previews a merge")
+        if count == 0 then ns.Print("No readable snapshots yet.") end
+        ns.Print(help)
         return
     end
-    local s = n and list[n]
-    if not s then ns.Print("No snapshot number " .. tostring(n) .. ".") return end
+    local sub, number = args:match("^(%a+)%s+(%d+)$")
+    if sub ~= "show" and sub ~= "restore" then ns.Print(help); return end
+    local n = tonumber(number)
+    local entry = n and n <= KEEP and list[n]
+    if not ValidSnapshot(entry) then ns.Print("No readable snapshot number " .. tostring(n) .. "."); return end
     if sub == "show" then
-        if ns.ShowText then ns.ShowText("Snapshot " .. n, "A stats backup from " .. date("%b %d, %Y %H:%M", s.t or 0) .. ". Paste it into Restore to merge.", s.text) end
-    elseif sub == "restore" then
-        if type(s) ~= "table" or type(s.text) ~= "string" then ns.Print("That snapshot is unreadable."); return end
-        ns.ShowImport(s.text)
+        ns.ShowText("Snapshot " .. n, "A stats backup from " .. date("%b %d, %Y %H:%M", entry.t) .. ". Paste it into Restore to merge.", entry.text)
     else
-        ns.Print("/lts snapshot list · show <n> · restore <n>")
+        ns.ShowImport(entry.text)
     end
 end
 
 -- ------------------------------------------------------------ more CSV exports
-local function Field(v, spreadsheetSafe)
+function ns.CSVField(v, spreadsheetSafe)
     if v == nil then return "" end
     if spreadsheetSafe and type(v) == "string" and (v:find("^%s*[=+@%-]") or v:find("^[\t\r\n]")) then
         v = "'" .. v
@@ -179,17 +192,22 @@ local function Field(v, spreadsheetSafe)
 end
 local function Rows(header, list, fn, spreadsheetSafe, since, timeKey)
     local out = { table.concat(header, ",") }
-    for _, e in ipairs(list or {}) do
+    for _, e in ipairs(type(list) == "table" and list or {}) do
         if type(e) == "table" and (not since or (type(e[timeKey]) == "number" and e[timeKey] >= since)) then
             local row, cells = fn(e), {}
             -- empty fields are nil, so walk every column instead of ipairs
-            for i = 1, #header do cells[i] = Field(row[i], spreadsheetSafe) end
+            for i = 1, #header do cells[i] = ns.CSVField(row[i], spreadsheetSafe) end
             out[#out + 1] = table.concat(cells, ",")
         end
     end
     return table.concat(out, "\n"), #out - 1
 end
-local function Day(t) return t and date("%Y-%m-%d %H:%M", t) or "" end
+local function Day(t)
+    if ns.BadNumber(t) or t < 0 or t > 4102444800 then return "" end
+    local ok, label = pcall(date, "%Y-%m-%d %H:%M", t)
+    return ok and label or ""
+end
+local function Coordinate(value) return not ns.BadNumber(value) and string.format("%.4f", value) or "" end
 ns.EXPORTS = {
     items = { "Item log", function(ch, safe, since)
         return Rows({ "date", "item", "item_id", "quality", "item_level", "source", "from", "zone", "level", "count" }, ch.items,
@@ -205,7 +223,7 @@ ns.EXPORTS = {
     end },
     deaths = { "Deaths", function(ch, safe, since)
         return Rows({ "date", "cause", "zone", "level", "map_id", "x", "y" }, ch.deathlog,
-            function(e) return { Day(e.t), e.c, e.z, e.l, e.m, e.x and string.format("%.4f", e.x), e.y and string.format("%.4f", e.y) } end, safe, since, "t")
+            function(e) return { Day(e.t), e.c, e.z, e.l, e.m, Coordinate(e.x), Coordinate(e.y) } end, safe, since, "t")
     end },
 }
 function ns.ExportCSV(kind, raw, since)

@@ -225,9 +225,10 @@ local function NewSession(rec)
 end
 ns.session = NewSession()
 
+local MAX_REVISION = 9007199254740990
 local function Revision(value)
     if value == nil then return 0 end
-    if type(value) == "number" and value >= 0 and value < 9007199254740991 and value == math.floor(value) then
+    if type(value) == "number" and value >= 0 and value <= MAX_REVISION and value == math.floor(value) then
         return value
     end
 end
@@ -358,6 +359,7 @@ function ns.InitDB()
     meta.created = meta.created or time()
     ns.char = rec
     db.schema = 2
+    ns.InvalidateAccount()
 end
 
 local function RecapText(c, elapsed, top)
@@ -381,24 +383,26 @@ ns.RecapText = RecapText
 
 function ns.Save()
     if not ns.char then return end
-    if type(LifeTimeStatsCharDB) == "table" then
-        local s = ns.session
-        local highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(s.rh, 3) or {}
-        LifeTimeStatsCharDB.lastSession = {
-            c = s.c, elapsed = GetTime() - s.start, at = time(), top = SessionTopSpell(), highlights = highlights,
-        }
-    end
-    if type(LifeTimeStatsCharDB) == "table" then
-        local s = ns.session
-        LifeTimeStatsCharDB.session = { c = s.c, r = s.r, t = s.t, u = s.u, un = s.un, f = s.f, fw = s.fw, fd = s.fd,
-            first = s.first, firstd = s.firstd, rh = s.rh, id = s.id, wallStart = s.wallStart,
-            elapsed = GetTime() - s.start, savedAt = time(),
-            fightCorrelation = ns.SaveFightCorrelation and ns.SaveFightCorrelation() }
-    end
-    ns.char.meta.rev = (Revision(ns.char.meta.rev) or 0) + 1
+    ns.char.meta.rev = math.min(MAX_REVISION, (Revision(ns.char.meta.rev) or 0) + 1)
     ns.char.meta.saved = time()
     ns.char.meta.level = UnitLevel("player")
-    if type(LifeTimeStatsCharDB) == "table" then LifeTimeStatsCharDB.data = ns.char end
+    if type(LifeTimeStatsCharDB) ~= "table" then return end
+    local db, session = LifeTimeStatsCharDB, ns.session
+    local elapsed, savedAt = GetTime() - session.start, time()
+    db.data = ns.char
+    db.session = { c = session.c, r = session.r, t = session.t, u = session.u, un = session.un,
+        f = session.f, fw = session.fw, fd = session.fd, first = session.first, firstd = session.firstd,
+        rh = session.rh, id = session.id, wallStart = session.wallStart, elapsed = elapsed, savedAt = savedAt }
+    if ns.SaveFightCorrelation then
+        local ok, value = pcall(ns.SaveFightCorrelation)
+        if ok then db.session.fightCorrelation = value else ns.LogError("save:fight correlation", value) end
+    end
+    local ok, recap = pcall(function()
+        return { c = session.c, elapsed = elapsed, at = savedAt, top = SessionTopSpell(),
+            highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(session.rh, 3) or {} }
+    end)
+    if ok then db.lastSession = recap
+    else db.lastSession = nil; ns.LogError("save:recap", recap) end
 end
 
 -- ---------------------------------------------------------------- accent colour
@@ -723,15 +727,22 @@ function ns.MonthSeries(view, key, n)
     return out
 end
 function ns.TrimTallyBuckets(rec)
-    for _, t in pairs(rec.t) do
-        if type(t) == "table" then
-            local n, list = 0, {}
-            for k, v in pairs(t) do n = n + 1; list[n] = { k, v } end
-            if n > TALLY_CAP then
-                table.sort(list, function(a, b) return a[2] > b[2] end)
-                for i = TALLY_CAP + 1, n do t[list[i][1]] = nil end
-                tallySizes[t] = TALLY_CAP
+    for _, bucket in pairs(rec.t) do
+        if type(bucket) == "table" then
+            local count = 0
+            for key, value in pairs(bucket) do
+                if Bad(value) then bucket[key] = nil else count = count + 1 end
             end
+            if count > TALLY_CAP then
+                local list = {}
+                for key, value in pairs(bucket) do list[#list + 1] = { key, value } end
+                table.sort(list, function(a, b)
+                    if a[2] == b[2] then return tostring(a[1]) < tostring(b[1]) end
+                    return a[2] > b[2]
+                end)
+                for i = TALLY_CAP + 1, count do bucket[list[i][1]] = nil end
+            end
+            tallySizes[bucket] = math.min(count, TALLY_CAP)
         end
     end
 end
@@ -739,7 +750,7 @@ end
 function ns.PruneTallies(rec)
     ns.TrimTallyBuckets(rec)
     ns.RollUpDays(rec)
-    rec.qa = rec.qa or {}
+    if type(rec.qa) ~= "table" then rec.qa = {} end
     local cutoff = time() - 30 * 86400
     for q, t in pairs(rec.qa) do if Bad(t) or t < cutoff then rec.qa[q] = nil end end
 end
@@ -749,14 +760,18 @@ local EMPTY = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {
 
 local function MergeAccount()
     local empty = {}
+    local function Table(value) return type(value) == "table" and value or empty end
+    local function AddBucket(dst, src)
+        for k, n in pairs(Table(src)) do if not Bad(n) then dst[k] = (dst[k] or 0) + n end end
+    end
     local v = { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = {}, months = {}, ach = {}, achr = {}, meta = {}, rh = {}, bestiary = {} }
     for _, rec in pairs(ns.db.chars) do
         if Valid(rec) then
             for k, n in pairs(rec.c) do
-                if type(n) == "number" then v.c[k] = (v.c[k] or 0) + n end
+                if not Bad(n) then v.c[k] = (v.c[k] or 0) + n end
             end
             for k, n in pairs(rec.r) do
-                if type(n) == "number" and n > (v.r[k] or 0) then
+                if type(k) == "string" and not Bad(n) and n > (v.r[k] or 0) then
                     v.r[k] = n
                     v.r[k .. "_what"] = rec.r[k .. "_what"]
                 end
@@ -764,7 +779,7 @@ local function MergeAccount()
             for tn, t in pairs(rec.t) do
                 local dst = v.t[tn] or {}
                 v.t[tn] = dst
-                for k, n in pairs(t) do dst[k] = (dst[k] or 0) + n end
+                AddBucket(dst, t)
             end
             for set, t in pairs(type(rec.u) == "table" and rec.u or empty) do
                 local dst = v.u[set] or {}
@@ -775,32 +790,33 @@ local function MergeAccount()
                 end
             end
             for k, n in pairs(type(rec.f) == "table" and rec.f or empty) do
-                if not v.f[k] or n < v.f[k] then
-                    v.f[k], v.fw[k], v.fd[k] = n, (rec.fw or empty)[k], (rec.fd or empty)[k]
+                if not Bad(n) and n > 0 and (not v.f[k] or n < v.f[k]) then
+                    v.f[k], v.fw[k], v.fd[k] = n, Table(rec.fw)[k], Table(rec.fd)[k]
                 end
             end
             for k, when in pairs(type(rec.firstd) == "table" and rec.firstd or empty) do
-                if not v.firstd[k] or when < v.firstd[k] then
-                    v.firstd[k], v.first[k] = when, (rec.first or empty)[k]
+                if not Bad(when) and (not v.firstd[k] or when < v.firstd[k]) then
+                    v.firstd[k], v.first[k] = when, Table(rec.first)[k]
                 end
             end
             for k, when in pairs(type(rec.ach) == "table" and rec.ach or empty) do
-                if not v.ach[k] or when < v.ach[k] then v.ach[k] = when end
+                if not Bad(when) and (not v.ach[k] or when < v.ach[k]) then v.ach[k] = when end
             end
             for d, day in pairs(type(rec.days) == "table" and rec.days or empty) do
                 local dst = v.days[d] or {}
                 v.days[d] = dst
-                for k, n in pairs(day) do dst[k] = (dst[k] or 0) + n end
+                AddBucket(dst, day)
             end
             for name, e in pairs(type(rec.bestiary) == "table" and rec.bestiary or empty) do
-                if type(e) == "table" and type(e.k) == "number" then
+                if type(e) == "table" and not Bad(e.k) then
+                    local first, last = not Bad(e.f) and e.f or nil, not Bad(e.l) and e.l or nil
                     local dst = v.bestiary[name]
                     if not dst then
-                        v.bestiary[name] = { k = e.k, f = e.f, l = e.l, z = e.z, ty = e.ty, cl = e.cl, who = rec.meta.name }
+                        v.bestiary[name] = { k = e.k, f = first, l = last, z = e.z, ty = e.ty, cl = e.cl, who = rec.meta.name }
                     else
                         dst.k = dst.k + e.k
-                        if (e.f or 0) < (dst.f or math.huge) then dst.f, dst.z, dst.who = e.f, e.z or dst.z, rec.meta.name end
-                        if (e.l or 0) > (dst.l or 0) then dst.l = e.l end
+                        if first and first < (dst.f or math.huge) then dst.f, dst.z, dst.who = first, e.z or dst.z, rec.meta.name end
+                        if last and last > (dst.l or 0) then dst.l = last end
                         dst.ty, dst.cl = dst.ty or e.ty, dst.cl or e.cl
                     end
                 end
@@ -808,10 +824,10 @@ local function MergeAccount()
             for m, month in pairs(type(rec.months) == "table" and rec.months or empty) do
                 local dst = v.months[m] or {}
                 v.months[m] = dst
-                for k, n in pairs(month) do if type(n) == "number" then dst[k] = (dst[k] or 0) + n end end
+                AddBucket(dst, month)
             end
-            for _, entry in ipairs(rec.rh or {}) do
-                if type(entry) == "table" then
+            for _, entry in ipairs(Table(rec.rh)) do
+                if type(entry) == "table" and not Bad(entry.at) and not Bad(entry.v) then
                     v.rh[#v.rh + 1] = {
                         k = entry.k, v = entry.v, at = entry.at, d = entry.d, w = entry.w,
                         character = type(rec.meta.name) == "string" and rec.meta.name or nil,
@@ -839,8 +855,10 @@ function ns.GetView(scope, range)
     else
         base = ns.char
     end
+    local days = type(base.days) == "table" and base.days or EMPTY.days
     if range == "today" then
-        local day = base.days[ns.Today()] or {}
+        local day = days[ns.Today()]
+        if type(day) ~= "table" then day = EMPTY.days end
         return { c = day, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, months = base.months, rh = base.rh, today = true }
     end
     if range == "week" or range == "month" then
@@ -848,8 +866,8 @@ function ns.GetView(scope, range)
         local n = range == "week" and 7 or 30
         local sum, now = {}, time()
         for i = 0, n - 1 do
-            local day = base.days[date("%Y%m%d", now - i * 86400)]
-            if day then for k, v in pairs(day) do sum[k] = (sum[k] or 0) + v end end
+            local day = days[date("%Y%m%d", now - i * 86400)]
+            if type(day) == "table" then for k, v in pairs(day) do if not Bad(v) then sum[k] = (sum[k] or 0) + v end end end
         end
         return { c = sum, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, days = base.days, months = base.months, rh = base.rh, today = true, span = n }
     end
@@ -858,14 +876,18 @@ end
 
 -- Daily series for the last n days (oldest first) of a counter, or of a function(day).
 function ns.DaySeries(view, key, n)
-    local out, days = {}, (view and view.days) or EMPTY.days
+    local out, days = {}, (view and type(view.days) == "table" and view.days) or EMPTY.days
     local now = time()
     for i = n - 1, 0, -1 do
         local d = date("%Y%m%d", now - i * 86400)
         local day = days[d]
+        if type(day) ~= "table" then day = nil end
         local v
         if type(key) == "function" then v = key(day or {})
-        else v = day and day[key] or 0 end
+        else
+            v = day and day[key]
+            if Bad(v) then v = 0 end
+        end
         out[#out + 1] = { d = d, v = v }
     end
     return out
@@ -898,12 +920,16 @@ end)
 ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin)
     if not isLogin then return end
     local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
-    if ns.settings.recap and type(last) == "table" and type(last.c) == "table" and (last.elapsed or 0) > 60 then
-        local highlights = type(last.highlights) == "table" and #last.highlights > 0
-            and (" · new records: " .. table.concat(last.highlights, "; ")) or ""
-        ns.Print("Last session: " .. RecapText(last.c, last.elapsed, last.top) .. highlights)
-    end
     ns.ResetSession()
+    if ns.settings.recap and type(last) == "table" and type(last.c) == "table"
+        and not Bad(last.elapsed) and last.elapsed > 60 then
+        local ok, message = pcall(function()
+            local highlights = type(last.highlights) == "table" and #last.highlights > 0
+                and (" · new records: " .. table.concat(last.highlights, "; ")) or ""
+            return "Last session: " .. RecapText(last.c, last.elapsed, last.top) .. highlights
+        end)
+        if ok then ns.Print(message) else ns.LogError("login:recap", message) end
+    end
 end)
 
 -- Each logout step runs on its own so a failure in one can never skip ns.Save(),
@@ -917,7 +943,7 @@ ns.On("PLAYER_LOGOUT", function()
     LogoutStep("flush", ns.FlushCombatDamage)
     LogoutStep("hooks", ns.OnLogout)
     if ns.char then LogoutStep("prune", ns.PruneTallies, ns.char) end
-    ns.Save()
+    LogoutStep("save", ns.Save)
 end)
 
 -- Slash commands

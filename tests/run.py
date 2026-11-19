@@ -43,6 +43,13 @@ local oldQuestChat = ns.src.questChat
 ns.src.questChat = 1
 eq(ns.StatSource({ key = "quests_done" }):find("fallback was used", 1, true) ~= nil, true, "quest source reports a fallback")
 ns.src.questChat = oldQuestChat
+local noCaptures = ns.Match(ns.MakePattern("Trade complete."), "Trade complete.")
+eq(type(noCaptures), "table", "literal notification matches")
+eq(next(noCaptures), nil, "literal notification does not fabricate captures")
+local originalSecret = ns.IsSecret
+ns.IsSecret = function(v) return v == "unreadable" end
+eq(ns.Match(ns.MakePattern("%s"), "unreadable"), nil, "unreadable chat is skipped")
+ns.IsSecret = originalSecret
 -- movement: 10 s at 7 yd/s on foot
 state.speed = 7
 for i = 1, 40 do NOW = NOW + 0.25; ticker.scripts.OnUpdate(ticker, 0.25) end
@@ -277,6 +284,21 @@ ns.InitDB()
 eq(ns.char.c.jumps, initialJumps, "recover previous generation when both current copies fail")
 eq(ns.char == checkpoint, false, "recovery does not alias its saved input")
 
+local savedRevision = ns.char.meta.rev
+ns.char.meta.rev = 9007199254740990
+ns.Save()
+eq(ns.char.meta.rev, 9007199254740990, "save revision saturates at valid limit")
+ns.char.meta.rev = savedRevision
+local originalHighlights = ns.SessionRecordHighlights
+local errorCount = #ns.errors
+ns.SessionRecordHighlights = function() error("broken recap fixture") end
+fire("PLAYER_LOGOUT")
+eq(ns.char.meta.rev, savedRevision + 1, "failed recap does not block record revision")
+eq(#ns.errors, errorCount + 1, "failed save callback is logged")
+ns.errors[#ns.errors] = nil
+eq(LifeTimeStatsCharDB.session.id, ns.session.id, "failed recap preserves reload continuity")
+eq(LifeTimeStatsCharDB.lastSession, nil, "failed recap does not retain stale summary")
+ns.SessionRecordHighlights = originalHighlights
 -- ===== v1.2 hardening =====
 -- help page + reset window
 ns.ShowPage("help"); ns.ResetWindow()
@@ -308,6 +330,18 @@ ns.InvalidateAccount()
 local acc2 = ns.GetView("account", "lifetime")
 eq(acc2.c.kills_npc >= 20, true, "old record merged into account view")
 eq(LifeTimeStatsDB.chars["Forever-Oldtimer"].u, nil, "account view does not mutate a legacy record")
+local malformed = ns.NewCharRecord()
+malformed.c.jumps, malformed.t.creatures = 0/0, false
+malformed.days["20260101"], malformed.f.quest_fast = false, "bad"
+malformed.rh[1] = { at = "bad", v = 10 }
+ns.db.chars["Forever-Malformed"] = malformed
+ns.InvalidateAccount()
+local safeView = ns.GetView("account", "lifetime")
+eq(type(safeView.c.jumps), "number", "malformed alt does not block account totals")
+eq(safeView.c.jumps == safeView.c.jumps, true, "malformed alt does not poison numeric totals")
+eq(malformed.f.quest_fast, "bad", "account view does not rewrite malformed source")
+ns.db.chars["Forever-Malformed"] = nil
+ns.InvalidateAccount()
 -- LTS1 backup (1.0 format) still restores
 local v1 = "c.jumps=777;r.max_hit=1234;t.creatures.Wolf=5"
 local function cs(str) local sum = 0 for i = 1, #str do sum = (sum * 31 + str:byte(i)) % 16777213 end return string.format("%06x", sum) end
@@ -327,6 +361,33 @@ eq(ns.char.t.budget_test.item1, 3, "existing lifetime tally can grow at cap")
 eq(ns.char.t.budget_test.item401, nil, "lifetime tally cannot exceed cap")
 eq(ns.session.t.budget_test.item401, nil, "session tally cannot exceed cap")
 ns.char.t.budget_test, ns.session.t.budget_test = nil, nil
+local impossibleDay = "days.20250229.jumps=4"
+eq(ns.Deserialize("LTS2|" .. cs(impossibleDay) .. "|" .. impossibleDay), nil, "legacy rejects invalid calendar day")
+local leapDay = "days.20240229.jumps=4"
+eq(type(ns.Deserialize("LTS2|" .. cs(leapDay):upper() .. "|" .. leapDay)), "table", "legacy accepts leap date and uppercase checksum")
+local foldDestination = ns.NewCharRecord()
+foldDestination.meta.monthsThrough = "20240229"
+ns.MergeMax(foldDestination, { days = { ["20240229"] = { jumps = 4 }, ["20240301"] = { jumps = 5 } } })
+eq(foldDestination.days["20240229"], nil, "legacy merge ignores days already rolled into months")
+eq(foldDestination.days["20240301"].jumps, 5, "legacy merge keeps newer day")
+local malformedHistory = ns.NewCharRecord()
+malformedHistory.qa = "bad"
+malformedHistory.t.test = { corrupt = "bad" }
+for i = 1, 401 do malformedHistory.t.test[string.format("%03d", i)] = 1 end
+ns.PruneTallies(malformedHistory)
+eq(type(malformedHistory.qa), "table", "corrupt quest timer container replaced")
+eq(malformedHistory.t.test.corrupt, nil, "non-numeric tally removed before sorting")
+eq(malformedHistory.t.test["400"], 1, "stable tie cutoff retains earlier label")
+eq(malformedHistory.t.test["401"], nil, "stable tie cutoff drops later label")
+local todayKey, days = ns.Today(), ns.char.days
+ns.char.days = { [todayKey] = false }
+eq(ns.GetView("char", "week").c.jumps, nil, "range tolerates malformed day container")
+eq(ns.DaySeries(ns.char, "jumps", 1)[1].v, 0, "chart tolerates malformed day container")
+ns.char.days[todayKey] = { jumps = "bad" }
+eq(ns.GetView("char", "month").c.jumps, nil, "range skips nonnumeric daily values")
+eq(ns.DaySeries(ns.char, "jumps", 1)[1].v, 0, "chart skips nonnumeric daily values")
+ns.char.days = days
+
 -- early events before the DB exists are ignored safely
 local saveChar = ns.char; ns.char = nil
 fire("PLAYER_MONEY"); fire("GOSSIP_SHOW"); fire("COMBAT_LOG_EVENT_UNFILTERED")

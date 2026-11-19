@@ -132,6 +132,18 @@ eq(ch.c.jumps, 0, "preview does not merge immediately")
 local button = ns.backupDialog.action
 button.scripts.OnClick(button)
 eq(ch.c.jumps, jumps, "restore merges the higher value back")
+local snapshots = LifeTimeStatsCharDB.snapshots
+LifeTimeStatsCharDB.snapshots = { false, { d = "20261119", t = "bad", text = snap.text }, snapshots[3] }
+local dialogBefore = ns.backupDialog.mode
+SlashCmdList.LIFETIMESTATS("snapshot list")
+SlashCmdList.LIFETIMESTATS("snapshot restore 3 extra")
+SlashCmdList.LIFETIMESTATS("snapshot show 2")
+eq(ns.backupDialog.mode, dialogBefore, "malformed snapshot rows and commands do not open dialogs")
+LifeTimeStatsCharDB.snapshots = snapshots
+local oddField = "  =2+2"
+eq(ns.CSVField(oddField, true), "'" .. oddField, "spreadsheet formula-like text neutralized")
+eq(ns.CSVField("a\rb", true), '"a\rb"', "bare CR quoted")
+eq(ns.CSVField(-2, true), "-2", "numeric negative preserved")
 -- A large preview reports progress, can be canceled, and never applies by itself.
 local source = ns.NewCharRecord()
 source.c.jumps = jumps + 100
@@ -221,6 +233,16 @@ local _, separators = csv:gsub("\n", "")
 eq(count, separators, "filtered CSV count excludes header")
 SlashCmdList.LIFETIMESTATS("export quests days 7")
 eq(ns.backupDialog.eb:GetText(), csv, "slash export applies the date filter")
+
+local deathsBefore = ch.deathlog
+ch.deathlog = { { t = "bad", x = "bad", y = math.huge, c = "Malformed death" } }
+local _, tolerantCSV, tolerantCount = ns.ExportCSV("deaths")
+eq(tolerantCount, 1, "CSV retains row with unreadable date and coordinates")
+eq(tolerantCSV:find("\n,Malformed death,,,,,", 1, true) ~= nil, true, "unreadable CSV cells are blank")
+ch.deathlog = false
+local _, _, emptyCount = ns.ExportCSV("deaths")
+eq(emptyCount, 0, "malformed history list exports header only")
+ch.deathlog = deathsBefore
 
 -- ------------------------------------------------------------ locale
 eq(ns.L["Quest history"], "Quest history", "missing translations fall back to English")
