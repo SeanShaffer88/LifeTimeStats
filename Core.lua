@@ -1045,7 +1045,7 @@ SlashCmdList.LIFETIMESTATS = function(msg)
     elseif msg == "resetwindow" then
         ns.ResetWindow()
         ns.Print("Window centered and fitted to the current UI canvas.")
-    elseif cmd == "size" or cmd == "fill" or cmd == "normal" then
+    elseif (cmd == "size" and msg:match("^%S+%s+%S")) or cmd == "fill" or cmd == "normal" then
         local arg = cmd == "size" and msg:match("^%S+%s+(%S+)") or cmd
         if arg == "fill" or arg == "normal" then
             if not ns.SetWindowSize(arg) then ns.Print("The window is already " .. (arg == "fill" and "filling the screen." or "at its normal size.")) end
