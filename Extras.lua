@@ -308,7 +308,6 @@ On("PLAYER_ENTERING_WORLD", function() whereZone = nil end)
 -- ------------------------------------------------------------ per-frame watcher
 -- Watches counters that other trackers bump and derives zone/hour/band tallies,
 -- firsts and rolling records from them. Also measures airtime of falls.
-local watch = CreateFrame("Frame")
 local last = {}
 local killTimes = {}
 local falling, fallStart, lastAir, landedAt = false, 0, 0, 0
@@ -328,10 +327,9 @@ local function Delta(key)
     return d
 end
 
-watch:SetScript("OnUpdate", ns.Guard("watcher", function(_, elapsed)
-    if not ns.char or not ns.char.c then return end
+ns.Sampling.ObserveFalls("airtime", ns.Guard("airtime", function()
+    if not ns.char then return end
     local now = GetTime()
-
     -- airtime
     local f = B(IsFalling()) and not B(UnitOnTaxi("player"))
     if f and not falling then
@@ -346,6 +344,12 @@ watch:SetScript("OnUpdate", ns.Guard("watcher", function(_, elapsed)
         end
     end
 
+end), function()
+    falling, fallStart, lastAir, landedAt = false, 0, 0, 0
+end)
+
+ns.Sampling.ObserveTaxi(ns.Guard("flight-duration", function()
+    local now = GetTime()
     -- flights
     local taxi = B(UnitOnTaxi("player"))
     if taxi and not taxiStart then taxiStart = now
@@ -354,6 +358,12 @@ watch:SetScript("OnUpdate", ns.Guard("watcher", function(_, elapsed)
         taxiStart = nil
         if dur > 5 then Min("flight_fast", dur, Zone()); Max("flight_long", dur, Zone()) end
     end
+
+end), function() taxiStart = nil end)
+
+ns.Sampling.Register("extras", 0.25, ns.Guard("watcher", function(_, elapsed)
+    if not ns.char or not ns.char.c then return end
+    local now = GetTime()
 
     -- everything below runs at 4 Hz
     formAcc = formAcc + elapsed

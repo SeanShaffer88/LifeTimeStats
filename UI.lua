@@ -152,7 +152,8 @@ local function StatRows(cat, view, sess, focus)
         local v, what = ns.StatValue(st, view)
         local ov = ns.StatValue(st, other)
         local empty = view.today and st.rec
-        local na, naTip = ns.IsNA(st, v)
+        local measurement = ns.Measurement.Resolve(st, view, { scope = Settings().scope, range = Settings().range })
+        local na, naTip = measurement.availability == "unavailable", measurement.reason
         rows[#rows + 1] = {
             (st.label2 and what) and (st.label .. ": " .. what) or st.label,
             na and "n/a" or (empty and "—" or ns.FormatStat(st, v)),
@@ -164,6 +165,7 @@ local function StatRows(cat, view, sess, focus)
             local pc = PerChar(st.key)
             if pc then rows[#rows].tip = ((st.tip and (st.tip .. "\n\n")) or "") .. pc end
         end
+        rows[#rows].tip = ((rows[#rows].tip or "") .. "\n" .. ns.Measurement.Text(measurement))
     end
     end
     return rows, sections
@@ -224,7 +226,8 @@ local function UpdateDashboardKpis(page, view, base, sess)
         local stat = pin.stat
         local value = ns.StatValue(stat, view)
         local unavailable, why = ns.IsNA(stat, value)
-        local tip = unavailable and why or stat.tip
+        local status = ns.Measurement.Resolve(stat, view, { scope = Settings().scope })
+        local tip = (unavailable and why or stat.tip or "") .. "\n" .. ns.Measurement.Text(status)
         if showCharacterParts and stat.key and not unavailable then
             local parts = PerChar(stat.key)
             if parts then tip = tip and (tip .. "\n\n" .. parts) or parts end
@@ -472,7 +475,10 @@ function ns.ShowStatDetail(st)
     local h = ns.StatHistory(st, ns.char)
     L.stat = st
     L.data = h
-    local F = function(v) return ns.FormatStat(st, v) end
+    local F = function(v)
+        if h.measurement.availability == "unavailable" and (v or 0) == 0 then return "—" end
+        return ns.FormatStat(st, v)
+    end
     L.title:SetText(st.label)
     L.home:SetText(h.home or "")
     local tip = st.tip or (st.rec and "A personal record: the best value ever reached." or "")
@@ -492,7 +498,7 @@ function ns.ShowStatDetail(st)
             { "Lifetime", F(h.value) }, { "This session", F(h.session or 0) },
             { "Today", h.series and F(h.today) or "—" }, { "Last 7 days", h.series and F(h.last7) or "—" },
             { "Last 30 days", h.series and F(h.last30) or "—" },
-            { "Best day", h.bestEver and (F(h.bestEver.v) .. " · " .. DetailDay(h.bestEver.d)) or "—" },
+            { "Best retained day", h.bestEver and (F(h.bestEver.v) .. " · " .. DetailDay(h.bestEver.d)) or "—" },
             { "Days with any", h.series and (Int(h.daysOnFile or 0) .. " of the last 40") or "—" },
             { "All characters", (function() local t = 0 for _, c in ipairs(h.chars) do t = t + c.v end return F(t) end)() },
         }
@@ -637,7 +643,7 @@ local function BuildDashboard()
         for _, e in ipairs(ns.DaySeries(base, "money_in", 30)) do inn = inn + e.v end
         for _, e in ipairs(ns.DaySeries(base, "money_out", 30)) do out = out + e.v end
         self.goldBig:SetText(Money(net))
-        self.goldInfo:SetText("Net, last 30 days\nEarned " .. Money(inn) .. "\nSpent " .. Money(out) .. "\nBest day " .. Money(best))
+        self.goldInfo:SetText("Net, last 30 days\nEarned " .. Money(inn) .. "\nSpent " .. Money(out) .. "\nBest retained day " .. Money(best))
         self.goldCols:Set(vals, { C.amber }, labels, { labels[1], labels[15], "Today" }, Money, { "Net gold" })
         -- deaths
         local o = c(base, "deaths_fatigue") + c(base, "deaths_slime")
@@ -931,7 +937,8 @@ local function BuildCategories()
                 sections[#sections + 1] = { name = group.name, index = #rows }
                 for _, st in ipairs(group.stats) do
                     local v, what = ns.StatValue(st, view)
-                    local na, naTip = ns.IsNA(st, v)
+                    local measurement = ns.Measurement.Resolve(st, view, { scope = Settings().scope, range = Settings().range })
+        local na, naTip = measurement.availability == "unavailable", measurement.reason
                     rows[#rows + 1] = { st.label, na and "n/a" or ((view.today) and "—" or ns.FormatStat(st, v)), what or "", tip = na and naTip or st.tip, what = what,
                         stat = st.label, def = st, color = (focus and st.label == focus) and T.amber or nil }
                 end
@@ -981,7 +988,9 @@ local function BuildFastest()
         local ur = {}
         local un, sun = base.un or {}, sess.un or {}
         for _, e in ipairs(ns.UNIQUES) do
-            ur[#ur + 1] = { e.label, Int(un[e.set] or 0), Plus(sun[e.set]) }
+            local retention = ns.Retention.Collection(base, "u", e.set)
+            ur[#ur + 1] = { e.label, (retention.atLeast and "at least " or "") .. Int(un[e.set] or 0), Plus(sun[e.set]),
+                tip = ns.Measurement.Text(ns.Measurement.Resolve(e, base, { scope = Settings().scope })) }
         end
         self.uniqT:SetData(ur, true)
 
@@ -1008,7 +1017,7 @@ local function BuildLists()
     end)
     function p:SectionTabs() return TableSectionTabs(self.nameT, self.sections) end
     p.nameT.onScroll = RefreshTabsAfterScroll
-    local rc = Panel(p, "Top 100", "star", lw + GAP, 0, CW - lw - GAP, CH)
+    local rc = Panel(p, "Top 100 retained", "star", lw + GAP, 0, CW - lw - GAP, CH)
     p.title = rc.title
     p.rankT = W.Table(rc.body, rc.bw, rc.bh, {
         { "#", 36, kind = "dim" }, { "NAME", 240, kind = "text" }, { "", 170, kind = "bar" }, { "TOTAL", 120, kind = "num" }, { "SESSION", 0, kind = "dim" },
@@ -1080,7 +1089,7 @@ local function BuildLists()
         local f = ns.FMT[def.fmt] or Int
         local rows = {}
         for i, e in ipairs(top) do
-            rows[i] = { tostring(i), tostring(e[1]), maxv > 0 and e[2] / maxv or 0, f(e[2]), st[e[1]] and ("+" .. f(st[e[1]])) or "" }
+            rows[i] = { tostring(i), tostring(e[1]), maxv > 0 and e[2] / maxv or 0, f(e[2]), st[e[1]] and ("+" .. f(st[e[1]])) or "", tip = ns.Retention.Collection(base, "t", def.id).text }
         end
         self.rankT:SetData(rows, self.lastSel == self.selected)
         self.lastSel = self.selected

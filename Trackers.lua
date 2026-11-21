@@ -831,11 +831,10 @@ local function MoveTick(dt)
 end
 
 -- ------------------------------------------------------------ ticker
-local ticker = CreateFrame("Frame")
 local acc, slow = 0, 0
 local MAX_TICK, MAX_GAP = 2, 120 -- seconds: normal tick limit, longest gap still counted
 ns.TICK_MAX_GAP = MAX_GAP
-ticker:SetScript("OnUpdate", ns.Guard("ticker", function(_, elapsed)
+ns.Sampling.Register("movement", 0.25, ns.Guard("ticker", function(_, elapsed)
     acc = acc + elapsed
     if acc < 0.25 then return end
     local dt = acc

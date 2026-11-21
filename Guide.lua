@@ -107,7 +107,7 @@ function ns.GuideRunStart(run)
     if not run or (run.type ~= "party" and run.type ~= "raid") or not ns.char then return end
     local log = ns.char.runlog
     log[#log + 1] = { s = run.start, e = run.start, n = Str(run.name) or "?", l = Level(), b = 0, de = 0, w = 0, g = 1 }
-    while #log > RUNLOG_CAP do table.remove(log, 1) end
+    while #log > RUNLOG_CAP do if ns.Retention then ns.Retention.Mark(ns.char, "h", "runlog") end; table.remove(log, 1) end
     Add("guide_runs_logged")
     local size = GroupSize()
     Add("guide_runs_" .. SizeLabel(size))

@@ -105,7 +105,8 @@ function ns.StatHistory(st, rec, n)
     local h = { stat = st, kind = st.rec and "record" or (st.key and "counter" or "computed") }
     h.value, h.what = SafeValue(st, rec)
     h.home = ns.StatHome(st)
-    h.source = ns.StatSource(st)
+    h.measurement = ns.Measurement.Resolve(st, rec)
+    h.source = ns.Measurement.Text(h.measurement)
     if ns.session then h.session = SafeValue(st, ns.session) end
 
     -- daily history: counters are kept per day for the last 40 days

@@ -146,8 +146,7 @@ end)
 -- ------------------------------------------------------------ camp vs inn, wild time, day/night
 local wild = 0
 local acc = 0
-local f = CreateFrame("Frame")
-f:SetScript("OnUpdate", ns.Guard("life", function(_, el)
+ns.Sampling.Register("life", 1, ns.Guard("life", function(_, el)
     acc = acc + el
     if acc < 1 then return end
     local dt = acc

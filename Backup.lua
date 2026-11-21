@@ -343,7 +343,7 @@ local FULL_HEADER = "LTS3|"
 local MAX_FULL_BYTES = 8 * 1024 * 1024
 local MAX_FULL_INPUT = MAX_FULL_BYTES + 64 * 1024
 local MAX_FULL_NODES = 700000
-local MAX_FULL_DEPTH = 6
+local MAX_FULL_DEPTH = 8 -- bounded provenance transition rows add two nested levels
 local MAX_TEXT_BYTES = 4096
 local MAX_ID = 9007199254740990
 local MAX_IMPORTED_SESSION_ID = MAX_ID - 65536
@@ -430,7 +430,7 @@ local FULL_META = {
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog", "meta",
+    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog", "meta", "measurement", "retention",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -553,6 +553,14 @@ local function StageFullSnapshot(snapshot, exportLegacy, progress)
     end
     local function StringOrID(value) return Key(value) or ID(value) end
 
+    section = "measurement provenance"
+    local measurement, measurementError = ns.Measurement.ValidateSaved(source.measurement)
+    Require(measurement ~= nil, measurementError or "Invalid measurement metadata.")
+    record.measurement = measurement
+    section = "retention metadata"
+    local retention, retentionError = ns.Retention.ValidateSaved(source.retention)
+    Require(retention ~= nil, retentionError or "Invalid retention metadata.")
+    record.retention = retention
     section = "counters"; record.c = Map(source.c, Key, Scalar(Number))
     section = "records"; record.r = Map(source.r, Key, function(value, key)
         if key:sub(-5) == "_what" then Check(Text(value)) else Check(Number(value)) end
@@ -929,6 +937,7 @@ local function CommitFullBackup(destination, character, staged, uniqueCounts)
     -- Swap only durable fields in place. Runs, quest timers, identity,
     -- revision and account settings remain on the existing character object.
     if ns.char ~= destination or ns.charKey ~= character then return false, "The active character changed." end
+    ns.Retention.MergeFlags(staged, destination) -- An older backup cannot erase known omissions.
     for _, field in ipairs(FULL_FIELDS) do
         if field ~= "meta" then destination[field] = staged[field] end
     end

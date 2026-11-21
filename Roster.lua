@@ -220,8 +220,7 @@ On("PLAYER_ENTERING_WORLD", function() pcall(ns.UpdatePeople) end)
 
 -- Grouped seconds per person, every 5 seconds while in a group.
 local acc = 0
-local tick = CreateFrame("Frame")
-tick:SetScript("OnUpdate", ns.Guard("people", function(_, el)
+ns.Sampling.Register("people", 5, ns.Guard("people", function(_, el)
     acc = acc + el
     if acc < 5 then return end
     local dt = acc

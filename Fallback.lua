@@ -367,8 +367,7 @@ On("PLAYER_UNGHOST", function() lastHp = nil end)
 -- ------------------------------------------------------------ falls from health
 local wasFalling, hpAtFall, airStart = false, nil, 0
 local lastFall -- { t, amt }
-local fallFrame = CreateFrame("Frame")
-fallFrame:SetScript("OnUpdate", ns.Guard("falls", function()
+ns.Sampling.ObserveFalls("health", ns.Guard("falls", function()
     if not ns.char or CleuActive() then return end
     local falling = B(IsFalling()) and not B(UnitOnTaxi("player"))
     if falling and not wasFalling then
@@ -398,7 +397,9 @@ fallFrame:SetScript("OnUpdate", ns.Guard("falls", function()
             end)
         end)
     end
-end))
+end), function()
+    wasFalling, hpAtFall, airStart, lastFall = false, nil, 0, nil
+end)
 
 -- ------------------------------------------------------------ death cause
 -- Breath / fatigue bars: only count when the bar is actually running (events, not
@@ -515,8 +516,7 @@ end
 
 -- ------------------------------------------------------------ housekeeping
 local acc = 0
-local tick = CreateFrame("Frame")
-tick:SetScript("OnUpdate", ns.Guard("unitwatch", function(_, el)
+ns.Sampling.Register("unitwatch", 0.25, ns.Guard("unitwatch", function(_, el)
     acc = acc + el
     if acc < 0.25 then return end
     acc = 0
