@@ -2,6 +2,16 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.27.1-forever] - 2026-11-21
+
+Prerelease for WoW: Forever 1.60.1 (Interface 16001). Offline regression and package checks pass. In-game validation is assumed for this release and was not performed during release preparation.
+
+### Fixed
+- Count a watched player death and its matching honor message as one PvP kill, in either arrival order, while preserving separate rapid kills.
+- Count each variant Hearthstone use once in its per-item tally.
+- Preserve the killing-blow amount from an environmental death recap for the biggest fatal fall record.
+- Restore the saved-data report for `/lts size` while keeping the window-size commands and aliases.
+
 ## [1.27.0-forever] - 2026-11-19
 
 Prerelease for WoW: Forever 1.60.1 (Interface 16001). Offline regression suites pass; live client testing is pending.
