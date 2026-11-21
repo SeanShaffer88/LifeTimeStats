@@ -156,7 +156,7 @@ local function StatRows(cat, view, sess, focus)
         local na, naTip = measurement.availability == "unavailable", measurement.reason
         rows[#rows + 1] = {
             (st.label2 and what) and (st.label .. ": " .. what) or st.label,
-            na and "n/a" or (empty and "—" or ns.FormatStat(st, v)),
+            na and "n/a" or ((empty or measurement.value == nil) and "—" or ns.FormatStat(st, v)),
             (Settings().showSession and type(ov) == "number" and ov > 0 and not st.get) and ("+" .. ns.FormatStat(st, ov)) or "",
             tip = na and naTip or st.tip, what = what, stat = st.label, def = st,
             color = (focus and st.label == focus) and T.amber or nil,
@@ -431,8 +431,14 @@ local function CreateStatDetail()
     W.Tip(close, "Close", "Close this statistic.")
 
     layer.tip = W.Text(dlg, 12, T.text)
-    layer.tip:SetPoint("TOPLEFT", 14, -64); layer.tip:SetPoint("RIGHT", -14, 0)
-    layer.tip:SetJustifyH("LEFT"); layer.tip:SetWordWrap(true)
+    layer.tip:SetPoint("TOPLEFT", 14, -64); layer.tip:SetWidth(width - 200); layer.tip:SetHeight(36)
+    layer.tip:SetJustifyH("LEFT"); layer.tip:SetWordWrap(false)
+    layer.measurementButton = W.FlatButton(dlg, "Measurement details…", 164, 26)
+    layer.measurementButton:SetPoint("TOPRIGHT", -14, -66)
+    layer.measurementButton:SetScript("OnClick", function()
+        local h = layer.data
+        if h then ns.ShowText(h.stat.label .. " · Measurement", "Read-only report · Ctrl+A, Ctrl+C to copy.", ns.Measurement.Text(h.measurement)) end
+    end)
 
     -- eight facts in two rows
     layer.facts = {}
@@ -475,27 +481,27 @@ function ns.ShowStatDetail(st)
     local h = ns.StatHistory(st, ns.char)
     L.stat = st
     L.data = h
-    local F = function(v)
-        if h.measurement.availability == "unavailable" and (v or 0) == 0 then return "—" end
+    local F = function(v, status)
+        if status and (status.value == nil or (status.availability == "unavailable" and (v or 0) == 0)) then return "—" end
         return ns.FormatStat(st, v)
     end
     L.title:SetText(st.label)
     L.home:SetText(h.home or "")
     local tip = st.tip or (st.rec and "A personal record: the best value ever reached." or "")
-    L.tip:SetText(h.source and (tip ~= "" and (tip .. "\n" .. h.source) or h.source) or tip)
+    L.tip:SetText(ns.Measurement.Summary(h.measurement))
 
     local facts
     if h.kind == "record" then
         local first, last = h.history[#h.history], h.history[1]
         facts = {
-            { "Best", F(h.value) }, { "Set at", h.what or "—" }, { "Times beaten", Int(#h.history) },
+            { "Best", F(h.value, h.measurement) }, { "Set at", h.what or "—" }, { "Times beaten", Int(#h.history) },
             { "Characters with it", Int((function() local n = 0 for _, c in ipairs(h.chars) do if c.v > 0 then n = n + 1 end end return n end)()) },
             { "First set", first and date("%b %d, %Y", first.at) or "—" }, { "Last beaten", last and date("%b %d, %Y", last.at) or "—" },
             { "Best on the account", h.chars[1] and h.chars[1].v > 0 and (F(h.chars[1].v) .. " · " .. tostring(h.chars[1].name)) or "—" }, { "", "" },
         }
     else
         facts = {
-            { "Lifetime", F(h.value) }, { "This session", F(h.session or 0) },
+            { "Lifetime", F(h.value, h.measurement) }, { "This session", F(h.session or 0) },
             { "Today", h.series and F(h.today) or "—" }, { "Last 7 days", h.series and F(h.last7) or "—" },
             { "Last 30 days", h.series and F(h.last30) or "—" },
             { "Best retained day", h.bestEver and (F(h.bestEver.v) .. " · " .. DetailDay(h.bestEver.d)) or "—" },
@@ -541,7 +547,7 @@ function ns.ShowStatDetail(st)
         local rows = {}
         for _, c in ipairs(h.chars) do
             local col = c.class and ns.ClassRGB and ns.ClassRGB(c.class) or nil
-            rows[#rows + 1] = { tostring(c.name) .. (c.me and "  (this character)" or ""), F(c.v), "", color = col }
+            rows[#rows + 1] = { tostring(c.name) .. (c.me and "  (this character)" or ""), F(c.v, c.measurement), "", color = col }
         end
         L.charTable:SetData(rows); L.charTable:Show(); L.recTable:Hide()
     end

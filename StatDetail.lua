@@ -148,7 +148,7 @@ function ns.StatHistory(st, rec, n)
         if type(r) == "table" and r.c then
             local v = SafeValue(st, r)
             local m = r.meta or {}
-            table.insert(h.chars, { key = key, name = m.name or key, class = m.class, v = v, me = r == rec })
+            table.insert(h.chars, { key = key, name = m.name or key, class = m.class, v = v, me = r == rec, measurement = ns.Measurement.Resolve(st, r) })
         end
     end
     table.sort(h.chars, function(a, b)

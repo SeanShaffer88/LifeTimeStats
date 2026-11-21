@@ -105,7 +105,7 @@ function ns.CompendiumCSV()
         for i, v in ipairs(views) do
             local ok, value = pcall(fn, v)
             local status = stat and ns.Measurement.Resolve(stat, v, { scope = i == #views and "account" or "character" })
-            parts[#parts + 1] = ok and (not status or status.availability ~= "unavailable") and CSVNumber(value) or ""
+            parts[#parts + 1] = ok and (not status or (status.value ~= nil and status.availability ~= "unavailable")) and CSVNumber(value) or ""
             statuses[i] = status and ns.Measurement.Text(status) or "Derived provider; historical source coverage unknown."
         end
         metadataRows[#metadataRows + 1] = { section, label, statuses }

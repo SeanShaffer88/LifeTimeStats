@@ -51,7 +51,9 @@ function Measurement.Catalog()
         local reviewed = catalog[id]
         local definition = reviewed and {
             id = id, family = reviewed.family, quality = reviewed.quality, provider = reviewed.provider,
-            source = families[reviewed.family], calculation = stat.tip
+            source = families[reviewed.family], inputs = reviewed.inputs or stat.measurementInputs,
+            computedPolicy = stat.get and (reviewed.computedPolicy or (stat.measurementInputs and "inputs") or "unknown-provider"),
+            calculation = reviewed.calculation or stat.measurementCalculation or stat.tip
                 or (stat.get and ("Reviewed computed provider " .. id) or (stat.rec and "Recorded maximum." or "Accumulated readable observations.")),
             availabilityPolicy = "registered-readable-feed", coveragePolicy = "since-recorded-provenance",
             category = category, key = stat.naKey or stat.key or stat.rec,
@@ -88,6 +90,21 @@ function Measurement.Definition(stat)
 end
 
 local function Current(definition, stat)
+    if stat.get then
+        if definition.computedPolicy ~= "inputs" or not definition.inputs or #definition.inputs == 0 then
+            return "unknown", "The named computed provider's current input coverage is not verified."
+        end
+        local unknown = false
+        for _, input in ipairs(definition.inputs) do
+            local kind, key = input:match("^(%a):(.+)$")
+            if kind == "c" or kind == "r" then
+                local state = Current({ key = key }, {})
+                if state == "unavailable" then return "unavailable", "A required computed input is unavailable: " .. key end
+                if state ~= "available" then unknown = true end
+            elseif kind ~= "u" and kind ~= "t" and kind ~= "h" then unknown = true end
+        end
+        if unknown then return "unknown", "Current coverage of one or more computed inputs is unverified." end
+    end
     local key = definition.key
     if key == "max_health" then
         local ok, value = pcall(function() return UnitHealthMax("player") end)
@@ -98,6 +115,14 @@ local function Current(definition, stat)
     if stat.expandedSource and (src[stat.expandedSource .. "Hidden"] or 0) > 0
         and not src[stat.expandedSource] then return "unavailable", "The sampled input is restricted." end
     if key and ns.CombatLogRestricted() then
+        local combatText = key == "hits" or key == "crits" or key == "hits_taken" or key == "crits_taken"
+            or key == "in_dodge" or key == "in_parry" or key == "in_block" or key == "in_miss"
+        if combatText then
+            if ns.eventStatus.UNIT_COMBAT == "rejected" then return "unavailable", "Client rejected combat text events." end
+            if (src.ucPlayer or 0) == 0 and (src.ucTarget or 0) == 0 then
+                return "unknown", "Combat text is registered; readable hit/avoidance flags have not been established."
+            end
+        end
         local meter = src.dmReadable or settings.dmReadable
         if ns.DM_KEYS and ns.DM_KEYS[key] then
             if meter then return "available" end
@@ -217,12 +242,12 @@ function Measurement.Resolve(stat, view, context)
     local session = view == ns.session or context.scope == "session"
     local legacy = not session and (not metadata or metadata.historicalUnknown ~= false)
     local availability = current
-    if current == "unavailable" and numeric and numeric ~= 0 and not session then availability = "unknown" end
+    if current == "unavailable" and numeric and (numeric ~= 0 or (stat.rec and view.r and view.r[stat.rec] ~= nil)) and not session then availability = "unknown" end
     if numeric == nil then availability = "unknown" end
     local result = { definition = definition, availability = availability, currentAvailability = current,
         quality = legacy and "historical-unknown" or definition.quality, source = definition.source,
         calculation = definition.calculation, reason = reason, historicalUnknown = legacy,
-        started = metadata and metadata.started, untilAt = time(),
+        started = session and Timestamp(view.wallStart) and view.wallStart or (metadata and metadata.started), untilAt = time(),
         sessionCharacter = session and (ns.char and ns.char.meta.name), value = numeric,
         retention = ns.Retention and ns.Retention.ForStat(stat, view) or nil }
     if context.scope == "account" then
@@ -243,6 +268,7 @@ end
 
 function Measurement.Text(status)
     local text = status.availability .. " · " .. status.quality .. "\n" .. status.source
+    if status.currentAvailability and status.currentAvailability ~= status.availability then text = text .. "\nCurrent feed: " .. status.currentAvailability end
     if status.calculation then text = text .. "\nCalculation: " .. status.calculation end
     if status.reason then text = text .. "\n" .. status.reason end
     if status.historicalUnknown then text = text .. "\nEarlier historical source coverage is unknown." end
@@ -253,3 +279,10 @@ function Measurement.Text(status)
 end
 
 for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "DAMAGE_METER_COMBAT_SESSION_UPDATED", "DAMAGE_METER_CURRENT_SESSION_UPDATED" }) do ns.On(event, Capture) end
+
+-- Fixed two-line header; the complete report remains available through Text.
+function Measurement.Summary(status)
+    local second = status.currentAvailability and status.currentAvailability ~= status.availability and ("Current feed: " .. status.currentAvailability)
+        or (status.historicalUnknown and "Earlier source coverage unknown") or "Source, formula and retained window in details"
+    return status.availability .. " · " .. status.quality .. "\n" .. second
+end

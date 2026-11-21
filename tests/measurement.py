@@ -5,6 +5,17 @@ ROOT = Path(__file__).resolve().parent.parent
 lua = lua51.LuaRuntime(unpack_returned_tuples=True)
 lua.execute((ROOT / "tests/harness.lua").read_text(encoding="utf-8"))
 lua.execute("ns = {}")
+lua.execute(r'''local create=CreateFrame
+CreateFrame=function(...)
+ local frame=create(...); local font=frame.CreateFontString
+ frame.CreateFontString=function(self,...)
+  local text=font(self,...)
+  text.SetHeight=function(self,height) self.h=height end
+  text.SetWidth=function(self,width) self.wdt=width end
+  return text
+ end
+ return frame
+end''')
 for name in (ROOT / "LifeTimeStats.toc").read_text(encoding="utf-8").splitlines():
     if name.strip().endswith(".lua"):
         lua.execute((ROOT / name.strip()).read_text(encoding="utf-8"), "LifeTimeStats", lua.globals().ns)
@@ -17,12 +28,16 @@ fire("ADDON_LOADED","LifeTimeStats"); fire("PLAYER_ENTERING_WORLD",true,false)
 check(ns.db.schema==3,"schema3 migration")
 local blank=ns.NewCharRecord()
 local catalog=ns.Measurement.Catalog(); check(#catalog==992,"all advertised families covered")
-for _,entry in ipairs(catalog) do check(entry.definition and entry.definition.provider and entry.definition.source and entry.definition.quality,"reviewed "..entry.id) end
+for _,entry in ipairs(catalog) do check(entry.definition and entry.definition.provider and entry.definition.source and entry.definition.quality,"reviewed "..entry.id)
+ if entry.stat.get then
+  local d=entry.definition
+  check(d.calculation and ((d.inputs and #d.inputs>0 and d.computedPolicy=="inputs") or d.computedPolicy=="unknown-provider"),"computed dependency/provider contract "..entry.id)
+ end end
 ns.STATS.life[#ns.STATS.life+1]={key="new_unreviewed_stat",label="new"}
 local missing=ns.Measurement.Definition(ns.STATS.life[#ns.STATS.life]); check(not missing,"new rows require explicit review")
 table.remove(ns.STATS.life)
 local function stat(key)
- for _,list in pairs(ns.STATS) do for _,s in ipairs(list) do if s.key==key or s.rec==key then return s end end end
+ for _,list in pairs(ns.STATS) do for _,s in ipairs(list) do if s.key==key or s.rec==key or s.label==key then return s end end end
  error(key)
 end
 local ch=ns.char
@@ -50,6 +65,43 @@ UnitHealthMax=hp
 ns.db.chars["Forever-Legacy"]=legacy
 check(ns.Measurement.Resolve(stat("jumps"),ns.GetView("account","lifetime"),{scope="account"}).availability=="mixed","mixed account provenance")
 ns.db.chars["Forever-Legacy"]=nil
+for _,label in ipairs({"Crit rate","Dodge rate"}) do
+ local status=ns.Measurement.Resolve(stat(label),ch)
+ check(status.currentAvailability=="unknown","unverified combat dependencies "..label)
+ check(status.calculation:find("/",1,true),"human formula "..label)
+end
+check(ns.Measurement.Resolve(stat("Effective healing per recorded heal"),ch).currentAvailability=="unavailable","computed healing propagates unavailable dependency")
+check(ns.Measurement.Resolve(stat("Gold per hour (online)"),ch).currentAvailability=="available","economy ratio has supported independent inputs")
+check(ns.Measurement.Resolve(stat("Active time (not AFK)"),ch).currentAvailability=="available","time computation remains independent of combat")
+check(ns.Measurement.Resolve(stat("Adventurer score"),ch).currentAvailability=="unknown","unverified multi-provider score stays conservative")
+local sessionStatus=ns.Measurement.Resolve(stat("jumps"),ns.session,{scope="session"})
+check(sessionStatus.started==ns.session.wallStart and sessionStatus.sessionCharacter==ns.char.meta.name,"session start and active-character scope")
+local oldHP=UnitHealthMax; UnitHealthMax=function() error("unreadable") end
+local absent=ns.Measurement.Resolve(stat("max_health"),ch)
+check(absent.value==nil and absent.currentAvailability=="unavailable","absent record and current restriction separate")
+local exported=ns.CompendiumCSV()
+local hpRow=exported:match("[^\n]*,Maximum health,[^\n]*") or exported:match("[^\n]*,Most health,[^\n]*")
+for line in exported:gmatch("[^\n]+") do if line:find(","..stat("max_health").label..",",1,true) then hpRow=line end end
+check(hpRow and hpRow:match(",,$"),"absent record exports empty character/account fields")
+ns.ToggleWindow(); ns.ShowStatDetail(stat("max_health"))
+local layer
+for _,frame in ipairs(frames) do if rawget(frame,"stat")==stat("max_health") then layer=frame end end
+check(layer and layer.tip:GetHeight()==36 and 64+layer.tip:GetHeight()<=112,"actual summary height fits fixed facts budget")
+layer.tip:SetWidth(220)
+check(select(2,layer.tip:GetText():gsub("\n",""))==1 and layer.tip:GetHeight()<=48,"narrow summary remains bounded two lines")
+local report;local show=ns.ShowText;ns.ShowText=function(_,_,text) report=text end
+layer.measurementButton.scripts.OnClick()
+check(report and report:find("Current feed: unavailable",1,true) and report:find("Calculation:",1,true),"full scroll/copy report retains complete metadata")
+ns.ShowText=show
+local other=ns.NewCharRecord();other.meta.name="Other";other.r.max_health=5
+ns.db.chars["Forever-Other"]=other
+ns.ShowStatDetail(stat("max_health"))
+check(layer.facts[1].val:GetText()=="—" and layer.facts[7].val:GetText():find("5",1,true),"active absent record cannot hide another character's retained record")
+ch.r.max_health=0
+check(ns.Measurement.Resolve(stat("max_health"),ch).value==0,"explicit historical record zero remains a value")
+ns.ShowStatDetail(stat("max_health"));check(layer.facts[1].val:GetText()=="0","genuine recorded zero remains visible")
+ch.r.max_health=nil; ns.db.chars["Forever-Other"]=nil
+UnitHealthMax=oldHP
 local original=ns.UNIQUE_CAP; ns.UNIQUE_CAP=20000
 for i=1,20000 do ch.u.test=ch.u.test or {};ch.u.test[tostring(i)]=true end;ch.un.test=20000
 check(not ns.Unique("test",20001),"unique cap preserved")
