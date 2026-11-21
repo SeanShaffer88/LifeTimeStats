@@ -19,7 +19,7 @@ local function Safe(v) if S(v) then Src("secret") return nil end return v end
 -- ------------------------------------------------------------ kill de-duplication
 -- A kill can be seen twice: as an XP chat line and as a watched unit dying.
 -- Each source leaves a short-lived marker per name; the other source consumes it.
-local marks = { xp = {}, unit = {} }
+local marks = { xp = {}, unit = {}, playerUnit = {}, honor = {} }
 local WINDOW = 5
 local function Consume(kind, name)
     local list = marks[kind][name]
@@ -32,7 +32,9 @@ end
 local function Mark(kind, name, detailed)
     local list = marks[kind][name] or {}
     marks[kind][name] = list
-    list[#list + 1] = { t = GetTime(), detailed = detailed }
+    local now = GetTime()
+    while list[1] and now - list[1].t > WINDOW do table.remove(list, 1) end
+    list[#list + 1] = { t = now, detailed = detailed }
 end
 
 -- Level colour of a kill, Classic rules (grey/green/yellow/orange/red).
@@ -82,15 +84,18 @@ local function Kill(source, guid, name, isPlayer, info)
     if CleuActive() then return end
     name = name or "Unknown"
     info = info or InfoFor(name, guid)
-    local other = (source == "xp") and "unit" or "xp"
-    if source ~= "honor" then
-        local entry = Consume(other, name)
-        if entry then
-            if not entry.detailed and info then entry.detailed = true; KillDetail(info, name) end
-            return
-        end
-        Mark(source, name, info ~= nil)
+    local marker, other = source, (source == "xp") and "unit" or "xp"
+    if source == "honor" then
+        other = "playerUnit"
+    elseif source == "unit" and isPlayer then
+        marker, other = "playerUnit", "honor"
     end
+    local entry = Consume(other, name)
+    if entry then
+        if not entry.detailed and info then entry.detailed = true; KillDetail(info, name) end
+        return
+    end
+    Mark(marker, name, info ~= nil)
     if source == "xp" then Src("xpKills") elseif source == "unit" then Src("unitKills") else Src("honorKills") end
     if not guid then guid = (isPlayer and "Player-" or "Creature-x-") .. name end
     ns.RecordKill(guid, name, nil)
@@ -450,7 +455,7 @@ function ns.RecapCause()
     local name = Str(e.sourceName)
     -- what hurt you in the last seconds of your life
     -- Recap amounts are readable on Forever (unlike UNIT_COMBAT and health).
-    local function N(v) if type(v) == "number" and not S(v) and v == v then return v end end
+    local function N(v) if type(v) == "number" and not S(v) and v > -math.huge and v < math.huge then return v end end
     local function What(ev)
         local et = Str(ev.environmentalType)
         if et then return et:sub(1, 1):upper() .. et:sub(2):lower(), et end
@@ -477,7 +482,7 @@ function ns.RecapCause()
     if kb and kb > 0 then Max("max_killing_blow", kb, (What(e))) end
     local ok2 = N(e.overkill); if ok2 and ok2 > 0 then Add("death_overkill", ok2); Max("max_death_overkill", ok2, (What(e))) end
     local hp = N(e.currentHP); if hp and hp > 0 then Max("max_hp_before_killing_blow", hp, (What(e))) end
-    if env then return { env = env:upper(), spell = env:sub(1, 1):upper() .. env:sub(2):lower(), t = GetTime() } end
+    if env then return { env = env:upper(), spell = env:sub(1, 1):upper() .. env:sub(2):lower(), amt = kb, t = GetTime() } end
     if not name and not spell then return nil end
     local player = false
     if name and B(UnitExists("target")) and Safe(UnitName("target")) == name then player = B(UnitIsPlayer("target")) and true or false end

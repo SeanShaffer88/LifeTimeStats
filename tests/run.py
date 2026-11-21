@@ -1715,4 +1715,110 @@ print(fails == 0 and "ALL PASS" or (fails .. " FAILURES"))
 return fails
 '''
 fails = L.execute(test)
-sys.exit(1 if fails else 0)
+audit = r'''
+local fails = 0
+local function eq(a, b, msg)
+  if a ~= b then fails = fails + 1; print("FAIL " .. msg .. ": got " .. tostring(a) .. " want " .. tostring(b)) end
+end
+local function fire(event, ...) ns.frame.scripts.OnEvent(ns.frame, event, ...) end
+fire("ADDON_LOADED", "LifeTimeStats")
+fire("PLAYER_ENTERING_WORLD", true, false)
+-- Audit regressions use normal event/command entry points with readable signals.
+do
+  local savedSpellInfo = GetSpellInfo
+  GetSpellInfo = function(id)
+    if id == 999998 then return "Audit Hearthstone" end
+    return savedSpellInfo(id)
+  end
+  local before = ns.char.c.hearths or 0
+  fire("UNIT_SPELLCAST_SUCCEEDED", "player", "audit", 999998)
+  eq(ns.char.c.hearths, before + 1, "variant hearth increments total once")
+  eq(ns.char.t.hearthsused["Audit Hearthstone"], 1, "variant hearth tally increments once")
+  before = ns.char.c.hearths or 0
+  local oldRegular = ns.char.t.hearthsused.Hearthstone or 0
+  fire("UNIT_SPELLCAST_SUCCEEDED", "player", "audit", 8690)
+  eq(ns.char.c.hearths, before + 1, "regular hearth increments total once")
+  eq(ns.char.t.hearthsused.Hearthstone, oldRegular + 1, "regular hearth tally increments once")
+  GetSpellInfo = savedSpellInfo
+
+  local oldShowText, reports = ns.ShowText, {}
+  ns.ShowText = function(title, hint, body) reports[#reports + 1] = { title, body } end
+  local fill = ns.settings.window.size
+  SlashCmdList.LIFETIMESTATS("size")
+  eq(#reports, 1, "bare size command opens report")
+  eq(reports[1] and reports[1][1], "Saved data size", "size command report title")
+  eq(ns.settings.window.size, fill, "size report preserves geometry preference")
+  SlashCmdList.LIFETIMESTATS("size invalid")
+  eq(#reports, 1, "invalid size argument does not open a report")
+  SlashCmdList.LIFETIMESTATS("size fill")
+  eq(ns.settings.window.size, "fill", "size fill still controls geometry")
+  SlashCmdList.LIFETIMESTATS("normal")
+  eq(ns.settings.window.size, "normal", "normal alias still controls geometry")
+  SlashCmdList.LIFETIMESTATS("fill")
+  eq(ns.settings.window.size, "fill", "fill alias still controls geometry")
+  SlashCmdList.LIFETIMESTATS("size normal")
+  eq(ns.settings.window.size, "normal", "size normal still controls geometry")
+  ns.ShowText = oldShowText
+
+  ns.cleuSeen = nil
+  state.combat = true
+  local unique = 0
+  local function unitDeath(name, player)
+    unique = unique + 1
+    units.target = { guid = (player and "Player-2-AUDIT-" or "Creature-0-1-1-1-99-") .. unique,
+      name = name, hostile = true, player = player }
+    fire("UNIT_HEALTH", "target")
+    units.target.dead = true
+    fire("UNIT_HEALTH", "target")
+    units.target = nil
+  end
+  local function honor(name)
+    fire("CHAT_MSG_COMBAT_HONOR_GAIN", name .. " dies, honorable kill Rank: Scout (Estimated Honor Points: 12)")
+  end
+  local pvp = ns.char.c.kills_pvp or 0
+  unitDeath("AuditFirst", true); honor("AuditFirst")
+  eq(ns.char.c.kills_pvp, pvp + 1, "unit then honor counts once")
+  honor("AuditReverse"); unitDeath("AuditReverse", true)
+  eq(ns.char.c.kills_pvp, pvp + 2, "honor then unit counts once")
+  honor("AuditRapid"); honor("AuditRapid")
+  unitDeath("AuditRapid", true); unitDeath("AuditRapid", true)
+  eq(ns.char.c.kills_pvp, pvp + 4, "two rapid same-victim kills match one marker each")
+  unitDeath("AuditRapidUnits", true); unitDeath("AuditRapidUnits", true)
+  honor("AuditRapidUnits"); honor("AuditRapidUnits")
+  eq(ns.char.c.kills_pvp, pvp + 6, "two unit deaths preserve same-source counts")
+  local npc = ns.char.c.kills_npc or 0
+  unitDeath("AuditSharedName", false); honor("AuditSharedName")
+  eq(ns.char.c.kills_npc, npc + 1, "NPC source retains its kill")
+  eq(ns.char.c.kills_pvp, pvp + 7, "same-name NPC cannot consume honor evidence")
+  honor("AuditExpired"); NOW = NOW + 6; unitDeath("AuditExpired", true)
+  eq(ns.char.c.kills_pvp, pvp + 9, "opposite-source markers expire after five seconds")
+  state.combat = false
+
+  local recapAmount = 700
+  C_DeathRecap = { HasRecapEvents = function(id) return id == 2 end,
+    GetRecapEvents = function() return { { event = "ENVIRONMENTAL_DAMAGE",
+      environmentalType = "Falling", amount = recapAmount } } end }
+  ns.char.meta.lastRecap = nil
+  local cause = ns.RecapCause()
+  eq(cause and cause.amt, 700, "recap cause retains killing-blow amount")
+  local fatalBefore = ns.char.r.max_fall_fatal or 0
+  ns.ClassifyDeath(cause)
+  eq(ns.char.r.max_fall_fatal, math.max(fatalBefore, 700), "fall recap preserves fatal maximum")
+  recapAmount, ns.char.meta.lastRecap = math.huge, nil
+  cause = ns.RecapCause()
+  eq(cause and cause.amt, nil, "nonfinite recap amount is omitted")
+  eq(cause and cause.env, "FALLING", "unreadable amount preserves death classification")
+end
+
+
+eq(#ns.errors, 0, "no audit handler errors")
+print(fails == 0 and "AUDIT PASS" or (fails .. " AUDIT FAILURES"))
+return fails
+'''
+audit_runtime = lua51.LuaRuntime(unpack_returned_tuples=True)
+audit_runtime.execute((pathlib.Path(__file__).parent / "harness.lua").read_text(encoding="utf-8"))
+audit_runtime.execute("ns = {}")
+for name in files:
+    audit_runtime.execute((ROOT / name).read_text(encoding="utf-8"), "LifeTimeStats", audit_runtime.globals().ns)
+audit_fails = audit_runtime.execute(audit)
+sys.exit(1 if fails or audit_fails else 0)

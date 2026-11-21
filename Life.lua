@@ -66,7 +66,6 @@ On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spellID)
         Add("elixirs"); Tally("potions", name)
     elseif name:find("Hearthstone") and spellID ~= 8690 then
         Add("hearths") -- other hearthstone toys/items
-        Tally("hearthsused", name)
     end
     if name:find("Hearthstone") then Tally("hearthsused", name); Tally("hearthzones", Zone()) end
 end)
