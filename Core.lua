@@ -245,7 +245,7 @@ local function RecoveryCandidate(rec, name, realm)
     if not Valid(rec) or not Revision(rec.meta.rev) then return false end
     if rec.meta.name and name and rec.meta.name ~= name then return false end
     if rec.meta.realm and rec.meta.realm ~= realm then return false end
-    for _, bucket in pairs(rec.t) do
+    for bucketName, bucket in pairs(rec.t) do
         if type(bucket) ~= "table" then return false end
         for _, n in pairs(bucket) do
             if type(n) ~= "number" or n ~= n or math.abs(n) == math.huge then return false end
@@ -285,7 +285,7 @@ function ns.InitDB()
     if type(LifeTimeStatsDB) ~= "table" then LifeTimeStatsDB = {} end
     local db = LifeTimeStatsDB
     local schema = db.schema
-    if type(schema) == "number" and schema > 2 then
+    if type(schema) == "number" and schema > 3 then
         ns.Print("This save was written by a newer LifeTimeStats version. Install that version to use it.")
         return
     end
@@ -320,6 +320,7 @@ function ns.InitDB()
         rec = CopyRecoveryRecord(previous)
         if rec then ns.restoredFromBackup = true end
     end
+    local isNew = rec == nil
     if rec then
         local generation = CopyRecoveryRecord(rec)
         if generation then charDB.previousGood = generation end
@@ -327,7 +328,12 @@ function ns.InitDB()
         rec = NewCharRecord()
     end
     Ensure(rec)
-    for _, other in pairs(db.chars) do if Valid(other) then Ensure(other) end end
+    if ns.Measurement then ns.Measurement.Initialize(rec, isNew) end
+    if ns.Retention then ns.Retention.Repair(rec) end
+    for _, other in pairs(db.chars) do if Valid(other) then
+        Ensure(other)
+        if ns.Retention then ns.Retention.Repair(other) end
+    end end
     db.chars[ns.charKey] = rec
     LifeTimeStatsCharDB = charDB
     LifeTimeStatsCharDB.data = rec
@@ -366,7 +372,7 @@ function ns.InitDB()
     meta.level = UnitLevel("player")
     meta.created = meta.created or time()
     ns.char = rec
-    db.schema = 2
+    db.schema = 3
     ns.InvalidateAccount()
 end
 
@@ -508,7 +514,10 @@ function ns.AddRecordHistory(rec, key, value, label, direction)
     if not ns.IsSecret(label) and type(label) == "string" and label ~= "" then event.w = label:sub(1, 100) end
     local log = rec.rh
     log[#log + 1] = event
-    while #log > HISTORY_CAP do table.remove(log, 1) end
+    while #log > HISTORY_CAP do
+        if ns.Retention then ns.Retention.Mark(rec, "h", "rh") end
+        table.remove(log, 1)
+    end
     return event
 end
 
@@ -616,7 +625,10 @@ function ns.Unique(set, key)
     local u = ch.u[set]
     if type(u) ~= "table" then u = {}; ch.u[set], ch.un[set] = u, 0 end
     if u[key] then return false end
-    if CounterValue(ch.un[set]) >= UNIQUE_CAP then return false end
+    if CounterValue(ch.un[set]) >= UNIQUE_CAP then
+        if ns.Retention then ns.Retention.Mark(ch, "u", set) end
+        return false
+    end
     u[key] = true
     ch.un[set] = CounterValue(ch.un[set]) + 1
     local s = ns.session
@@ -642,7 +654,7 @@ function ns.MarkTallyChanged(bucket, membershipChanged)
     if membershipChanged then tallyMembership[bucket] = (tallyMembership[bucket] or 0) + 1 end
 end
 
-local function AddTally(bucket, name, n)
+local function AddTally(bucket, name, n, record, bucketName)
     local isNew = bucket[name] == nil
     if isNew then
         local size = tallySizes[bucket]
@@ -652,6 +664,7 @@ local function AddTally(bucket, name, n)
         end
         if size >= TALLY_CAP then
             tallySizes[bucket] = size
+            if ns.Retention then ns.Retention.Mark(record, "t", bucketName) end
             return
         end
         tallySizes[bucket] = size + 1
@@ -670,10 +683,10 @@ function ns.Tally(tbl, name, n)
     if Bad(n) then return end
     local t = ns.char.t[tbl]
     if type(t) ~= "table" then t = {}; ns.char.t[tbl] = t end
-    AddTally(t, name, n)
+    AddTally(t, name, n, ns.char, tbl)
     local st = ns.session.t[tbl]
     if type(st) ~= "table" then st = {}; ns.session.t[tbl] = st end
-    AddTally(st, name, n)
+    AddTally(st, name, n, ns.session, tbl)
 end
 
 -- Keep day history bounded (performance + SavedVariables size).
@@ -700,6 +713,7 @@ function ns.RollUpDays(rec)
     if #keys <= DAY_KEEP then return 0 end
     table.sort(keys)
     local folded = #keys - DAY_KEEP
+    if ns.Retention then ns.Retention.Mark(rec, "h", "days") end
     for i = 1, folded do
         local k = keys[i]
         local m = k:sub(1, 6)
@@ -794,13 +808,14 @@ function ns.MonthSeries(view, key, n)
 end
 
 function ns.TrimTallyBuckets(rec)
-    for _, bucket in pairs(rec.t) do
+    for bucketName, bucket in pairs(rec.t) do
         if type(bucket) == "table" then
             local count, changed = 0, false
             for key, value in pairs(bucket) do
                 if Bad(value) then bucket[key], changed = nil, true else count = count + 1 end
             end
             if count > TALLY_CAP then
+                if ns.Retention then ns.Retention.Mark(rec, "t", bucketName) end
                 changed = true
                 local list = {}
                 for key, value in pairs(bucket) do list[#list + 1] = { key, value } end
@@ -839,6 +854,7 @@ local function MergeAccount()
             for k, n in pairs(rec.c) do
                 if not Bad(n) then v.c[k] = (v.c[k] or 0) + n end
             end
+            if ns.Retention then ns.Retention.MergeFlags(v, rec) end
             for k, n in pairs(rec.r) do
                 if type(k) == "string" and not Bad(n) and n > (v.r[k] or 0) then
                     v.r[k] = n

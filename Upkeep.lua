@@ -122,6 +122,9 @@ function ns.SizeReport()
             lines[#lines + 1] = string.format("%s: %s (%s entries) · largest: %s", key, KB(b), ns.FormatInt(n), table.concat(parts, ", "))
         end
     end
+    if ns.Retention and ns.char then
+        for _, line in ipairs(ns.Retention.Report(ns.char)) do lines[#lines + 1] = line end
+    end
     table.sort(lines)
     table.insert(lines, 1, "Account total: " .. KB(total) .. "  (warning at " .. KB(WARN_BYTES) .. " per character)")
     return lines, total
@@ -225,12 +228,23 @@ function ns.CSVField(v, spreadsheetSafe)
     return v
 end
 local function Rows(header, list, fn, spreadsheetSafe, since, timeKey)
+    local baseColumns = #header
+    local historyName = timeKey == "s" and "runlog" or (header[2] == "item" and "items" or (header[2] == "quest" and "quests" or "deathlog"))
+    local retained = ns.Retention.History(ns.char, historyName)
+    header[#header + 1] = "retained_count"
+    header[#header + 1] = "retained_limit"
+    header[#header + 1] = "retained_oldest"
+    header[#header + 1] = "retained_newest"
+    header[#header + 1] = "retention_status"
     local out = { table.concat(header, ",") }
     for _, e in ipairs(type(list) == "table" and list or {}) do
         if type(e) == "table" and (not since or (not ns.IsSecret(e[timeKey]) and not ns.BadNumber(e[timeKey]) and e[timeKey] >= since)) then
             local row, cells = fn(e), {}
             -- empty fields are nil, so walk every column instead of ipairs
-            for i = 1, #header do cells[i] = ns.CSVField(row[i], spreadsheetSafe) end
+            for i = 1, baseColumns do cells[i] = ns.CSVField(row[i], spreadsheetSafe) end
+            for _, value in ipairs({ retained.kept, retained.limit, retained.oldest or "", retained.newest or "", retained.text }) do
+                cells[#cells + 1] = ns.CSVField(value, spreadsheetSafe)
+            end
             out[#out + 1] = table.concat(cells, ",")
         end
     end

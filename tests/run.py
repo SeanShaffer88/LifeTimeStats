@@ -20,13 +20,18 @@ local function eq(a, b, msg)
   if a ~= b then fails = fails + 1; print("FAIL " .. msg .. ": got " .. tostring(a) .. " want " .. tostring(b)) end
 end
 local frame = ns.frame
-local function fire(ev, ...) frame.scripts.OnEvent(frame, ev, ...) end
+-- This legacy script exercises logout saves and then continues in the same
+-- mock runtime. Restart observation explicitly for its following scenarios.
+local function fire(ev, ...)
+  frame.scripts.OnEvent(frame, ev, ...)
+  if ev == "PLAYER_LOGOUT" and ns.Sampling then ns.Sampling.Start() end
+end
 local ticker
-for _, f in ipairs(frames) do if f.scripts.OnUpdate and f ~= frame then ticker = ticker or f end end
 
 fire("ADDON_LOADED", "LifeTimeStats")
 eq(type(LifeTimeStatsDB), "table", "db created")
 fire("PLAYER_ENTERING_WORLD", true, false)
+for _, f in ipairs(frames) do if f.scripts.OnUpdate and f ~= frame then ticker = ticker or f end end
 for _, e in ipairs(ns.errors) do print("ERR", e) end
 eq(ns.char.c.logins, 1, "login")
 eq(ns.char.c.hk_server, 42, "hk")
@@ -226,7 +231,7 @@ fire("CHAT_MSG_SKILL", "Your skill in Herbalism has increased to 75.")
 fire("UI_ERROR_MESSAGE", 1, "Inventory is full.")
 eq(ns.char.c.rolls_max, 1, "perfect roll"); eq(ns.char.c.rep_gained, 250, "rep"); eq(ns.char.t.skills.Herbalism, 1, "skill"); eq(ns.char.c.bags_full, 1, "bags full")
 -- watcher: continent/city/zone kills
-local w; for _, f in ipairs(frames) do if f.scripts.OnUpdate and f ~= frame and f ~= ticker then w = w or f end end
+local w = ticker -- observation domains now share the initialized dispatcher
 for i = 1, 8 do NOW = NOW + 0.25; w.scripts.OnUpdate(w, 0.25) end
 eq(ns.char.t.continenttime ~= nil and ns.char.t.continenttime.Kalimdor ~= nil, true, "continent time")
 -- days

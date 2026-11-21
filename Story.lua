@@ -75,7 +75,7 @@ function ns.Journal(text, kind, eventZone)
     ch.journal = ch.journal or {}
     local j = ch.journal
     j[#j + 1] = { time(), text, level, kind = kind, zone = ReadableZone(zone) }
-    if #j > JOURNAL_CAP then table.remove(j, 1) end
+    if #j > JOURNAL_CAP then if ns.Retention then ns.Retention.Mark(ns.char, "h", "journal") end; table.remove(j, 1) end
     -- Visible history refreshes on the window tick, coalescing event bursts.
 end
 
@@ -256,8 +256,7 @@ end
 
 local fed, naked = false, false
 local acc = 0
-local f = CreateFrame("Frame")
-f:SetScript("OnUpdate", ns.Guard("story", function(_, el)
+ns.Sampling.Register("story", 1, ns.Guard("story", function(_, el)
     acc = acc + el
     if acc < 1 then return end
     local dt = acc

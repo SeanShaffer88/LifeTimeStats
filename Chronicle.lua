@@ -23,8 +23,7 @@ end)
 
 -- ------------------------------------------------------------ grouped time, and with whom
 local acc, STEP = 0, 5
-local f = CreateFrame("Frame")
-f:SetScript("OnUpdate", ns.Guard and ns.Guard("chronicle", function(_, el)
+ns.Sampling.Register("chronicle", 5, ns.Guard("chronicle", function(_, el)
     acc = acc + el
     if acc < STEP then return end
     local dt = acc; acc = 0
@@ -42,7 +41,7 @@ f:SetScript("OnUpdate", ns.Guard and ns.Guard("chronicle", function(_, el)
             if name and not S(name) then Tally("groupedtime", name, dt) end
         end
     end
-end) or nil)
+end))
 
 -- ------------------------------------------------------------ gear
 On("PLAYER_EQUIPMENT_CHANGED", function(_, slot, empty)

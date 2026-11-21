@@ -325,3 +325,15 @@ Before publishing, test the candidate ZIP in Forever: clean install without opti
 - `tests/package_release.py` validates the versioned ZIP layout, manifest, required assets and SHA-256 sidecar.
 - New record history is saved locally, bounded to the 200 most recent breakthroughs per character/session, and included in text backups. Per-sample interval records need a meaningful gain before they create history or Journal entries.
 - These stubbed tests are not a live in-game compatibility test. `docs/screenshots/` holds the README images; `tests/`, `docs/` and `scripts/` are left out of release zips.
+
+### Measurement and retained data
+
+Statistic detail cards, value tooltips and Compendium CSV measurement rows share the measurement resolver. They separate the current feed's availability from historical totals, describe sampled or derived values, and show the provenance start and retained window. Unsupported numeric exports are empty; a supported zero remains numeric. Account results are conservative when characters have different coverage. Session metadata belongs to the active character.
+
+Schema 3 records bounded source-family transitions from this version onward (eight per family). Earlier source history remains unknown; opening an inactive character does not invent an observation start. Full-character backups validate and preserve provenance and omission flags. Legacy statistics imports retain existing omission evidence. Future save schemas are refused.
+
+Unique sets admit at most 20,000 identities and tallies 400 labels. Once an admission is omitted, unique counts read “at least” and top lists describe retained labels. Existing oversized legacy sets remain intact. Daily details retain 40 days with earlier aggregate totals folded into months; sessions retain 300 rows, personal-best history 200, Journal 600, runs 200, items/quests 1,000 and deaths 500. `/lts size` reports counts, limits and retained date windows. “Best retained day” refers to available daily details rather than an all-time daily record.
+
+One initialized sampling dispatcher coordinates periodic observers. It keeps guarded lightweight fall and taxi-state probes in its existing frame entry so short falls and flight endpoints keep their original timing fidelity; heavier health/airtime work is inactive while grounded. This reduces frame callbacks, not idle CPU to zero. World leave/logout and unreadable fall state reset armed observers. Host mock timing and callback measurements do not establish in-game CPU or frame latency.
+
+`tests/measurement.py` checks reviewed coverage of all 992 advertised definitions, availability, legacy/account metadata, bounded backup validation and retention. `tests/sampling.py` checks dispatcher lifecycle, failure isolation, short falls and bounded gaps. Both run in the release workflow.

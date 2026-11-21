@@ -25,7 +25,7 @@ function ns.LogSession()
     if not (e and e.id == s.id) then
         e = { id = s.id, s = start }
         log[#log + 1] = e
-        while #log > SESSION_KEEP do table.remove(log, 1) end
+        while #log > SESSION_KEEP do if ns.Retention then ns.Retention.Mark(ch, "h", "sessionlog") end; table.remove(log, 1) end
     end
     local c = s.c
     e.d = dur
@@ -98,35 +98,45 @@ function ns.CompendiumCSV()
     for i, c in ipairs(cols) do views[i] = c.rec end
     views[#views + 1] = account
     local lines = { table.concat(header, ",") }
-    local function Row(section, label, unit, fn)
+    local metadataRows = {}
+    local function Row(section, label, unit, fn, stat)
         local parts = { CSVField(section), CSVField(label), CSVField(unit or "") }
-        for _, v in ipairs(views) do
+        local statuses = {}
+        for i, v in ipairs(views) do
             local ok, value = pcall(fn, v)
-            parts[#parts + 1] = ok and CSVNumber(value) or ""
+            local status = stat and ns.Measurement.Resolve(stat, v, { scope = i == #views and "account" or "character" })
+            parts[#parts + 1] = ok and (not status or (status.value ~= nil and status.availability ~= "unavailable")) and CSVNumber(value) or ""
+            statuses[i] = status and ns.Measurement.Text(status) or "Derived provider; historical source coverage unknown."
         end
+        metadataRows[#metadataRows + 1] = { section, label, statuses }
         lines[#lines + 1] = table.concat(parts, ",")
     end
     for _, cat in ipairs(ns.CATEGORIES) do
         for _, st in ipairs(ns.STATS[cat.id] or {}) do
-            Row(cat.name, st.label, st.fmt, function(v) return (ns.StatValue(st, v)) end)
+            Row(cat.name, st.label, st.fmt, function(v) return (ns.StatValue(st, v)) end, st)
         end
     end
     for _, f in ipairs(ns.FASTEST or {}) do
-        Row("Fastest", f.label, "time", function(v) local x = v.f[f.key] return type(x) == "table" and x.v or x end)
+        Row("Fastest", f.label, "time", function(v) local x = v.f[f.key] return type(x) == "table" and x.v or x end, f)
     end
     for _, u in ipairs(ns.UNIQUES or {}) do
-        Row("Uniques", u.label, "int", function(v) return (v.un and v.un[u.set]) or 0 end)
+        Row("Uniques", u.label, "int", function(v) return (v.un and v.un[u.set]) or 0 end, u)
     end
     for _, f in ipairs(ns.FIRSTS or {}) do
-        Row("Firsts", f.label, "unix time", function(v) return v.firstd[f.key] end)
+        Row("Firsts", f.label, "unix time", function(v) return v.firstd[f.key] end, f)
     end
     for _, l in ipairs(ns.LISTS or {}) do
         Row("Top lists", l.name .. " (entries)", "int", function(v)
             if l.count then return l.count(v) end
             local n = 0 for _ in pairs((v.t or {})[l.id] or {}) do n = n + 1 end return n
-        end)
+        end, l)
     end
     if ns.Score then Row("Score", "Adventurer score", "int", function(v) return (ns.Score(v)) end) end
+    for _, row in ipairs(metadataRows) do
+        local parts = { CSVField(row[1]), CSVField(row[2] .. " [measurement]"), CSVField("status/source/window/retention") }
+        for _, value in ipairs(row[3]) do parts[#parts + 1] = CSVField(value:gsub("\n", " | ")) end
+        lines[#lines + 1] = table.concat(parts, ",")
+    end
     return table.concat(lines, "\n")
 end
 

@@ -175,7 +175,7 @@ function ns.LogItem(link, qty, quality, src, from)
     ch.items = ch.items or {}
     local log = ch.items
     log[#log + 1] = { t = time(), n = name, id = id, q = quality, src = src, from = from, z = Zone(), l = Level(), il = il, c = qty > 1 and qty or nil }
-    while #log > ITEM_CAP do table.remove(log, 1) end
+    while #log > ITEM_CAP do if ns.Retention then ns.Retention.Mark(ns.char, "h", "items") end; table.remove(log, 1) end
     Add("items_logged")
     Add("items_logged_q" .. math.min(quality, 5))
     if il then Max("max_item_level_found", il, name) end

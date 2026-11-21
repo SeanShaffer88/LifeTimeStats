@@ -25,7 +25,7 @@ On("QUEST_TURNED_IN", function(_, qid, xp, money)
     local log = ch.quests
     log[#log + 1] = { t = time(), id = N(qid), n = Str(info.title) or (N(qid) and ("Quest " .. qid)) or "?", z = Zone(), l = Level(),
         xp = N(xp), g = N(money), d = info.id == qid and N(info.dur) or nil }
-    while #log > QUEST_CAP do table.remove(log, 1) end
+    while #log > QUEST_CAP do if ns.Retention then ns.Retention.Mark(ns.char, "h", "quests") end; table.remove(log, 1) end
     Tally("questzones", Zone())
     Tally("questlevels", "Level " .. Level())
 end)
@@ -105,7 +105,7 @@ function ns.OnPlayerDeath(cause, eventZone)
     ch.deathlog = ch.deathlog or {}
     local log = ch.deathlog
     log[#log + 1] = spot
-    while #log > DEATH_CAP do table.remove(log, 1) end
+    while #log > DEATH_CAP do if ns.Retention then ns.Retention.Mark(ns.char, "h", "deathlog") end; table.remove(log, 1) end
     if spot.x then Add("deaths_located") end
     if ns.RefreshDeathPins then pcall(ns.RefreshDeathPins) end
 end

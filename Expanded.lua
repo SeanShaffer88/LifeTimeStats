@@ -387,6 +387,8 @@ for _, spec in ipairs(interfaces) do
     Stat(cat, label .. ": visits timed", "int", "ex_visits_" .. id, false, tip)
     Stat("records", label .. ": longest observed visit", "time", "ex_visit_longest_" .. id, true, tip)
     local row = { label = label .. ": average observed visit", fmt = "time", tip = "Completed visit durations only; ongoing visits are excluded.",
+        measurementInputs = { "c:ex_visit_completed_" .. id, "c:ex_visits_" .. id },
+        measurementCalculation = "Completed observed visit duration / completed visit count; zero when no visits are recorded.",
         get = function(v) return Ratio(C(v, "ex_visit_completed_" .. id), C(v, "ex_visits_" .. id)) end }
     table.insert(ns.STATS[cat], row); added = added + 1
 end
@@ -429,11 +431,30 @@ Stat("records", "Most moving time in an observed fight", "time", "ex_fight_movin
 Stat("records", "Most stationary time in an observed fight", "time", "ex_fight_stationary", true, sampleTip)
 
 local function Derived(cat, label, fmt, numerator, denominator, scale, naKey, tip, source)
+    local function InputLabel(key)
+        if type(key) ~= "string" then return "reviewed provider" end
+        for _, rows in pairs(ns.STATS) do
+            for _, row in ipairs(rows) do if row.key == key then return row.label end end
+        end
+        return key:gsub("^ex_", ""):gsub("_", " ")
+    end
     local function Value(v, key)
         if type(key) == "function" then return key(v) end
         return C(v, key)
     end
+    local functionInputs = {
+        ["Average typed bytes per public/channel message"] = { "c:chars_typed", "c:chat_sent", "c:whispers_sent" },
+        ["Overhealing share of total healing"] = { "c:overheal", "c:heal_done" },
+    }
+    local functionFormulas = {
+        ["Average typed bytes per public/channel message"] = "Typed bytes / max(0, sent messages - sent whispers); zero for an empty denominator.",
+        ["Overhealing share of total healing"] = "100 × overhealing / (effective healing + overhealing); zero for an empty denominator.",
+    }
     table.insert(ns.STATS[cat], { label = label, fmt = fmt, naKey = naKey, expandedSource = source,
+        measurementInputs = functionInputs[label] or (type(numerator) == "string" and type(denominator) == "string" and { "c:" .. numerator, "c:" .. denominator } or nil),
+        measurementCalculation = functionFormulas[label] or ((type(numerator) == "string" and InputLabel(numerator) or "reviewed numerator provider")
+            .. " / " .. (type(denominator) == "string" and InputLabel(denominator) or "reviewed denominator provider")
+            .. " × " .. tostring(scale or 1) .. "; zero for an empty denominator."),
         tip = tip or "Ratio of the recorded counters in the selected scope. No historical data is invented; a zero denominator displays zero.",
         get = function(v) return Ratio(Value(v, numerator), Value(v, denominator)) * (scale or 1) end })
     added = added + 1
