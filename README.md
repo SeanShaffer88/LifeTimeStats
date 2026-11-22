@@ -42,9 +42,9 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.29.0 prerelease archive, `LifeTimeStats-1.29.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.29.1 prerelease archive, `LifeTimeStats-1.29.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
-All 22 offline regression suites passed for this prerelease. Live-client validation is pending.
+All 23 offline regression suites passed for this prerelease. Live-client validation is pending.
 
 ## The window
 
@@ -185,7 +185,7 @@ Buttons under the character cards open:
 - **Goals**: a target for any statistic, with a progress bar. `/lts goal steps 1000000` adds one, `/lts goal list` lists them, `/lts goal remove 2` removes one. Reaching a goal writes a Journal line and a chat line.
 - **Trends**: this week against last week, and this month against last month, for steps, kills, deaths, quests, XP, gold, loot, time, damage, jumps, boss kills, gathering and fishing.
 
-After a session of 10 minutes or more, a summary window opens at your next login (turn it off with the session-recap setting). `/lts summary` shows the current session at any time.
+After a session of 10 minutes or more, a standalone journal recap opens four seconds after your next login. **Continue** closes it, and **Journal** opens the main journal. Tick **Never show again** to turn off the popup immediately. You can turn it back on in Settings → Chat and display → **Session window at login**. **Login recap in chat** controls the chat line separately. `/lts summary` shows the current session at any time.
 
 ### History (1.20)
 
@@ -230,7 +230,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.29.0-forever.zip`.
+1. Download `LifeTimeStats-1.29.1-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -286,7 +286,7 @@ Full character backups cover one character's saved record. Account settings, oth
 Options → AddOns → LifeTimeStats (or right-click the minimap button), in the addon's own theme:
 
 - **Appearance:** theme (with colour swatches; Reload button appears when it changes), class colour accent, window scale, lock window, minimap button.
-- **Chat and display:** session column, last-session recap, level-up line, kill counts on tooltips, milestones in chat, achievement alerts (Off / Chat / Toast / Both).
+- **Chat and display:** session column, Login recap in chat, Session window at login, level-up line, kill counts on tooltips, milestones in chat, achievement alerts (Off / Chat / Toast / Both).
 - **Screenshots:** on level-up, first boss kill, achievement (all off by default).
 - **Tracking and title:** count pet damage, title picker.
 - **Your data:** statistics, size and days of history; Backup, Restore, Character sheet, Reset session, Reset window, Erase character (asks first).

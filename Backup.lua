@@ -1130,7 +1130,8 @@ local PREFS = {
     { "classColor", "Class colour" }, { "countPet", "Pet tracking" },
     { "deathPins", "Death pins" }, { "itemTooltips", "Item tooltips" },
     { "levelMsg", "Level-up messages" }, { "milestones", "Milestones" },
-    { "recap", "Login recap" }, { "recordMoments", "Journal records" },
+    { "recap", "Login recap in chat" }, { "recapWindow", "Session window at login" },
+    { "recordMoments", "Journal records" },
 }
 local PREF_INDEX = {}
 for _, def in ipairs(PREFS) do PREF_INDEX[def[1]] = def end

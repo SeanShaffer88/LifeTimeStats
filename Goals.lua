@@ -256,10 +256,28 @@ function ns.ShowSessionSummary(current)
     end
 end
 
+local pendingLoginRecap
+local function EligibleLoginRecap(last)
+    return type(last) == "table" and not ns.IsSecret(last)
+        and type(last.c) == "table" and not ns.IsSecret(last.c)
+        and not ns.IsSecret(last.elapsed) and not ns.BadNumber(last.elapsed) and last.elapsed >= 600
+end
 On("PLAYER_ENTERING_WORLD", function(_, isLogin)
     if not isLogin or not ns.settings or ns.settings.recapWindow == false then return end
     local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
-    if type(last) == "table" and type(last.c) == "table" and (last.elapsed or 0) >= 600 and C_Timer then
-        C_Timer.After(4, function() pcall(ns.ShowSessionSummary, false) end)
-    end
+    if not EligibleLoginRecap(last) or not C_Timer or type(C_Timer.After) ~= "function" then return end
+    local character, key = ns.char, ns.charKey
+    local pending = {}
+    pendingLoginRecap = pending
+    C_Timer.After(4, function()
+        if pendingLoginRecap ~= pending then return end
+        pendingLoginRecap = nil
+        if ns.char ~= character or ns.charKey ~= key or not ns.settings or ns.settings.recapWindow == false
+            or type(LifeTimeStatsCharDB) ~= "table" or LifeTimeStatsCharDB.lastSession ~= last
+            or not EligibleLoginRecap(last) then return end
+        if type(ns.ShowLoginRecap) == "function" then
+            local ok, why = pcall(ns.ShowLoginRecap)
+            if not ok then ns.LogError("login:recap-window", why) end
+        end
+    end)
 end)

@@ -176,7 +176,7 @@ function ns.CreateOptions()
     local sf = CreateFrame("ScrollFrame", nil, panel)
     sf:SetPoint("TOPLEFT", 4, -4); sf:SetPoint("BOTTOMRIGHT", -4, 4)
     local c = CreateFrame("Frame", nil, sf)
-    c:SetSize(CW, Y(740))
+    c:SetSize(CW, Y(774))
     sf:SetScrollChild(c)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d)
@@ -256,21 +256,23 @@ function ns.CreateOptions()
         function() return S.shotAch end, function(v) S.shotAch = v end))
 
     -- CHAT & DISPLAY (right) ------------------------------------------
-    local cd = W.Card(c, Lang["Chat and display"], "social", R, y0, colW, Y(298))
+    local cd = W.Card(c, Lang["Chat and display"], "social", R, y0, colW, Y(332))
     b = cd.body
     Track(Toggle(b, 0, 0, cd.bw, "Session column", "Show how much each value grew this session.",
         function() return S.showSession end, function(v) S.showSession = v; ns.RefreshWindow() end))
-    Track(Toggle(b, 0, 34, cd.bw, "Last-session recap at login", "A chat line with your last session's highlights, and a summary window after sessions of 10+ minutes (/lts summary shows it any time).",
-        function() return S.recap end, function(v) S.recap = v; S.recapWindow = v end))
-    Track(Toggle(b, 0, 68, cd.bw, "Level-up line", "How long the level took and your time online.",
+    Track(Toggle(b, 0, 34, cd.bw, "Login recap in chat", "Print your last session's highlights in chat when you log in.",
+        function() return S.recap end, function(v) S.recap = v end))
+    Track(Toggle(b, 0, 68, cd.bw, "Session window at login", "Open a journal recap after sessions of 10 minutes or more. /lts summary remains available any time.",
+        function() return S.recapWindow ~= false end, function(v) S.recapWindow = v end))
+    Track(Toggle(b, 0, 102, cd.bw, "Level-up line", "How long the level took and your time online.",
         function() return S.levelMsg end, function(v) S.levelMsg = v end))
-    Track(Toggle(b, 0, 102, cd.bw, "Kill counts and item sources on tooltips", "How often you killed, fought and were hurt by a creature, and where you got an item (boss, quest, vendor...).",
+    Track(Toggle(b, 0, 136, cd.bw, "Kill counts and item sources on tooltips", "How often you killed, fought and were hurt by a creature, and where you got an item (boss, quest, vendor...).",
         function() return S.tooltipKills end, function(v) S.tooltipKills = v; S.itemTooltips = v end))
-    Track(Toggle(b, 0, 136, cd.bw, "Milestones in chat", "A line when counters pass 100, 1,000, 10,000...",
+    Track(Toggle(b, 0, 170, cd.bw, "Milestones in chat", "A line when counters pass 100, 1,000, 10,000...",
         function() return S.milestones end, function(v) S.milestones = v end))
-    Track(Toggle(b, 0, 170, cd.bw, "Record new highs in the journal", "Add meaningful new records to your local adventure chronicle; no live chat spam.",
+    Track(Toggle(b, 0, 204, cd.bw, "Record new highs in the journal", "Add meaningful new records to your local adventure chronicle; no live chat spam.",
         function() return S.recordMoments end, function(v) S.recordMoments = v end))
-    RowLabel(b, 0, 205, "Achievement alerts", nil)
+    RowLabel(b, 0, 239, "Achievement alerts", nil)
     local alerts
     alerts = W.Segmented(b, {
         { id = "off", label = Lang["Off"], tip = "Only a 'new' count on the sidebar." },
@@ -278,14 +280,14 @@ function ns.CreateOptions()
         { id = "toast", label = Lang["Toast"], tip = "A small pop-up you can click to open the page." },
         { id = "both", label = Lang["Both"], tip = "Chat line and toast." },
     }, function(id) S.achAnnounce = id; alerts:Select(id) end)
-    alerts:SetPoint("TOPLEFT", 6, -Y(225))
+    alerts:SetPoint("TOPLEFT", 6, -Y(259))
     alerts:Select(S.achAnnounce or "off")
     alerts.Sync = function(self) self:Select(S.achAnnounce or "off") end
     Track(alerts)
 
     -- TRACKING (right) ------------------------------------------------
-    -- below Chat and display (298 tall), so the alerts row is not covered
-    local tr = W.Card(c, Lang["Tracking and title"], "records", R, y0 + Y(308), colW, Y(114))
+    -- below Chat and display, so the alerts row is not covered
+    local tr = W.Card(c, Lang["Tracking and title"], "records", R, y0 + Y(342), colW, Y(114))
     b = tr.body
     Track(Toggle(b, 0, 0, tr.bw, "Count pet and guardian damage", "Include your pet's damage, kills and misses.",
         function() return S.countPet end, function(v) S.countPet = v end))
@@ -297,7 +299,7 @@ function ns.CreateOptions()
     Track(titleCyc)
 
     -- DATA (full width) -----------------------------------------------
-    local da = W.Card(c, Lang["Your data"], "chest", 0, y0 + Y(466), CW, 160)
+    local da = W.Card(c, Lang["Your data"], "chest", 0, y0 + Y(500), CW, 160)
     b = da.body
     local info = W.Text(b, 12, T.text); info:SetPoint("TOPLEFT", 6, -2)
     local note = W.Text(b, 10, T.dim); note:SetPoint("TOPLEFT", 6, -24); note:SetPoint("RIGHT", -6, 0); note:SetJustifyH("LEFT"); note:SetWordWrap(true)

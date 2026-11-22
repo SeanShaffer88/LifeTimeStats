@@ -2,6 +2,19 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.29.1-forever] - 2026-11-22
+
+Prerelease for WoW: Forever 1.60.1 (Interface 16001). All 23 offline regression suites passed. Live-client validation is pending.
+
+### Changed
+- Show the previous session in a standalone journal recap at login after sessions of at least ten minutes.
+- Add a “Never show again” checkbox and independent settings for the login window and chat recap.
+- Include the login-window preference in portable account preference backups.
+
+### Fixed
+- Cancel a pending login recap when its setting, character or saved-session identity changes.
+- Skip malformed saved session durations without opening the recap.
+
 ## [1.29.0-forever] - 2026-11-21
 
 Prerelease for WoW: Forever 1.60.1 (Interface 16001). All 22 offline regression suites passed. Live-client validation is pending.
