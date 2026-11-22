@@ -2037,6 +2037,141 @@ function ns.ShowSessionClosing(current)
     closingLayer:Open(current)
 end
 
+-- Login is a small, independent page: creating it never constructs the main notebook.
+local function CreateLoginRecap()
+    local popup = CreateFrame("Frame", "LifeTimeStatsLoginRecap", UIParent)
+    popup:SetSize(524, 520); popup:SetPoint("CENTER")
+    popup:SetFrameStrata("DIALOG"); popup:SetClampedToScreen(true); popup:EnableMouse(true)
+    popup:Hide()
+    local panel = W.Window(popup); panel:SetAllPoints()
+    if ns.Paper() then
+        local paper = panel:CreateTexture(nil, "BACKGROUND", nil, 1)
+        paper:SetTexture(W.MEDIA .. "notebook\\paper"); paper:SetAllPoints(); paper:SetAlpha(0.24)
+    end
+    local function Text(size, color, x, y, width)
+        local fs = W.Text(panel, size, color, nil, "LEFT")
+        fs:SetPoint("TOPLEFT", x, -y); fs:SetWidth(width); fs:SetJustifyV("TOP")
+        return fs
+    end
+    Text(10, T.dim, 25, 23, 450):SetText("LIFETIMESTATS · YOUR ADVENTURE CONTINUES")
+    popup.heading = Text(25, T.amber, 25, 48, 445)
+    popup.heading:SetHeight(34)
+    local headingTip = CreateFrame("Frame", nil, panel)
+    headingTip:SetPoint("TOPLEFT", 25, -48); headingTip:SetSize(445, 34); headingTip:EnableMouse(true)
+    W.Tip(headingTip, "Welcome back", function() return popup.headingText end)
+    popup.when = Text(12, T.dim, 25, 91, 465)
+    popup.duration = Text(23, T.text, 25, 115, 465)
+    local rule = W.Line(panel); rule:SetPoint("TOPLEFT", 25, -155); rule:SetPoint("TOPRIGHT", -25, -155); rule:SetHeight(1)
+    popup.counts = {}
+    for i, label in ipairs({ "QUESTS COMPLETED", "ENEMIES SLAIN", "DEATHS" }) do
+        local x = 25 + (i - 1) * 158
+        local value = Text(24, T.amber, x, 168, 145)
+        Text(9, T.dim, x, 201, 145):SetText(label)
+        popup.counts[i] = value
+    end
+    popup.sections = {}
+    for i, label in ipairs({ "PLACES VISITED", "BOSSES DEFEATED", "NEW RECORDS" }) do
+        local y = 218 + (i - 1) * 52
+        local owner = CreateFrame("Frame", nil, panel)
+        owner:SetPoint("TOPLEFT", 25, -y); owner:SetSize(474, 50); owner:EnableMouse(true)
+        Text(10, T.amber, 25, y, 474):SetText(label)
+        local body = Text(12, T.text, 25, y + 17, 474)
+        body:SetHeight(32); body:SetWordWrap(true)
+        if body.SetMaxLines then body:SetMaxLines(2) end
+        popup.sections[i] = { owner = owner, body = body, label = label }
+        local section = popup.sections[i]
+        W.Tip(owner, label, function() return section.full end)
+    end
+    popup.notes = Text(11, T.dim, 25, 380, 474)
+    popup.status = Text(10, T.dim, 25, 401, 474)
+    popup.status:SetHeight(28); popup.status:SetWordWrap(true)
+    local optOut = CreateFrame("CheckButton", nil, panel)
+    optOut:SetPoint("BOTTOMLEFT", 25, 60); optOut:SetSize(240, 28)
+    local square = W.Panel(optOut, T.bg, T.amber); square:SetSize(18, 18); square:SetPoint("LEFT", 0, 0)
+    local check = W.Fill(square, T.amber, "ARTWORK"); check:SetPoint("TOPLEFT", 4, -4); check:SetPoint("BOTTOMRIGHT", -4, 4)
+    local label = W.Text(optOut, 12, T.text); label:SetPoint("LEFT", square, "RIGHT", 8, 0); label:SetText("Never show again")
+    local function Sync()
+        optOut:SetChecked(ns.settings.recapWindow == false)
+        check:SetShown(optOut:GetChecked())
+    end
+    optOut:SetScript("OnClick", function(self)
+        ns.settings.recapWindow = not self:GetChecked()
+        check:SetShown(self:GetChecked())
+    end)
+    W.Tip(optOut, "Never show again", "Skip this welcome window on future logins. You can enable it again in Settings. Chat recaps are a separate setting.")
+    popup.optOut = optOut
+    local function Button(labelText, width)
+        local button = W.FlatButton(panel, labelText, width, 30)
+        if ns.Paper() then
+            W.Color(button.bg, T.tile)
+            button:SetScript("OnLeave", function() W.Color(button.bg, T.tile); button.edge:SetAlpha(0.5) end)
+        end
+        return button
+    end
+    popup.journal = Button("Open Journal", 144); popup.journal:SetPoint("BOTTOMRIGHT", -168, 20)
+    popup.journal:SetScript("OnClick", function() popup:Hide(); ns.ShowSessionClosing(false) end)
+    popup.continue = Button("Continue", 132); popup.continue:SetPoint("BOTTOMRIGHT", -25, 20)
+    popup.continue:SetScript("OnClick", function() popup:Hide() end)
+    local close = Button("×", 26); close:SetPoint("TOPRIGHT", -12, -12)
+    close:SetScript("OnClick", function() popup:Hide() end)
+    popup:SetScript("OnHide", function() GameTooltip:Hide() end)
+    popup:SetScript("OnShow", function()
+        Sync()
+        local preferred = ns.settings.window and ns.settings.window.scale or 1
+        if ns.IsSecret(preferred) or ns.BadNumber(preferred) or preferred <= 0 then preferred = 1 end
+        local width, height = UIParent:GetWidth(), UIParent:GetHeight()
+        local scale = math.min(preferred, 1.5)
+        if not ns.BadNumber(width) and width > 0 then scale = math.min(scale, width * 0.96 / 532) end
+        if not ns.BadNumber(height) and height > 0 then scale = math.min(scale, height * 0.96 / 528) end
+        popup:SetScale(scale)
+    end)
+    tinsert(UISpecialFrames, "LifeTimeStatsLoginRecap")
+    ns.loginRecap = popup
+    return popup
+end
+
+function ns.ShowLoginRecap()
+    local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
+    if ns.IsSecret(last) or type(last) ~= "table" or ns.IsSecret(last.c) or type(last.c) ~= "table"
+        or ns.IsSecret(last.elapsed) or ns.BadNumber(last.elapsed) or last.elapsed < 0 then return false end
+    -- All displayed data is copied into strings before showing; no live session references survive.
+    local function Plain(value) return not ns.IsSecret(value) and type(value) == "string" and value:gsub("|", "||") or "" end
+    local function Count(value) return not ns.IsSecret(value) and not ns.BadNumber(value) and value >= 0 and value or 0 end
+    local data = ns.SessionClosingData(false)
+    local savedDate = "Date not recorded"
+    if not ns.IsSecret(last.at) and not ns.BadNumber(last.at) then
+        local ok, formatted = pcall(date, "%b %d, %Y · %H:%M", last.at)
+        if ok and type(formatted) == "string" then savedDate = formatted end
+    end
+    local sections = {}
+    for i, key in ipairs({ "zones", "bosses", "highlights" }) do
+        local entries = {}
+        for _, text in ipairs(data[key] or {}) do entries[#entries + 1] = Plain(text) end
+        local full = table.concat(entries, "\n")
+        if i == 1 and data.zoneOverflow or i == 2 and data.bossOverflow then
+            full = full .. (#entries > 0 and "\n" or "") .. "More details beyond the saved limit."
+        end
+        sections[i] = { summary = #entries > 0 and table.concat(entries, " · ") or "None recorded.", full = full ~= "" and full or "None recorded." }
+    end
+    local heading = "Welcome back, " .. Plain(UnitName("player") or "adventurer")
+    local duration = Time(data.elapsed) .. " on your last adventure"
+    local counts = { Int(Count(last.c.quests_done)), Int(Count(last.c.kills_npc) + Count(last.c.kills_pvp)), Int(Count(last.c.deaths)) }
+    local notes = string.format("%s entries with note edits · Kept in your Journal", Int(Count(data.notes)))
+    local status = data.complete and "A local page from your adventure. Hover over details to read the full saved text."
+        or "Earlier details were not recorded for this session. Hover over details for the saved text."
+    local popup = ns.loginRecap or CreateLoginRecap()
+    popup.headingText = heading; popup.heading:SetText(heading)
+    popup.when:SetText(savedDate); popup.duration:SetText(duration)
+    for i, value in ipairs(counts) do popup.counts[i]:SetText(value) end
+    for i, entry in ipairs(sections) do
+        popup.sections[i].body:SetText(entry.summary)
+        popup.sections[i].full = entry.full
+    end
+    popup.notes:SetText(notes); popup.status:SetText(status)
+    popup:Show()
+    return true
+end
+
 local function CreateJournalNoteEditor()
     local layer = CreateFrame("Frame", nil, win)
     layer:SetAllPoints()
