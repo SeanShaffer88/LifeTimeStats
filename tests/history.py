@@ -184,6 +184,9 @@ eq(dialog.previewSnapshot.record, nil, "preview does not expose validated record
 local applyPreview = dialog.previewSnapshot.apply
 ch.c.jumps = jumps + 150
 button.scripts.OnClick(button)
+eq(ch.c.jumps, jumps + 150, "changed data requires reviewing refreshed full-restore comparison")
+eq(dialog.hint:GetText():find("updated comparison", 1, true) ~= nil, true, "changed preview explains reconfirmation")
+button.scripts.OnClick(button)
 eq(ch.c.jumps, jumps + 100, "confirmed full restore replaces stats")
 eq(applyPreview(), false, "full preview is single use")
 queued = {}
@@ -303,7 +306,7 @@ local position = ns.settings.window
 local record = ns.char
 ns.ShowImport(savedPrefs)
 eq(ns.settings.theme, "auto", "review does not change settings")
-eq(#ns.backupDialog.previewPreferences, 2, "review lists only changed settings")
+eq(#ns.backupDialog.previewPreferences.changes, 2, "review lists only changed settings")
 ns.settings.theme = "notebook"
 button.scripts.OnClick(button)
 eq(ns.settings.theme, "notebook", "settings changed during preview require fresh confirmation")

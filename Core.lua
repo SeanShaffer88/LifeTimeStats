@@ -1012,7 +1012,7 @@ end)
 ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin)
     if not isLogin then return end
     local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
-    ns.ResetSession()
+    ns.ResetSession(false)
     if ns.settings.recap and type(last) == "table" and type(last.c) == "table"
         and not Bad(last.elapsed) and last.elapsed > 60 then
         local ok, message = pcall(function()
@@ -1158,9 +1158,9 @@ SlashCmdList.LIFETIMESTATS = function(msg)
     end
 end
 
-function ns.ResetSession()
+function ns.ResetSession(finishPrevious)
     local previous = ns.session
-    if previous and GetTime() - previous.start >= 5 then
+    if finishPrevious ~= false and previous and GetTime() - previous.start >= 5 then
         if ns.LogSession then ns.LogSession() end
         if type(LifeTimeStatsCharDB) == "table" then
             local counters = {}

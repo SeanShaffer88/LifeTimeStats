@@ -42,9 +42,9 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.28.0 prerelease archive, `LifeTimeStats-1.28.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.29.0 prerelease archive, `LifeTimeStats-1.29.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
 
-The regression suites and live-client checks were not run for this prerelease.
+All 22 offline regression suites passed for this prerelease. Live-client validation is pending.
 
 ## The window
 
@@ -137,7 +137,11 @@ The Journal writes itself as you explore. Dated entries collect firsts, level-up
 
 Use **Chapters…** to create, rename or delete a named chapter. Open an entry to assign its chapter, then filter the Journal with **Chapter**. Deleting a chapter keeps its entries and notes. Up to forty named chapters are kept per character.
 
+The Journal's **Search** field matches literal text in entries, personal notes and zones, alongside the existing filters. Mark an entry with **Highlight** to favorite it, then show only those highlights. Each chapter can have a private introduction and a summary of its retained entries, notes, highlights and places.
+
 **Closing page** opens a local summary for the **Current session** or **Last saved** session. It collects observed places and bosses, new records, session totals and how many entries you annotated. Older sessions can show that earlier details were unavailable.
+
+Compare two retained saved sessions to see totals and rates per saved play hour. The comparison uses each row's saved duration and identifies whether either row is still the current session.
 
 ## Adventure Guide (key G)
 
@@ -226,7 +230,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.28.0-forever.zip`.
+1. Download `LifeTimeStats-1.29.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -246,6 +250,10 @@ Large backup pastes show checksum and entry-reading progress; full character bac
 Large backup exports show progress while validating full-character data, encoding statistics or full-character data, and computing checksums. The initial copy of mutable values remains synchronous so the backup reflects one consistent point in time. Closing the dialog or switching formats cancels pending work. The export captures the character state when requested; later tracking changes do not alter that backup.
 
 Choose **Account preferences** in the backup window to copy a separate preferences backup. It includes an allowlist of appearance and tracking options, not character data, window positions, or screenshot settings. Paste it into Restore to review the settings that would change, then confirm to apply them account-wide. Use `/reload` to apply appearance changes.
+
+New account preference backups also include Dashboard pins, custom layouts and the selected layout. Older LTSP1 preference backups keep their original scalar-settings scope.
+
+A confirmed full-character replacement first captures one local safety copy of the current character. Use the recovery control in Restore to preview that copy before applying it. Recovering it replaces the safety copy with the state being replaced, so you can reverse the recovery. Full-character backups also keep Journal highlights and chapter introductions.
 
 Full character backups cover one character's saved record. Account settings, other characters, Dashboard pins, the active session, and in-progress tracking are outside that snapshot.
 

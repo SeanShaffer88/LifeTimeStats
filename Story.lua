@@ -266,7 +266,11 @@ function ns.SetJournalNote(entry, text)
     if not HasJournalEntry(entry) then return false, "This Journal entry is no longer available." end
 
     if text == nil then
-        if entry.note ~= nil then entry.note = nil; NoteEdited(entry) end
+        if entry.note ~= nil then
+            entry.note = nil
+            NoteEdited(entry)
+            ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+        end
         return true
     end
     if S(text) or type(text) ~= "string" then return false, "The note must be readable text." end
@@ -281,8 +285,150 @@ function ns.SetJournalNote(entry, text)
     -- continuation range, regardless of how many bytes it occupies.
     local _, characters = text:gsub("[^\128-\191]", "")
     if characters > ns.JOURNAL_NOTE_LIMIT then return false, tooLong end
-    if entry.note ~= text then entry.note = text; NoteEdited(entry) end
+    if entry.note ~= text then
+        entry.note = text
+        NoteEdited(entry)
+        ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    end
     return true
+end
+
+function ns.JournalFavorite(entry)
+    return type(entry) == "table" and not S(entry) and not S(entry.favorite) and entry.favorite == true
+end
+
+function ns.SetJournalFavorite(entry, favorite)
+    if not HasJournalEntry(entry) then return false, "This Journal entry is no longer available." end
+    if S(favorite) or type(favorite) ~= "boolean" then return false, "Choose whether to favorite this entry." end
+    if ns.JournalFavorite(entry) ~= favorite then
+        entry.favorite = favorite or nil
+        ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    end
+    return true
+end
+
+function ns.JournalSearchLower(value)
+    if not SafeStr(value) then return "" end
+    if C_Intl and type(C_Intl.ToLower) == "function" then
+        local ok, lowered = pcall(C_Intl.ToLower, value)
+        if ok and SafeStr(lowered) then return lowered end
+    end
+    return value:lower()
+end
+
+local function JournalQuery(value)
+    if not SafeStr(value) then return "" end
+    value = value:match("^%s*(.-)%s*$")
+    local index, count = 1, 0
+    while index <= #value and count < 200 do
+        local byte = value:byte(index)
+        local width = byte >= 240 and 4 or byte >= 224 and 3 or byte >= 192 and 2 or 1
+        index, count = index + width, count + 1
+    end
+    return ns.JournalSearchLower(value:sub(1, index - 1))
+end
+
+function ns.JournalMatches(entry, filters)
+    if type(entry) ~= "table" or S(entry) or not SafeStr(entry[2]) then return false end
+    filters = type(filters) == "table" and filters or {}
+    local kind, zone, alsoKind = ns.JournalEntryInfo(entry)
+    if filters.kind and filters.kind ~= "" and filters.kind ~= "all"
+        and kind ~= filters.kind and alsoKind ~= filters.kind then return false end
+    local zoneQuery = JournalQuery(filters.zone)
+    if zoneQuery ~= "" and not (zone and ns.JournalSearchLower(zone):find(zoneQuery, 1, true)) then return false end
+    if filters.chapter and filters.chapter ~= "" and filters.chapter ~= "all" then
+        if filters.chapter == "unassigned" then
+            if entry.chapter ~= nil then return false end
+        elseif entry.chapter ~= filters.chapter then return false end
+    end
+    if filters.favoritesOnly and not ns.JournalFavorite(entry) then return false end
+    local query = JournalQuery(filters.text)
+    if query == "" then return true end
+    for _, text in ipairs({ entry[2], ns.JournalNote(entry) or "", zone or "" }) do
+        if ns.JournalSearchLower(text):find(query, 1, true) then return true end
+    end
+    return false
+end
+
+function ns.FilterJournal(entries, filters)
+    local result = {}
+    for _, entry in ipairs(type(entries) == "table" and entries or {}) do
+        if ns.JournalMatches(entry, filters) then result[#result + 1] = entry end
+    end
+    return result
+end
+
+function ns.ValidateJournalChapterIntro(text)
+    if text == nil then return "" end
+    if S(text) or type(text) ~= "string" then return nil, "Enter a readable chapter introduction." end
+    text = text:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("\t", " "):match("^%s*(.-)%s*$")
+    if text:find("[%z\1-\8\11-\31\127]") then return nil, "The introduction contains unsupported control characters." end
+    if #text > 2000 then return nil, "Keep the introduction to 500 characters or fewer." end
+    local index, count = 1, 0
+    while index <= #text do
+        local byte, width = text:byte(index), 1
+        if byte >= 194 and byte <= 223 then width = 2
+        elseif byte >= 224 and byte <= 239 then width = 3
+        elseif byte >= 240 and byte <= 244 then width = 4
+        elseif byte >= 128 then return nil, "The introduction contains invalid text." end
+        local second = text:byte(index + 1) or 0
+        if (byte == 224 and second < 160) or (byte == 237 and second > 159)
+            or (byte == 240 and second < 144) or (byte == 244 and second > 143) then
+            return nil, "The introduction contains invalid text."
+        end
+        for offset = 1, width - 1 do
+            local continuation = text:byte(index + offset) or 0
+            if continuation < 128 or continuation > 191 then return nil, "The introduction contains invalid text." end
+        end
+        index, count = index + width, count + 1
+        if count > 500 then return nil, "Keep the introduction to 500 characters or fewer." end
+    end
+    return text
+end
+
+function ns.SetJournalChapterIntro(id, text)
+    local chapter = FindChapter(id)
+    if not chapter then return false, "This chapter is no longer available." end
+    local clean, reason = ns.ValidateJournalChapterIntro(text)
+    if clean == nil then return false, reason end
+    clean = clean ~= "" and clean or nil
+    if chapter.intro ~= clean then
+        chapter.intro = clean
+        ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    end
+    return true
+end
+
+function ns.JournalChapterSummary(id, record)
+    record = record or ns.char
+    if type(record) ~= "table" or S(record) then return nil, "The character is unavailable." end
+    local chapter
+    for _, value in ipairs(record.chapters or {}) do if value.id == id then chapter = value; break end end
+    if not chapter then return nil, "This chapter is no longer available." end
+    local retention = ns.Retention and ns.Retention.History(record, "journal")
+    local result = {
+        id = id, name = chapter.name, intro = chapter.intro, count = 0, notes = 0, favorites = 0,
+        kinds = { first = 0, boss = 0, death = 0, personalBest = 0 }, zones = {},
+        retainedOnly = retention and retention.partial or false,
+    }
+    local zones = {}
+    for _, entry in ipairs(record.journal or {}) do
+        if type(entry) == "table" and entry.chapter == id then
+            result.count = result.count + 1
+            if ns.JournalNote(entry) then result.notes = result.notes + 1 end
+            if ns.JournalFavorite(entry) then result.favorites = result.favorites + 1 end
+            if not S(entry[1]) and not ns.BadNumber(entry[1]) then
+                result.first = result.first and math.min(result.first, entry[1]) or entry[1]
+                result.last = result.last and math.max(result.last, entry[1]) or entry[1]
+            end
+            local kind, zone, alsoKind = ns.JournalEntryInfo(entry)
+            if result.kinds[kind] then result.kinds[kind] = result.kinds[kind] + 1 end
+            if alsoKind ~= kind and result.kinds[alsoKind] then result.kinds[alsoKind] = result.kinds[alsoKind] + 1 end
+            if zone and not zones[zone] then result.zones[#result.zones + 1], zones[zone] = zone, true end
+        end
+    end
+    table.sort(result.zones)
+    return result
 end
 
 -- ------------------------------------------------------------ level snapshots

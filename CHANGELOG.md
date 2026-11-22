@@ -2,6 +2,20 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.29.0-forever] - 2026-11-21
+
+Prerelease for WoW: Forever 1.60.1 (Interface 16001). All 22 offline regression suites passed. Live-client validation is pending.
+
+### Added
+- Journal text search and favorites, with combined entry-type, zone and chapter filters.
+- Chapter introductions and summaries of retained entries, places, personal notes and favorites.
+- Saved-session comparison with totals and rates per saved play hour.
+- Portable Dashboard pins and named layouts in account preference backups, with a confirmation preview.
+- A local safety copy before full-character replacement and a preview for recovering that copy.
+
+### Fixed
+- Preserve quick-relog and reload session continuity without finalizing a stale prior session twice.
+
 ## [1.28.0-forever] - 2026-11-21
 
 Prerelease for WoW: Forever 1.60.1 (Interface 16001). Regression suites and live-client checks were not run for this release, at the user's request.
