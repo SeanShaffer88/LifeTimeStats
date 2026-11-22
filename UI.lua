@@ -53,6 +53,8 @@ local pinLayer
 local noteLayer
 local chapterLayer
 local closingLayer
+local chapterPageLayer
+local comparisonLayer
 
 local function Choice(parent, width, onPick)
     local f = CreateFrame("Frame", nil, parent)
@@ -64,12 +66,12 @@ local function Choice(parent, width, onPick)
     local text = W.Text(f, 12, T.text, nil, "CENTER")
     text:SetPoint("LEFT", left, "RIGHT", 5, 0); text:SetPoint("RIGHT", right, "LEFT", -5, 0)
     f:EnableMouse(true)
-    W.Tip(f, "Selection", function() return text:GetText() end)
+    W.Tip(f, "Selection", function() return f.tip or text:GetText() end)
     function f:SetChoices(items, selected)
         self.items, self.selected = items, selected
-        text:SetText("")
+        text:SetText(""); self.tip = nil
         for _, item in ipairs(items) do
-            if item.id == selected then text:SetText(item.name); break end
+            if item.id == selected then text:SetText(item.name); self.tip = item.tip; break end
         end
         left:SetEnabled(#items > 1); right:SetEnabled(#items > 1)
     end
@@ -1763,15 +1765,6 @@ end
 -- ============================================================ JOURNAL
 local JOURNAL_PAGE_SIZE = 10
 
-local function JournalZoneLower(text)
-    local lower = C_Intl and C_Intl.ToLower
-    if type(lower) == "function" then
-        local ok, value = pcall(lower, text)
-        if ok and not ns.IsSecret(value) and type(value) == "string" then return value end
-    end
-    return text:lower()
-end
-
 local function JournalEntryTitle(entry)
     local _, zone = ns.JournalEntryInfo(entry)
     return DateLabel(entry[1]) .. "  ·  Level " .. (entry[3] or "?") .. (zone and ("  ·  " .. zone) or "")
@@ -1799,6 +1792,83 @@ local function JournalModal(title, width, height)
     return layer, panel, status
 end
 
+local function CreateChapterPage()
+    local layer, panel, status = JournalModal("A chapter of your story", 580, 472)
+    local selected
+    local title = W.Text(panel, 18, T.amber, nil, "CENTER")
+    title:SetPoint("TOPLEFT", 13, -46); title:SetSize(554, 24)
+    local summaryScroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    summaryScroll:SetPoint("TOPLEFT", 13, -77); summaryScroll:SetSize(529, 108)
+    local summaryBody = CreateFrame("Frame", nil, summaryScroll)
+    summaryBody:SetSize(520, 108); summaryScroll:SetScrollChild(summaryBody)
+    local summary = W.Text(summaryBody, 12, T.text, nil, "LEFT")
+    summary:SetPoint("TOPLEFT"); summary:SetWidth(520); summary:SetWordWrap(true)
+    local label = W.Text(panel, 13, T.text); label:SetPoint("TOPLEFT", 13, -202); label:SetText("Chapter introduction")
+    local box = W.Panel(panel, T.bg); box:SetPoint("TOPLEFT", 13, -224); box:SetSize(554, 148)
+    local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 9, -7); scroll:SetPoint("BOTTOMRIGHT", -25, 7)
+    local intro = CreateFrame("EditBox", nil, scroll)
+    intro:SetMultiLine(true); intro:SetAutoFocus(false); intro:SetFont(W.FONT, 13, "")
+    intro:SetTextColor(T.text[1], T.text[2], T.text[3]); intro:SetSize(518, 1); intro:SetPoint("TOPLEFT")
+    scroll:SetScrollChild(intro)
+    local cursorY, cursorHeight
+    local function KeepIntroVisible()
+        if not layer:IsVisible() or not cursorY or not cursorHeight then return end
+        local offset, height = scroll:GetVerticalScroll(), scroll:GetHeight()
+        local top = -cursorY
+        if top + cursorHeight > offset + height then top = top + cursorHeight - height
+        elseif top >= offset then return end
+        scroll:SetVerticalScroll(math.max(0, math.min(top, scroll:GetVerticalScrollRange())))
+    end
+    intro:SetScript("OnCursorChanged", function(_, _, y, _, lineHeight)
+        cursorY, cursorHeight = y, lineHeight
+        KeepIntroVisible()
+    end)
+    intro:SetScript("OnTextChanged", function()
+        scroll:UpdateScrollChildRect()
+        if intro:HasFocus() then KeepIntroVisible() end
+    end)
+    scroll:HookScript("OnScrollRangeChanged", function() if intro:HasFocus() then KeepIntroVisible() end end)
+    intro:SetScript("OnEscapePressed", function() layer:Hide() end)
+    local save = W.FlatButton(panel, "Save introduction", 151, 24); save:SetPoint("TOPLEFT", 13, -383)
+    local function Summary()
+        local data = ns.JournalChapterSummary(selected, ns.char)
+        if not data then return end
+        title:SetText(data.name)
+        local period = data.first and data.last and (DateLabel(data.first) .. " — " .. DateLabel(data.last)) or "No assigned entries yet"
+        local kinds = data.kinds or {}
+        summary:SetText(period .. "\n\n" .. string.format("%d entries · %d Highlights · %d notes\n%d firsts · %d bosses · %d deaths · %d personal bests\n\n%s",
+            data.count or 0, data.favorites or 0, data.notes or 0, kinds.first or 0, kinds.boss or 0, kinds.death or 0,
+            kinds.personalBest or 0, table.concat(data.zones or {}, " · ")))
+        summaryBody:SetHeight(math.max(108, summary:GetStringHeight() or 0))
+        status:SetText(data.retainedOnly and "Summary covers retained Journal entries." or "A local chapter of your adventure.")
+        return data
+    end
+    save:SetScript("OnClick", function()
+        local ok, why = ns.SetJournalChapterIntro(selected, intro:GetText() or "")
+        if ok then Summary(); ns.RefreshWindow() end
+        status:SetText(ok and "Chapter introduction saved." or why)
+    end)
+    function layer:Open(id)
+        selected = id
+        local data = Summary()
+        if not data then return end
+        intro:SetText(data.intro or ""); self:Show(); intro:SetCursorPosition(0); scroll:SetVerticalScroll(0)
+        summaryScroll:SetVerticalScroll(0)
+    end
+    layer:SetScript("OnHide", function()
+        cursorY, cursorHeight = nil, nil
+        intro:ClearFocus(); intro:SetText(""); selected = nil
+    end)
+    return layer
+end
+
+local function OpenChapterPage(id)
+    if not id or id == "" then return end
+    if not chapterPageLayer then chapterPageLayer = CreateChapterPage() end
+    chapterPageLayer:Open(id)
+end
+
 local function CreateChapterManager()
     local layer, panel, status = JournalModal("Journal chapters", 560, 370)
     local selected, list
@@ -1810,6 +1880,7 @@ local function CreateChapterManager()
     local create = W.FlatButton(panel, "Create", 85, 23); create:SetPoint("TOPLEFT", 13, -78)
     local rename = W.FlatButton(panel, "Rename selected", 128, 23); rename:SetPoint("LEFT", create, "RIGHT", 8, 0)
     local delete = W.FlatButton(panel, "Delete selected", 128, 23); delete:SetPoint("LEFT", rename, "RIGHT", 8, 0)
+    local read = W.FlatButton(panel, "Chapter page", 113, 23); read:SetPoint("LEFT", delete, "RIGHT", 8, 0)
     local parent = CreateFrame("Frame", nil, panel); parent:SetPoint("TOPLEFT", 13, -113)
     local function Refresh(message)
         local rows, found = {}, false
@@ -1823,6 +1894,7 @@ local function CreateChapterManager()
         end
         if not found then selected = nil end
         rename:SetEnabled(found); delete:SetEnabled(found)
+        read:SetEnabled(found)
         list:SetData(rows, true)
         status:SetText(message or "Deleting a chapter keeps its entries and notes.")
     end
@@ -1845,6 +1917,7 @@ local function CreateChapterManager()
         Refresh(ok and "Chapter deleted. Its entries and notes are kept." or why)
     end)
     name:SetScript("OnEnterPressed", name.ClearFocus); name:SetScript("OnEscapePressed", function() layer:Hide() end)
+    read:SetScript("OnClick", function() layer:Hide(); OpenChapterPage(selected) end)
     layer:SetScript("OnShow", function() Refresh(); name:SetFocus() end)
     layer:SetScript("OnHide", function() name:ClearFocus(); GameTooltip:Hide() end)
     return layer
@@ -1853,6 +1926,68 @@ end
 local function OpenChapterManager()
     if not chapterLayer then chapterLayer = CreateChapterManager() end
     chapterLayer:Show()
+end
+
+local function CreateSessionComparison()
+    local layer, panel, status = JournalModal("Compare saved sessions", 840, 478)
+    local saved, left, right, rows
+    local Refresh
+    local leftLabel = W.Text(panel, 12, T.text); leftLabel:SetPoint("TOPLEFT", 13, -53); leftLabel:SetText("First")
+    local rightLabel = W.Text(panel, 12, T.text); rightLabel:SetPoint("TOPLEFT", 432, -53); rightLabel:SetText("Second")
+    local first = Choice(panel, 349, function(id) left = saved[id]; Refresh() end)
+    first:SetPoint("TOPLEFT", 58, -46)
+    local second = Choice(panel, 330, function(id) right = saved[id]; Refresh() end)
+    second:SetPoint("TOPLEFT", 496, -46)
+    local parent = CreateFrame("Frame", nil, panel); parent:SetPoint("TOPLEFT", 13, -89)
+    rows = W.Table(parent, 814, 336, {
+        { "STATISTIC", 214, kind = "text" }, { "FIRST", 130, kind = "num" }, { "SECOND", 130, kind = "num" },
+        { "FIRST / HOUR", 160, kind = "num" }, { "SECOND / HOUR", 0, kind = "num" },
+    }, nil, "Two saved sessions are needed for comparison.")
+    Refresh = function()
+        if not left or not right then rows:SetData({}); status:SetText("Choose two retained sessions."); return end
+        local data, why = ns.CompareSavedSessions(left, right)
+        if not data then rows:SetData({}); status:SetText(why); return end
+        local result = {}
+        for _, item in ipairs(data.rows) do
+            local money = item.key == "g" or item.key == "mi" or item.key == "lv"
+            local duration = item.key == "d" or item.key == "afk" or item.key == "elapsed"
+            local function Format(value, rate)
+                if value == nil then return "—" end
+                if money then return Money(value) end
+                if duration then return Time(value) end
+                return rate and string.format("%.1f", value) or Int(value)
+            end
+            result[#result + 1] = { item.label, Format(item.left), Format(item.right), Format(item.leftRate, true), Format(item.rightRate, true) }
+        end
+        rows:SetData(result)
+        status:SetText((data.leftCurrent or data.rightCurrent) and "Includes the saved portion of an active session."
+            or (data.retainedOnly and "Comparison covers retained session totals." or "Rates use saved play time."))
+    end
+    function layer:Open()
+        saved = {}
+        for _, session in ipairs((ns.char and ns.char.sessionlog) or {}) do saved[#saved + 1] = session end
+        local choices = {}
+        for i = #saved, 1, -1 do
+            local session = saved[i]
+            local active = ns.session and session.id == ns.session.id and session.s == ns.session.wallStart
+            local clock = session.s and date("%b %d %H:%M", session.s) or "Unknown start"
+            local details = session.s and date("%b %d, %Y %H:%M:%S", session.s) or "Unknown start"
+            if type(session.z) == "string" and session.z ~= "" then details = details .. "\n" .. session.z:gsub("|", "||") end
+            if type(session.l) == "number" then details = details .. "\nLevel " .. tostring(session.l) end
+            choices[#choices + 1] = { id = i,
+                name = string.format("%s · %s%s", clock, Time(session.d or 0), active and " (in progress)" or ""), tip = details }
+        end
+        left, right = saved[#saved - 1], saved[#saved]
+        first:SetChoices(choices, #saved - 1); second:SetChoices(choices, #saved)
+        Refresh(); self:Show()
+    end
+    return layer
+end
+
+function ns.ShowSessionComparison()
+    if not win or not win:IsShown() then ns.OpenPage("journal") end
+    if not comparisonLayer then comparisonLayer = CreateSessionComparison() end
+    comparisonLayer:Open()
 end
 
 local function CreateSessionClosing()
@@ -1887,6 +2022,9 @@ local function CreateSessionClosing()
         { id = "last", label = "Last saved", tip = "The most recently saved completed session." },
     }, function(id) currentSession = id == "current"; layer.choices:Select(id); Refresh() end)
     choices:SetPoint("TOPLEFT", 13, -43); layer.choices = choices
+    local compare = W.FlatButton(panel, "Compare saved sessions", 189, 24)
+    compare:SetPoint("TOPRIGHT", -13, -43)
+    compare:SetScript("OnClick", function() layer:Hide(); ns.ShowSessionComparison() end)
     function layer:Open(current)
         currentSession = current ~= false; choices:Select(currentSession and "current" or "last"); Refresh(); self:Show()
     end
@@ -1952,6 +2090,8 @@ local function CreateJournalNoteEditor()
     local chapterChoice = Choice(dlg, 374, function(id) selectedChapter = id end)
     chapterChoice:SetPoint("TOPLEFT", 77, -135)
     local assign = W.FlatButton(dlg, "Assign", 92, 24); assign:SetPoint("LEFT", chapterChoice, "RIGHT", 9, 0)
+    local favorite = W.FlatButton(dlg, "Highlight", 99, 22)
+    favorite:SetPoint("TOPRIGHT", -42, -8)
     local label = W.Text(dlg, 13, ink and ink.gold or T.amber)
     label:SetPoint("TOPLEFT", 13, -175); label:SetText("Personal note")
     local limit = W.Text(dlg, 11, T.dim)
@@ -2010,6 +2150,13 @@ local function CreateJournalNoteEditor()
         status:SetText(ok and "Chapter assignment saved." or why)
         if ok then ns.RefreshWindow() end
     end)
+    favorite:SetScript("OnClick", function()
+        local ok, why = ns.SetJournalFavorite(entry, not ns.JournalFavorite(entry))
+        if ok then
+            favorite.text:SetText(ns.JournalFavorite(entry) and "★ Highlighted" or "Highlight")
+            ns.RefreshWindow()
+        else status:SetText(why) end
+    end)
     local function Apply(text)
         local ok, why = ns.SetJournalNote(entry, text)
         if not ok then
@@ -2031,6 +2178,7 @@ local function CreateJournalNoteEditor()
     function layer:Open(selected)
         entry = selected
         local saved = ns.JournalNote(selected)
+        favorite.text:SetText(ns.JournalFavorite(selected) and "★ Highlighted" or "Highlight")
         selectedChapter = ns.JournalChapter(selected) or ""
         chapterChoice:SetChoices(ChapterChoices("Unassigned"), selectedChapter)
         title:SetText(saved and "Edit journal note" or "Add journal note")
@@ -2106,6 +2254,22 @@ local function JournalFeed(parent, width, height)
     f.source, f.kindFilter, f.zoneText = f.entries, "all", ""
     local gold = ink and ink.gold or T.amber
     local categories, zoneEdit, toolbarHeight = JournalFilters(f, width)
+    local searchLabel = W.Text(f, 11, T.text)
+    searchLabel:SetPoint("TOPLEFT", 9, -toolbarHeight - 12); searchLabel:SetText("Search")
+    local searchBox = W.Panel(f, T.bg)
+    searchBox:SetPoint("TOPLEFT", 66, -toolbarHeight - 5); searchBox:SetSize(width - 190, 24)
+    local textSearch = CreateFrame("EditBox", nil, searchBox)
+    textSearch:SetPoint("TOPLEFT", 7, 0); textSearch:SetPoint("BOTTOMRIGHT", -7, 0)
+    textSearch:SetFont(W.FONT, 11, ""); textSearch:SetTextColor(T.text[1], T.text[2], T.text[3])
+    textSearch:SetAutoFocus(false); textSearch:SetCountInvisibleLetters(true); textSearch:SetMaxLetters(200)
+    textSearch:SetScript("OnTextChanged", function(self) f:SetSearch(self:GetText() or "") end)
+    textSearch:SetScript("OnEscapePressed", textSearch.ClearFocus)
+    textSearch:SetScript("OnEnterPressed", textSearch.ClearFocus)
+    textSearch:SetScript("OnHide", textSearch.ClearFocus)
+    local highlights = W.FlatButton(f, "Highlights", 108, 24)
+    highlights:SetPoint("LEFT", searchBox, "RIGHT", 7, 0)
+    highlights:SetScript("OnClick", function() f:SetHighlights(not f.favoritesOnly) end)
+    toolbarHeight = toolbarHeight + 34
     local chapterLabel = W.Text(f, 11, T.text)
     chapterLabel:SetPoint("TOPLEFT", 9, -toolbarHeight - 12); chapterLabel:SetText("Chapter")
     local chapterChoice = Choice(f, width - 270, function(id)
@@ -2118,8 +2282,9 @@ local function JournalFeed(parent, width, height)
     local closing = W.FlatButton(f, "Closing page", 96, 24)
     closing:SetPoint("LEFT", manage, "RIGHT", 7, 0); closing:SetScript("OnClick", function() ns.ShowSessionClosing(true) end)
     toolbarHeight = toolbarHeight + 34
-    f.chapterFilter = ""
+    f.chapterFilter, f.textFilter, f.favoritesOnly = "", "", false
     f.zoneEdit = zoneEdit
+    f.textSearch = textSearch
     for i = 1, JOURNAL_PAGE_SIZE do
         local row = CreateFrame("Button", nil, f)
         row:SetWidth(width - 26)
@@ -2134,6 +2299,8 @@ local function JournalFeed(parent, width, height)
         row.prose:SetJustifyV("TOP")
         row.prose:SetWordWrap(true)
         row.prose:SetMaxLines(2)
+        row.highlight = W.Text(row, 12, gold, nil, "RIGHT")
+        row.highlight:SetPoint("TOPRIGHT", 0, -2)
         local line = W.Line(row)
         line:SetPoint("BOTTOMLEFT"); line:SetPoint("BOTTOMRIGHT"); line:SetHeight(1); line:SetAlpha(0.5)
         W.Tip(row, function() return JournalEntryTitle(row.entry) end,
@@ -2190,6 +2357,7 @@ local function JournalFeed(parent, width, height)
                 row.prose:SetHeight(rowHeight - 2)
                 row.prose:SetText(e[2])
                 row.entry = e
+                row.highlight:SetText(ns.JournalFavorite(e) and "★" or "")
                 row:Show()
                 y = y - h
             else
@@ -2220,27 +2388,19 @@ local function JournalFeed(parent, width, height)
         if not chapterNames[self.chapterFilter] then self.chapterFilter = "" end
         chapterChoice:SetChoices(chapters, self.chapterFilter)
         local filterChanged = self.kindFilter ~= self.cachedKind or self.zoneText ~= self.cachedZone
-            or self.chapterFilter ~= self.cachedChapter
+            or self.chapterFilter ~= self.cachedChapter or self.textFilter ~= self.cachedText
+            or self.favoritesOnly ~= self.cachedFavorites
         local chapterRevision = ns.journalChapterRevision or 0
-        local chaptersChanged = chapterRevision ~= self.chapterRevision
+        local journalRevision = ns.journalRevision or 0
+        local chaptersChanged = chapterRevision ~= self.chapterRevision or journalRevision ~= self.journalRevision
         if not sourceChanged and not filterChanged and not chaptersChanged and total == self.total and latest == self.latest then return end
         self.source, self.total, self.latest = entries, total, latest
         self.cachedKind, self.cachedZone = self.kindFilter, self.zoneText
         self.cachedChapter, self.chapterRevision = self.chapterFilter, chapterRevision
+        self.cachedText, self.cachedFavorites, self.journalRevision = self.textFilter, self.favoritesOnly, journalRevision
 
-        local query = JournalZoneLower(self.zoneText:match("^%s*(.-)%s*$"))
-        local matches = entries
-        if self.kindFilter ~= "all" or query ~= "" or self.chapterFilter ~= "" then
-            matches = {}
-            for _, entry in ipairs(entries) do
-                local kind, zone, alsoKind = ns.JournalEntryInfo(entry)
-                local matchesKind = self.kindFilter == "all" or kind == self.kindFilter or alsoKind == self.kindFilter
-                if matchesKind and (query == "" or (zone and JournalZoneLower(zone):find(query, 1, true)))
-                    and (self.chapterFilter == "" or ns.JournalChapter(entry) == self.chapterFilter) then
-                    matches[#matches + 1] = entry
-                end
-            end
-        end
+        local matches = ns.FilterJournal(entries, { kind = self.kindFilter, zone = self.zoneText,
+            chapter = self.chapterFilter, text = self.textFilter, favoritesOnly = self.favoritesOnly })
         self.entries = matches
         if sourceChanged or filterChanged then
             self.offset = 0
@@ -2258,6 +2418,19 @@ local function JournalFeed(parent, width, height)
         if self.kindFilter == kind and self.zoneText == zone then return end
         self.kindFilter, self.zoneText = kind, zone
         categories:Select(kind)
+        self:SetEntries(self.source)
+    end
+
+    function f:SetSearch(text)
+        if self.textFilter == text then return end
+        self.textFilter = text
+        self:SetEntries(self.source)
+    end
+
+    function f:SetHighlights(enabled)
+        if self.favoritesOnly == enabled then return end
+        self.favoritesOnly = enabled
+        highlights.text:SetText(enabled and "★ Highlights" or "Highlights")
         self:SetEntries(self.source)
     end
 
@@ -2415,6 +2588,8 @@ function ns.ShowPage(id)
     if id ~= "dashboard" and pinLayer then pinLayer:Hide() end
     if id ~= "journal" and noteLayer then noteLayer:Hide() end
     if id ~= "journal" and chapterLayer then chapterLayer:Hide() end
+    if chapterPageLayer then chapterPageLayer:Hide() end
+    if comparisonLayer then comparisonLayer:Hide() end
     if closingLayer then closingLayer:Hide() end
     win:SetDashboardPinButtonShown(id == "dashboard")
     if current and current ~= pages[id] then current:Hide() end
@@ -2880,9 +3055,12 @@ local function CreateWindow()
         if noteLayer and noteLayer:IsShown() then modal = noteLayer end
         if chapterLayer and chapterLayer:IsShown() then modal = chapterLayer end
         if closingLayer and closingLayer:IsShown() then modal = closingLayer end
+        if chapterPageLayer and chapterPageLayer:IsShown() then modal = chapterPageLayer end
+        if comparisonLayer and comparisonLayer:IsShown() then modal = comparisonLayer end
         if modal and modal:IsShown() then
             if key == "ESCAPE" then modal:Hide(); handled = true end
-        elseif self:IsMouseOver() and not win.search:HasFocus() and not pages.journal.story.zoneEdit:HasFocus() then
+        elseif self:IsMouseOver() and not win.search:HasFocus() and not pages.journal.story.zoneEdit:HasFocus()
+            and not pages.journal.story.textSearch:HasFocus() then
             if key == "F" and IsControlKeyDown() then
                 win.search:SetFocus(); handled = true
             elseif keyMap[key] and not IsModifierKeyDown() then
@@ -2909,6 +3087,8 @@ local function CreateWindow()
         if noteLayer then noteLayer:Hide() end
         if chapterLayer then chapterLayer:Hide() end
         if closingLayer then closingLayer:Hide() end
+        if chapterPageLayer then chapterPageLayer:Hide() end
+        if comparisonLayer then comparisonLayer:Hide() end
     end)
     local acc = 0
     win:SetScript("OnUpdate", function(_, el)
@@ -3150,16 +3330,21 @@ end
 local function LayoutBackupDialog(mode, width, height)
     CancelBackupJob()
     dlg.mode, dlg.previewInput, dlg.previewSnapshot, dlg.previewLegacy, dlg.previewPreferences = mode, false, false, false, false
+    dlg.recoveryPreview = false
     dlg:SetSize(width, height)
     dlg.eb:SetWidth(width - 70)
     local export, restore = mode == "export", mode == "restore"
+    local safety = restore and ns.GetRestoreSafety()
+    dlg.recovery:SetShown(safety ~= nil and safety ~= false)
+    dlg.recoveryDate:SetShown(safety ~= nil and safety ~= false)
+    if safety then dlg.recoveryDate:SetText(DateLabel(safety.savedAt)) end
     dlg.exportModes:SetShown(export)
     dlg.differences:Hide()
     dlg.summary:SetHeight(96)
     dlg.summary:Hide()
     dlg.editPaste:Hide()
     dlg.box:Show()
-    local hintTop, boxTop = export and -66 or -32, export and -116 or -64
+    local hintTop, boxTop = export and -66 or -32, export and -116 or (safety and -101 or -64)
     dlg.hint:ClearAllPoints()
     dlg.hint:SetPoint("TOPLEFT", 12, hintTop); dlg.hint:SetPoint("RIGHT", -12, 0)
     dlg.box:ClearAllPoints()
@@ -3204,9 +3389,10 @@ local function ShowBackupExport(mode)
             dlg.hint:SetText("|cffd9604aCould not create backup:|r " .. tostring(why))
             return
         end
-        dlg.hint:SetText(full
-            and "Copy manually with Ctrl+A and Ctrl+C. Contains private Journal notes. Restore on this character only. Account settings and the active session are outside this backup."
-            or "Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files.")
+        local hint = "Copy with Ctrl+A then Ctrl+C. Includes statistics and personal-best history. Journal and play-session history stay in the saved files."
+        if full then hint = "Copy manually with Ctrl+A and Ctrl+C. Contains private Journal notes. Restore on this character only. Account settings and the active session are outside this backup."
+        elseif mode == "preferences" then hint = "Copy with Ctrl+A then Ctrl+C. Includes account preferences, Dashboard pins and saved layouts." end
+        dlg.hint:SetText(hint)
         dlg.eb:SetText(payload)
         dlg.eb:SetFocus()
         dlg.eb:HighlightText()
@@ -3217,7 +3403,6 @@ local function ShowBackupExport(mode)
     local cancel
     if mode == "preferences" then
         Finished(ns.SerializePreferences())
-        dlg.hint:SetText("Copy with Ctrl+A then Ctrl+C. Includes portable account preferences only; no character history, window positions, or screenshot settings.")
     elseif full then cancel = ns.WriteFullBackup(Finished, Status)
     else cancel = ns.WriteLegacyBackup(ns.char, Finished, Status) end
     if dlg.backupJob == job then dlg.cancelBackupJob = cancel end
@@ -3227,9 +3412,10 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.previewInput, dlg.previewSnapshot = input, snapshot
     dlg:SetSize(620, 476)
     dlg.title:SetText("Restore full character backup")
-    dlg.hint:SetText("This will replace this character’s statistics and saved history.")
+    dlg.hint:SetText("This replaces saved character data. A recovery copy of the current data is kept before replacement.")
     dlg.eb:ClearFocus()
     dlg.box:Hide()
+    dlg.recovery:Hide(); dlg.recoveryDate:Hide()
     local validDate, saved = pcall(date, "%b %d, %Y at %H:%M", snapshot.savedAt)
     dlg.summary.source:SetText("Source: " .. snapshot.character:gsub("|", "||") .. "  ·  This character")
     dlg.summary.saved:SetText(validDate and type(saved) == "string" and "Backed up " .. saved or "Backup date unavailable")
@@ -3241,44 +3427,67 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.differences:Show()
     dlg.summary:Show()
     dlg.editPaste:Show()
-    dlg.action.text:SetText(L["Replace history"])
+    dlg.action.text:SetText(dlg.recoveryPreview and "Restore recovery" or L["Replace history"])
     dlg.action.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
 end
 
 local function ReviewPreferences(text)
-    local values, why = ns.DeserializePreferences(text)
-    if not values then SetRestoreInput(why); return end
-    local changes = ns.PreferenceChanges(values)
     local old = dlg.previewPreferences
+    local staleReason
     if old then
-        local same = #old == #changes
-        for i, entry in ipairs(changes) do
-            if not old[i] or old[i].key ~= entry.key or old[i].before ~= entry.before then same = false; break end
-        end
-        if same then
-            for _, entry in ipairs(changes) do ns.settings[entry.key] = entry.value end
-            if ns.RefreshDeathPins then pcall(ns.RefreshDeathPins) end
+        local ok, why = old.apply()
+        if ok then
             dlg:Hide()
             ns.Print("Account preferences applied in memory. Use /reload to apply appearance changes.")
             ns.RefreshWindow()
             return
         end
+        staleReason = why or "Settings changed. Review the backup again."
     end
-    dlg.previewPreferences, dlg.previewInput = changes, text
-    dlg:SetSize(560, 254)
+    local preview, why = ns.ReadPreferencesBackup(text)
+    if not preview then SetRestoreInput(why); return end
+    local changes = preview.changes
+    dlg.previewPreferences, dlg.previewInput = preview, text
+    dlg:SetSize(620, 476)
     dlg.title:SetText(L["Restore account preferences"])
     dlg.hint:SetText("Applies account-wide. Character data and window positions will not change.")
     dlg.eb:ClearFocus()
     dlg.box:Hide()
+    dlg.recovery:Hide(); dlg.recoveryDate:Hide()
     local labels = {}
     for i, entry in ipairs(changes) do labels[i] = entry.label end
     dlg.summary.source:SetText(#changes > 0 and (#changes .. " preferences will change") or "No preferences would change")
-    dlg.summary.saved:SetText(old and "Settings changed since review. Review again to apply." or "Appearance changes require /reload.")
-    dlg.summary.counts:SetText(table.concat(labels, " · "))
+    dlg.summary.saved:SetText(staleReason or "Appearance changes require /reload.")
+    dlg.summary.counts:SetText("Review the account preference changes below.")
+    dlg.differenceText:SetText(table.concat(labels, "\n"))
+    dlg.differenceBody:SetHeight(math.max(200, (dlg.differenceText:GetStringHeight() or 0) + 12))
+    dlg.differences:SetVerticalScroll(0); dlg.differences:Show()
     dlg.summary:Show()
     dlg.editPaste:Show()
     dlg.action.text:SetText(L["Apply preferences"])
     dlg.action:SetShown(#changes > 0)
+end
+
+local function ReviewRestoreSafety()
+    local safety = ns.GetRestoreSafety()
+    if not safety then SetRestoreInput("There is no recovery copy for this character."); return end
+    SetRestoreInput("Preparing the recovery comparison…")
+    dlg.eb:SetText(safety.text)
+    dlg.eb:ClearFocus(); dlg.box:Hide(); dlg.recovery:Hide(); dlg.recoveryDate:Hide(); dlg.action:Hide()
+    local job = {}
+    dlg.backupJob = job
+    local cancel = ns.ReadRestoreSafety(function(snapshot, why)
+        if dlg.backupJob ~= job then return end
+        CancelBackupJob()
+        if not snapshot then SetRestoreInput(why or "The recovery copy could not be read."); return end
+        dlg.recoveryPreview = true
+        ShowFullBackupPreview(safety.text, snapshot)
+        dlg.hint:SetText("Review the recovery copy before replacing this character’s saved data.")
+        dlg.action:Show()
+    end, function(phase, count, total)
+        if dlg.backupJob == job then BackupProgress(phase, count, total) end
+    end)
+    if dlg.backupJob == job then dlg.cancelBackupJob = cancel end
 end
 
 local function ApplyBackup(parsed, readError, readingFinished)
@@ -3331,7 +3540,7 @@ local function ApplyBackup(parsed, readError, readingFinished)
             SetRestoreInput("|cffd9604aCould not restore full backup:|r " .. tostring(reason))
             return
         end
-        ns.Print("Full character backup restored.")
+        ns.Print(dlg.recoveryPreview and "Recovery copy restored." or "Full character backup restored.")
     else
         local legacy = dlg.previewLegacy
         if not legacy then
@@ -3348,6 +3557,7 @@ local function ApplyBackup(parsed, readError, readingFinished)
             dlg.hint:SetText("This merges into the current character. It does not replace saved history.")
             dlg.eb:ClearFocus()
             dlg.box:Hide()
+            dlg.recovery:Hide(); dlg.recoveryDate:Hide()
             dlg.summary.source:SetText("Format: " .. (text:match("LTS[12]") or "legacy") .. "  ·  Source identity not stored")
             dlg.summary.saved:SetText("Check that this backup belongs to the intended character.")
             dlg.summary.counts:SetText(string.format("%d proposed updates before retention limits", count))
@@ -3397,6 +3607,11 @@ local function CreateDialog()
     }, function(id) if dlg.mode == "export" then ShowBackupExport(id) end end)
     dlg.exportModes:SetPoint("TOPLEFT", 12, -34)
     dlg.exportModes:Hide()
+    dlg.recovery = W.FlatButton(dlg, "Recover previous data", 184, 24, nil, "Review the automatic copy made before the last full restore.")
+    dlg.recovery:SetPoint("TOPLEFT", 12, -66)
+    dlg.recovery:SetScript("OnClick", ReviewRestoreSafety); dlg.recovery:Hide()
+    dlg.recoveryDate = W.Text(dlg, 11, T.dim, nil, "RIGHT")
+    dlg.recoveryDate:SetPoint("TOPRIGHT", -13, -73); dlg.recoveryDate:Hide()
     dlg.box = W.Panel(dlg, T.tile)
     local sf = CreateFrame("ScrollFrame", nil, dlg.box, "UIPanelScrollFrameTemplate")
     sf:SetPoint("TOPLEFT", 6, -6); sf:SetPoint("BOTTOMRIGHT", -26, 6)

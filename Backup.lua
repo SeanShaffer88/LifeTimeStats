@@ -439,7 +439,7 @@ for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
 local JOURNAL_KINDS = { first = true, boss = true, death = true, personalBest = true }
 local JOURNAL_ROW = {
     [1] = Timestamp, [2] = function(value) return Text(value) and value ~= "" end,
-    [3] = Level, zone = Key, note = Note,
+    [3] = Level, zone = Key, note = Note, favorite = Boolean,
     kind = function(value) return Key(value) and JOURNAL_KINDS[value] end,
     chapter = function(value) return Key(value) and ns.JournalChapterSerial(value) ~= nil end,
     session = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
@@ -451,6 +451,7 @@ local CHAPTER_ROW = {
         return Key(value) and ns.ValidateJournalChapterName(value) == value
     end,
     created = Timestamp,
+    intro = function(value) return Text(value) and value ~= "" and ns.ValidateJournalChapterIntro(value) == value end,
 }
 local function ClosingNames(values, limit)
     if not PlainTable(values) then return false end
@@ -994,6 +995,14 @@ local function CommitFullBackup(destination, character, staged, uniqueCounts)
     -- Swap only durable fields in place. Runs, quest timers, identity,
     -- revision and account settings remain on the existing character object.
     if ns.char ~= destination or ns.charKey ~= character then return false, "The active character changed." end
+    local ok, safetyText, safetyReason = pcall(ns.SerializeFullBackup)
+    if not ok or not ns.IsFullBackup(safetyText) or #safetyText > MAX_FULL_INPUT then
+        return false, "The safety copy could not be created. " .. tostring(ok and safetyReason or safetyText)
+    end
+    local safety = { character = character, savedAt = time(), text = safetyText }
+    if not Timestamp(safety.savedAt) or ns.char ~= destination or ns.charKey ~= character then
+        return false, "The active character changed or its save time is unavailable."
+    end
     ns.Retention.MergeFlags(staged, destination) -- An older backup cannot erase known omissions.
     for _, field in ipairs(FULL_FIELDS) do
         if field ~= "meta" then destination[field] = staged[field] end
@@ -1003,6 +1012,7 @@ local function CommitFullBackup(destination, character, staged, uniqueCounts)
     if collision then session.id = serial end
     ns.db.chars[character] = destination
     LifeTimeStatsCharDB.data = destination
+    LifeTimeStatsCharDB.restoreSafety = safety
     ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
     ns.InvalidateAccount()
     return true
@@ -1096,6 +1106,22 @@ function ns.RestoreFullBackup(snapshot)
     return CommitFullBackup(destination, character, staged, CountFullUniques(staged))
 end
 
+function ns.GetRestoreSafety()
+    local value = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.restoreSafety
+    if not PlainTable(value) or not Key(ns.charKey) or value.character ~= ns.charKey or not Timestamp(value.savedAt)
+        or not ns.IsFullBackup(value.text) or #value.text > MAX_FULL_INPUT then return nil end
+    -- Button availability must not decode a potentially multi-megabyte record.
+    -- ReadRestoreSafety uses the normal strict reader before offering an apply.
+    if not value.text:match("^LTS3|%x%x%x%x%x%x%x%x|") then return nil end
+    return { character = value.character, savedAt = value.savedAt, text = value.text }
+end
+
+function ns.ReadRestoreSafety(finished, status)
+    local copy = ns.GetRestoreSafety()
+    if not copy then finished(nil, "No valid restore safety copy is available for this character."); return end
+    return ns.ReadFullBackup(copy.text, finished, status)
+end
+
 -- Portable account preferences, deliberately separate from character backups.
 -- Do not include geometry, identity, notes, diagnostic flags or screenshot settings.
 local PREFS = {
@@ -1157,4 +1183,218 @@ function ns.PreferenceChanges(values)
         end
     end
     return changes
+end
+
+local ReadPreferencesV1, ScalarPreferenceChanges = ns.DeserializePreferences, ns.PreferenceChanges
+local PREF2_HEADER, MAX_PREF2_BYTES = "LTSP2|", 64 * 1024
+
+local function PreferenceValue(key, value)
+    local def = PREF_INDEX[key]
+    return def and not IsSecret(value)
+        and ((def[3] and type(value) == "string" and def[3](value))
+            or (not def[3] and type(value) == "boolean"))
+end
+
+local function PreferenceLayoutName(value)
+    if not Text(value) or value:find("[%z\1-\31\127|]") or value:match("^%s*(.-)%s*$") ~= value
+        or #value > 160 or not Note(value) then return false end
+    local _, count = value:gsub("[^\128-\191]", "")
+    return count <= 40
+end
+
+local function PreferenceLayoutID(value)
+    if not Key(value) then return false end
+    local serial = value:match("^layout:([1-9]%d*)$")
+    return serial ~= nil and Integer(tonumber(serial), 1, 9007199254740000)
+end
+
+local function PreferenceArray(value, limit, convert)
+    Require(PlainTable(value), "The Dashboard preference list is invalid.")
+    local count = 0
+    for index in pairs(value) do
+        Require(Integer(index, 1, limit), "The Dashboard preference list is invalid.")
+        count = count + 1
+    end
+    local result = {}
+    for index = 1, count do
+        Require(value[index] ~= nil, "The Dashboard preference list has missing entries.")
+        result[index] = convert(value[index])
+    end
+    return result
+end
+
+local function PreferencePins(value)
+    local _, byID = ns.DashboardPinCatalog()
+    local seen = {}
+    return PreferenceArray(value, ns.DASHBOARD_PIN_LIMIT or 4, function(id)
+        Require(Key(id) and byID[id] ~= nil and not seen[id], "A Dashboard pin is unknown or repeated.")
+        seen[id] = true
+        return id
+    end)
+end
+
+local function BuiltinPreferences()
+    local ids, names = {}, {}
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if layout.builtin then ids[layout.id], names[layout.name:lower()] = layout.pins, true end
+    end
+    return ids, names
+end
+
+local function StageDashboard(value)
+    Require(PlainTable(value), "The Dashboard preferences are invalid.")
+    for field in pairs(value) do
+        Require(field == "pins" or field == "layouts" or field == "selected", "Unexpected Dashboard preference.")
+    end
+    local ids, names = BuiltinPreferences()
+    local result = { pins = PreferencePins(value.pins) }
+    result.layouts = PreferenceArray(value.layouts, 12, function(layout)
+        Require(PlainTable(layout) and PreferenceLayoutID(layout.id) and PreferenceLayoutName(layout.name),
+            "A saved Dashboard layout is invalid.")
+        for field in pairs(layout) do
+            Require(field == "id" or field == "name" or field == "pins", "Unexpected saved layout field.")
+        end
+        local name = layout.name:lower()
+        Require(not ids[layout.id] and not names[name], "A saved layout ID or name is repeated or reserved.")
+        local pins = PreferencePins(layout.pins)
+        ids[layout.id], names[name] = pins, true
+        return { id = layout.id, name = layout.name, pins = pins }
+    end)
+    if value.selected ~= nil then
+        Require(Key(value.selected) and ids[value.selected], "The selected Dashboard layout is unavailable.")
+        Require(EncodeFull(result.pins) == EncodeFull(ids[value.selected]),
+            "The selected Dashboard layout does not match its pins.")
+        result.selected = value.selected
+    end
+    return result
+end
+
+local function StagePreferences(values)
+    Require(PlainTable(values), "The account preferences are invalid.")
+    local result = {}
+    for key, value in pairs(values) do
+        if key == "dashboard" then result.dashboard = StageDashboard(value)
+        else
+            Require(PreferenceValue(key, value), "Unexpected or invalid account preference.")
+            result[key] = value
+        end
+    end
+    return result
+end
+
+local function CaptureDashboard()
+    local ids, names = BuiltinPreferences()
+    local result = { pins = ns.DashboardPins(), layouts = {} }
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if not layout.builtin and PreferenceLayoutID(layout.id) and PreferenceLayoutName(layout.name)
+            and not ids[layout.id] and not names[layout.name:lower()] then
+            result.layouts[#result.layouts + 1] = {
+                id = layout.id, name = layout.name, pins = PreferencePins(layout.pins),
+            }
+            ids[layout.id], names[layout.name:lower()] = true, true
+            if #result.layouts == 12 then break end
+        end
+    end
+    local selected = ns.ActiveDashboardLayout()
+    if ids[selected] then result.selected = selected end
+    return result
+end
+
+local function PreferencesFingerprint()
+    local values = {}
+    for _, def in ipairs(PREFS) do values[def[1]] = ns.settings[def[1]] end
+    return EncodeFull({ preferences = values, dashboard = {
+        pins = ns.settings.dashboardPins, layouts = ns.settings.dashboardLayouts, selected = ns.settings.dashboardLayout,
+    } })
+end
+
+function ns.IsPreferencesBackup(text)
+    return type(text) == "string" and not IsSecret(text) and text:match("^%s*LTSP[12]|") ~= nil
+end
+
+function ns.SerializePreferences()
+    return Attempt(function()
+        Require(type(ns.settings) == "table", "Account preferences are unavailable.")
+        local preferences = {}
+        for _, def in ipairs(PREFS) do
+            local value = ns.settings[def[1]]
+            if PreferenceValue(def[1], value) then preferences[def[1]] = value end
+        end
+        local body = EncodeFull({ preferences = preferences, dashboard = CaptureDashboard() })
+        Require(#PREF2_HEADER + 9 + #body <= MAX_PREF2_BYTES, "The account preferences backup is too large.")
+        return PREF2_HEADER .. FullChecksum(body) .. "|" .. body
+    end)
+end
+
+function ns.DeserializePreferences(text)
+    if not ns.IsPreferencesBackup(text) then return nil, "Invalid preferences backup." end
+    if text:match("^%s*LTSP1|") then return ReadPreferencesV1(text) end
+    return Attempt(function()
+        Require(#text <= MAX_PREF2_BYTES, "The account preferences backup is too large.")
+        local sum, body = text:gsub("%s", ""):match("^LTSP2|(%x%x%x%x%x%x%x%x)|(.+)$")
+        Require(sum and not body:find("[^!-~]") and not body:find("|", 1, true), "Invalid preferences backup.")
+        Require(FullChecksum(body) == sum:lower(), "Preferences backup checksum does not match.")
+        local value = DecodeFull(body)
+        Require(PlainTable(value) and PlainTable(value.preferences) and value.dashboard ~= nil,
+            "The account preferences backup is invalid.")
+        for field in pairs(value) do
+            Require(field == "preferences" or field == "dashboard", "Unexpected preferences backup field.")
+        end
+        Require(value.preferences.dashboard == nil, "Unexpected preferences backup field.")
+        local result = StagePreferences(value.preferences)
+        result.dashboard = StageDashboard(value.dashboard)
+        return result
+    end)
+end
+
+function ns.PreferenceChanges(values)
+    local changes = ScalarPreferenceChanges(values)
+    if values.dashboard then
+        local current = CaptureDashboard()
+        for _, field in ipairs({ { "pins", "Dashboard pins" }, { "layouts", "Saved Dashboard layouts" }, { "selected", "Selected Dashboard layout" } }) do
+            local key = field[1]
+            if EncodeFull(current[key] or {}) ~= EncodeFull(values.dashboard[key] or {}) then
+                local function Description(value)
+                    if type(value) == "table" then return tostring(#value) .. " saved" end
+                    return value or "Custom"
+                end
+                changes[#changes + 1] = { key = "dashboard." .. key, label = field[2],
+                    before = Description(current[key]), value = Description(values.dashboard[key]) }
+            end
+        end
+    end
+    return changes
+end
+
+function ns.ReadPreferencesBackup(text, finished)
+    local preview, reason = Attempt(function()
+        Require(type(ns.settings) == "table", "Account preferences are unavailable.")
+        local parsed, why = ns.DeserializePreferences(text)
+        Require(parsed ~= nil, why)
+        local values = StagePreferences(parsed)
+        local settings, fingerprint = ns.settings, PreferencesFingerprint()
+        local result = { changes = ns.PreferenceChanges(values) }
+        local used = false
+        result.apply = function()
+            if used then return false, "This preferences preview has already been used." end
+            used = true
+            local same, current = pcall(PreferencesFingerprint)
+            if ns.settings ~= settings or not same or current ~= fingerprint then
+                return false, "Account preferences changed. Review the backup again."
+            end
+            for _, def in ipairs(PREFS) do
+                local key = def[1]
+                if values[key] ~= nil then settings[key] = values[key] end
+            end
+            if values.dashboard then
+                settings.dashboardPins = values.dashboard.pins
+                settings.dashboardLayouts = values.dashboard.layouts
+                settings.dashboardLayout = values.dashboard.selected
+            end
+            return true
+        end
+        return result
+    end)
+    if finished then finished(preview, reason) end
+    return preview, reason
 end

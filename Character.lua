@@ -65,6 +65,51 @@ function ns.SessionStats(v)
     }
 end
 
+local COMPARE_SESSION_FIELDS = {
+    { "d", "Duration" }, { "afk", "AFK time" }, { "steps", "Steps" }, { "k", "Enemies killed" },
+    { "de", "Deaths" }, { "q", "Quests completed" }, { "xp", "XP gained" }, { "dmg", "Damage done" },
+    { "g", "Net gold" }, { "mi", "Gold earned" }, { "lv", "Vendor value of loot" },
+    { "it", "Items looted" }, { "gh", "Gathered materials and fish" },
+}
+
+function ns.CompareSavedSessions(left, right)
+    local character = ns.char
+    local history = character and character.sessionlog
+    if type(history) ~= "table" then return nil, "No saved sessions are available." end
+    local foundLeft, foundRight = false, false
+    for _, entry in ipairs(history) do
+        if rawequal(entry, left) then foundLeft = true end
+        if rawequal(entry, right) then foundRight = true end
+    end
+    if not foundLeft or not foundRight or type(left) ~= "table" or type(right) ~= "table" then
+        return nil, "One of these saved sessions is no longer available."
+    end
+    local retained = ns.Retention and ns.Retention.History(character, "sessionlog")
+    local function IsCurrent(entry)
+        return ns.session ~= nil and entry.id ~= nil and entry.id == ns.session.id and entry.s == ns.session.wallStart
+    end
+    local result = { rows = {}, left = left, right = right, retainedOnly = retained and retained.partial or false,
+        leftCurrent = IsCurrent(left), rightCurrent = IsCurrent(right) }
+    local function Value(entry, key)
+        local value = entry[key]
+        if S(value) or ns.BadNumber(value) or (key ~= "g" and value < 0) then return end
+        return value
+    end
+    local function Rate(entry, value)
+        local duration = Value(entry, "d")
+        if value == nil or not duration or duration <= 0 then return end
+        local perHour = value / (duration / 3600)
+        if not ns.BadNumber(perHour) then return perHour end
+    end
+    for _, field in ipairs(COMPARE_SESSION_FIELDS) do
+        local key = field[1]
+        local a, b = Value(left, key), Value(right, key)
+        result.rows[#result.rows + 1] = { key = key, label = field[2], left = a, right = b,
+            leftRate = key ~= "d" and Rate(left, a) or nil, rightRate = key ~= "d" and Rate(right, b) or nil }
+    end
+    return result
+end
+
 -- CSV for /lts csv (copy into a spreadsheet).
 function ns.SessionCSV()
     local lines = { "date,start,duration_min,afk_min,level,zone,steps,kills,deaths,quests,xp,damage" }
