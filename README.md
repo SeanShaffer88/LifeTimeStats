@@ -42,7 +42,9 @@ In-game captures from version 1.12.1 show the previous Odometer layout (Mage, le
 </details>
 
 ## Download
-Get the 1.27.1 prerelease archive, `LifeTimeStats-1.27.1-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+Get the 1.28.0 prerelease archive, `LifeTimeStats-1.28.0-forever.zip`, from the [Releases](../../releases) page and unzip it into `World of Warcraft\_forever_\Interface\AddOns\`.
+
+The regression suites and live-client checks were not run for this prerelease.
 
 ## The window
 
@@ -76,6 +78,8 @@ A Warcraft-style adventurer's journal (`/lts`) with gold trim, warm page panels,
 Steps, jumps, kills and deaths counters · kills vs deaths in your five deadliest zones · net gold per day for 30 days · deaths by cause · quests/kills/deaths per level band · where your gold came from · jumps by hour of day · steps per day · crit rate, quest completion and dungeon runs with a boss kill · **Your legend**: signature spell, nemesis, most hunted creature, best fight and homeland.
 
 Use **Manage pins** at the bottom of the Dashboard to search by statistic or category and pin up to four counters. Pins come first, and the original counters fill the remaining spaces. The same pins are available on each character, and their values follow the selected Character or Account scope and date range.
+
+The **Layout** selector includes **Default**, **Exploration** and **Combat**. Choose a layout and press **Use** to apply its pins. Enter a name to **Save new**, or use an existing custom name to **Replace saved**. **Delete** removes a selected custom layout. You can keep up to twelve named custom layouts.
 
 ## What it counts (highlights)
 
@@ -130,6 +134,10 @@ Times drunk (tipsy, drunk, completely smashed) and sobered up · campfires lit a
 ## Journal (key L)
 
 The Journal writes itself as you explore. Dated entries collect firsts, level-ups, new zones, first inn visits, boss kills, deaths, achievements and personal bests. Choose an entry type and optionally enter part of a zone name in **Zone**. The search ignores case. Leave **Zone** blank for all zones, including older entries without a known location. Browse matches with **Newer** and **Older**. Click an entry to read it or add, edit or remove a personal note of up to 500 characters. Notes stay in that character's local Journal and are included when you copy a full character backup. Chat shares, character sheets and stats-only backups exclude notes. **Life per level** compares what happened at each level, and **Travel log** lists each zone with its first-visit date and level.
+
+Use **Chapters…** to create, rename or delete a named chapter. Open an entry to assign its chapter, then filter the Journal with **Chapter**. Deleting a chapter keeps its entries and notes. Up to forty named chapters are kept per character.
+
+**Closing page** opens a local summary for the **Current session** or **Last saved** session. It collects observed places and bosses, new records, session totals and how many entries you annotated. Older sessions can show that earlier details were unavailable.
 
 ## Adventure Guide (key G)
 
@@ -218,7 +226,7 @@ Edit it if you like, pick Say / Party / Raid / Guild / Instance, press Send. Not
 
 ## Install
 
-1. Download `LifeTimeStats-1.27.1-forever.zip`.
+1. Download `LifeTimeStats-1.28.0-forever.zip`.
 2. Unzip into `World of Warcraft\_forever_\Interface\AddOns\` so the folder is `AddOns\LifeTimeStats`.
 3. Enable **LifeTimeStats** on the AddOns screen.
 
@@ -230,6 +238,8 @@ Open **Backup** or run `/lts export` and copy the text for safekeeping.
 
 - **Stats only** is the default. It copies character statistics and personal-best history. **Restore** or `/lts import` accepts LTS1 and LTS2 backups and merges those records with your current data.
 - **Full character** includes saved statistics, Journal entries and personal notes, level and travel history, and saved session history. Keep this text private if it contains personal notes. A full restore previews the snapshot and asks you to confirm replacing the saved record for the same character.
+
+The full-character preview lists counter totals that will decrease and compares the current and backup counts of Journal entries, notes, saved sessions and named chapters. Review those differences before confirming the replacement. Named chapters and saved session closing details travel with a full-character backup.
 
 Large backup pastes show checksum and entry-reading progress; full character backups also report character-data validation. Cancel or change the paste to stop pending reads without changing your stats. The merge preview still requires confirmation, and the final merge is applied in memory before WoW writes SavedVariables.
 

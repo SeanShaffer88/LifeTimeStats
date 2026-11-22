@@ -1001,6 +1001,7 @@ function ns.ToggleDashboardPin(id)
         if pinnedID == id then
             table.remove(pins, i)
             ns.settings.dashboardPins = pins
+            ns.settings.dashboardLayout = nil
             return true
         end
     end
@@ -1009,6 +1010,119 @@ function ns.ToggleDashboardPin(id)
     end
     pins[#pins + 1] = id
     ns.settings.dashboardPins = pins
+    ns.settings.dashboardLayout = nil
+    return true
+end
+
+local DASHBOARD_LAYOUT_LIMIT = 12
+local BUILTIN_LAYOUTS = {
+    { id = "default", name = "Default", builtin = true, pins = {} },
+    { id = "exploration", name = "Exploration", builtin = true,
+      pins = { "computed:steps", "counter:dist_total", "counter:zones_discovered", "counter:quests_done" } },
+    { id = "combat", name = "Combat", builtin = true,
+      pins = { "counter:dmg_done", "computed:kills", "counter:deaths", "counter:heal_done" } },
+}
+
+local function LayoutName(name)
+    if type(name) ~= "string" or ns.IsSecret(name) then return end
+    name = name:match("^%s*(.-)%s*$")
+    local _, count = name:gsub("[^\128-\191]", "")
+    if name == "" or #name > 160 or count > 40 or name:find("[%z\1-\31\127|]") then return end
+    return name
+end
+
+local function LayoutPins(input)
+    if type(input) ~= "table" then return {} end
+    local _, byID = ns.DashboardPinCatalog()
+    local pins, seen = {}, {}
+    for i = 1, ns.DASHBOARD_PIN_LIMIT do
+        local id = input[i]
+        if type(id) == "string" and byID[id] and not seen[id] then
+            pins[#pins + 1], seen[id] = id, true
+        end
+    end
+    return pins
+end
+
+function ns.DashboardLayouts()
+    local rows, seen = {}, {}
+    for _, layout in ipairs(BUILTIN_LAYOUTS) do
+        rows[#rows + 1] = { id = layout.id, name = layout.name, builtin = true, pins = LayoutPins(layout.pins) }
+        seen[layout.id] = true
+    end
+    local saved = ns.settings and ns.settings.dashboardLayouts
+    for _, layout in ipairs(type(saved) == "table" and saved or {}) do
+        if #rows >= #BUILTIN_LAYOUTS + DASHBOARD_LAYOUT_LIMIT then break end
+        if type(layout) == "table" and type(layout.id) == "string" and layout.id:match("^layout:%d+$")
+            and not seen[layout.id] and LayoutName(layout.name) then
+            rows[#rows + 1] = { id = layout.id, name = LayoutName(layout.name), pins = LayoutPins(layout.pins) }
+            seen[layout.id] = true
+        end
+    end
+    return rows
+end
+
+function ns.ActiveDashboardLayout()
+    local selected = ns.settings and ns.settings.dashboardLayout
+    local pins = ns.DashboardPins()
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if layout.id == selected then
+            if #layout.pins ~= #pins then return "custom" end
+            for i, id in ipairs(pins) do if layout.pins[i] ~= id then return "custom" end end
+            return selected
+        end
+    end
+    return #pins == 0 and "default" or "custom"
+end
+
+function ns.UseDashboardLayout(id)
+    if not ns.settings then return false, "Dashboard settings are unavailable." end
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if layout.id == id then
+            ns.settings.dashboardPins = LayoutPins(layout.pins)
+            ns.settings.dashboardLayout = id
+            return true
+        end
+    end
+    return false, "This Dashboard layout is unavailable."
+end
+
+function ns.SaveDashboardLayout(name)
+    if not ns.settings then return false, "Dashboard settings are unavailable." end
+    name = LayoutName(name)
+    if not name then return false, "Enter a layout name of 1 to 40 characters without control codes or |." end
+    local saved, match, serial = {}, nil, 0
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if layout.builtin then
+            if layout.name:lower() == name:lower() then return false, "Choose a name different from the built-in layouts." end
+        else
+            saved[#saved + 1] = layout
+            serial = math.max(serial, tonumber(layout.id:match("^layout:(%d+)$")) or 0)
+            if layout.name:lower() == name:lower() then match = layout end
+        end
+    end
+    if not match then
+        if #saved >= DASHBOARD_LAYOUT_LIMIT then return false, "Remove a saved layout before adding another." end
+        if serial >= 9007199254740000 then return false, "The layout ID limit has been reached." end
+        match = { id = "layout:" .. string.format("%.0f", serial + 1) }
+        saved[#saved + 1] = match
+    end
+    match.name, match.pins = name, ns.DashboardPins()
+    ns.settings.dashboardLayouts, ns.settings.dashboardLayout = saved, match.id
+    return true, match.id
+end
+
+function ns.DeleteDashboardLayout(id)
+    if not ns.settings then return false, "Dashboard settings are unavailable." end
+    local saved, found = {}, false
+    for _, layout in ipairs(ns.DashboardLayouts()) do
+        if not layout.builtin then
+            if layout.id == id then found = true else saved[#saved + 1] = layout end
+        end
+    end
+    if not found then return false, "Only a saved custom layout can be removed." end
+    ns.settings.dashboardLayouts = saved
+    if ns.settings.dashboardLayout == id then ns.settings.dashboardLayout = nil end
     return true
 end
 

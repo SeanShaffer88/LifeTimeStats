@@ -38,6 +38,7 @@ function ns.LogSession()
     e.xp = c.xp or 0
     e.dmg = c.dmg_done or 0
     e.z = ns.GetZone and ns.GetZone() or e.z
+    e.closing = ns.CopySessionClosing(s.closing)
     if ns.LogSessionFarming then ns.LogSessionFarming(e, c) end
     Max("max_session_time", dur, date("%b %d", start))
 end

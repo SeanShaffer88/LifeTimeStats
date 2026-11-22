@@ -2,6 +2,19 @@
 
 All notable changes to LifeTimeStats. Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [1.28.0-forever] - 2026-11-21
+
+Prerelease for WoW: Forever 1.60.1 (Interface 16001). Regression suites and live-client checks were not run for this release, at the user's request.
+
+### Added
+- Named Journal chapters with entry assignments, chapter filtering and chapter management.
+- A session closing page with observed places, bosses, new records and the number of entries with note edits during the session.
+- Exploration and Combat Dashboard pin layouts, plus named custom layouts you can save, replace, apply and delete.
+
+### Changed
+- Full-character restore previews show counter decreases and the counts of Journal entries, notes, saved sessions and named chapters being replaced.
+- Full-character backups retain named chapters and saved session closing details.
+
 ## [1.27.1-forever] - 2026-11-21
 
 Prerelease for WoW: Forever 1.60.1 (Interface 16001). Offline regression and package checks pass. In-game validation is assumed for this release and was not performed during release preparation.

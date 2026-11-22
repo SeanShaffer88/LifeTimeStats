@@ -51,6 +51,41 @@ local pages = {}
 local current
 local pinLayer
 local noteLayer
+local chapterLayer
+local closingLayer
+
+local function Choice(parent, width, onPick)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(width, 24)
+    local left = W.FlatButton(f, "‹", 24, 24)
+    left:SetPoint("LEFT")
+    local right = W.FlatButton(f, "›", 24, 24)
+    right:SetPoint("RIGHT")
+    local text = W.Text(f, 12, T.text, nil, "CENTER")
+    text:SetPoint("LEFT", left, "RIGHT", 5, 0); text:SetPoint("RIGHT", right, "LEFT", -5, 0)
+    f:EnableMouse(true)
+    W.Tip(f, "Selection", function() return text:GetText() end)
+    function f:SetChoices(items, selected)
+        self.items, self.selected = items, selected
+        text:SetText("")
+        for _, item in ipairs(items) do
+            if item.id == selected then text:SetText(item.name); break end
+        end
+        left:SetEnabled(#items > 1); right:SetEnabled(#items > 1)
+    end
+    local function Turn(step)
+        local items = f.items or {}
+        if #items == 0 then return end
+        local index = 1
+        for i, item in ipairs(items) do if item.id == f.selected then index = i; break end end
+        local item = items[(index - 1 + step) % #items + 1]
+        f:SetChoices(items, item.id)
+        onPick(item.id)
+    end
+    left:SetScript("OnClick", function() Turn(-1) end)
+    right:SetScript("OnClick", function() Turn(1) end)
+    return f
+end
 
 -- ------------------------------------------------------------ helpers
 local function c(v, k) return (v and v.c and v.c[k]) or 0 end
@@ -277,7 +312,7 @@ local function CreateDashboardPinPicker()
     local dim = W.Fill(layer, { 0.06, 0.04, 0.02, 0.66 })
     dim:SetPoint("TOPLEFT", 1, -HEADER_H); dim:SetPoint("BOTTOMRIGHT", -1, FOOTER_H)
 
-    local width, height = 630, 390
+    local width, height = 630, 458
     local dlg = W.Window(layer)
     dlg:SetSize(width, height)
     dlg:SetPoint("CENTER")
@@ -302,8 +337,26 @@ local function CreateDashboardPinPicker()
     close:SetScript("OnClick", function() layer:Hide() end)
     W.Tip(close, "Close", "Close the pin picker.")
 
+    local selectedLayout, Refresh
+    local layoutLabel = W.Text(dlg, 12, T.text)
+    layoutLabel:SetPoint("TOPLEFT", 13, -53); layoutLabel:SetText("Layout")
+    local layoutChoice = Choice(dlg, 373, function(id) selectedLayout = id; Refresh(true) end)
+    layoutChoice:SetPoint("TOPLEFT", 67, -46)
+    local useLayout = W.FlatButton(dlg, "Use", 65, 24)
+    useLayout:SetPoint("LEFT", layoutChoice, "RIGHT", 8, 0)
+    local deleteLayout = W.FlatButton(dlg, "Delete", 65, 24)
+    deleteLayout:SetPoint("LEFT", useLayout, "RIGHT", 8, 0)
+    local saveLabel = W.Text(dlg, 12, T.text)
+    saveLabel:SetPoint("TOPLEFT", 13, -85); saveLabel:SetText("Save current as")
+    local saveBox = W.Panel(dlg, T.bg)
+    saveBox:SetPoint("TOPLEFT", 115, -78); saveBox:SetSize(379, 24)
+    local saveName = CreateFrame("EditBox", nil, saveBox)
+    saveName:SetPoint("TOPLEFT", 7, 0); saveName:SetPoint("BOTTOMRIGHT", -7, 0)
+    saveName:SetFont(W.FONT, 12, ""); saveName:SetTextColor(T.text[1], T.text[2], T.text[3]); saveName:SetAutoFocus(false)
+    local saveLayout = W.FlatButton(dlg, "Save new", 99, 24)
+    saveLayout:SetPoint("LEFT", saveBox, "RIGHT", 8, 0)
     local label = W.Text(dlg, 12, T.text)
-    label:SetPoint("TOPLEFT", 13, -56); label:SetText("Find a statistic")
+    label:SetPoint("TOPLEFT", 13, -118); label:SetText("Find a statistic")
     local box = W.Panel(dlg, T.bg)
     box:SetPoint("LEFT", label, "RIGHT", 9, 0); box:SetSize(236, 24)
     local edit = CreateFrame("EditBox", nil, box)
@@ -314,7 +367,7 @@ local function CreateDashboardPinPicker()
     local placeholder = W.Text(box, 11, T.dim, nil, "LEFT")
     placeholder:SetPoint("LEFT", 7, 0); placeholder:SetText("Search by name or category")
     local count = W.Text(dlg, 12, ink and ink.gold or T.amber, nil, "RIGHT")
-    count:SetPoint("TOPRIGHT", -13, -56)
+    count:SetPoint("TOPRIGHT", -13, -118)
 
     local done = W.FlatButton(dlg, "Done", 76, 20)
     done:SetPoint("BOTTOMRIGHT", -13, 10)
@@ -322,10 +375,20 @@ local function CreateDashboardPinPicker()
     local status = W.Text(dlg, 11, T.dim, nil, "LEFT")
     status:SetPoint("BOTTOMLEFT", 13, 14); status:SetPoint("RIGHT", done, "LEFT", -8, 0)
     local listParent = CreateFrame("Frame", nil, dlg)
-    listParent:SetPoint("TOPLEFT", 12, -82); listParent:SetSize(width - 24, height - 124)
+    listParent:SetPoint("TOPLEFT", 12, -144); listParent:SetSize(width - 24, height - 186)
 
     local list
-    local function Refresh(keepOffset, message)
+    Refresh = function(keepOffset, message)
+        local layouts, selected, replaces = ns.DashboardLayouts()
+        for _, layout in ipairs(layouts) do if layout.id == selectedLayout then selected = layout end end
+        if not selected then selected = layouts[1]; selectedLayout = selected.id end
+        layoutChoice:SetChoices(layouts, selectedLayout)
+        deleteLayout:SetEnabled(not selected.builtin)
+        local name = (saveName:GetText() or ""):match("^%s*(.-)%s*$"):lower()
+        for _, layout in ipairs(layouts) do
+            if not layout.builtin and layout.name:lower() == name then replaces = layout end
+        end
+        saveLayout.text:SetText(replaces and "Replace saved" or "Save new")
         local catalog, byID = ns.DashboardPinCatalog()
         local pins = ns.DashboardPins()
         local limit = ns.DASHBOARD_PIN_LIMIT
@@ -347,10 +410,12 @@ local function CreateDashboardPinPicker()
         end
         list:SetData(rows, keepOffset)
         count:SetText(string.format("%d of %d pins", #pins, limit))
-        status:SetText(message or (full and "Unpin a statistic to free a slot." or "Click a row to pin or unpin it. Scroll for more."))
+        status:SetText(message or (replaces and ("Save replaces “" .. replaces.name .. "”."))
+            or (ns.ActiveDashboardLayout() == "custom" and "Current pins have unsaved changes.")
+            or (full and "Unpin a statistic to free a slot." or "Click a row to pin or unpin it. Scroll for more."))
     end
 
-    list = W.Table(listParent, width - 24, height - 124, {
+    list = W.Table(listParent, width - 24, height - 186, {
         { "STATISTIC", 306, kind = "text" }, { "CATEGORY", 195, kind = "text" }, { "PINS", 0, kind = "text" },
     }, function(row)
         local ok, why = ns.ToggleDashboardPin(row.id)
@@ -367,12 +432,32 @@ local function CreateDashboardPinPicker()
     edit:SetScript("OnEditFocusLost", function(self) placeholder:SetShown((self:GetText() or "") == "") end)
     edit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     edit:SetScript("OnEscapePressed", function() layer:Hide() end)
+    saveName:SetScript("OnTextChanged", function() Refresh(true) end)
+    saveName:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    saveName:SetScript("OnEscapePressed", function() layer:Hide() end)
+    useLayout:SetScript("OnClick", function()
+        local ok, why = ns.UseDashboardLayout(selectedLayout)
+        Refresh(true, ok and "Layout applied." or why)
+        if ok then ns.RefreshWindow() end
+    end)
+    saveLayout:SetScript("OnClick", function()
+        local ok, id = ns.SaveDashboardLayout(saveName:GetText() or "")
+        if ok then selectedLayout = id end
+        Refresh(true, ok and "Layout saved." or id)
+    end)
+    deleteLayout:SetScript("OnClick", function()
+        local ok, why = ns.DeleteDashboardLayout(selectedLayout)
+        if ok then selectedLayout = nil end
+        Refresh(true, ok and "Saved layout deleted." or why)
+    end)
     layer:SetScript("OnShow", function()
+        selectedLayout = ns.ActiveDashboardLayout()
         Refresh(false)
         edit:SetFocus()
     end)
     layer:SetScript("OnHide", function()
         edit:ClearFocus()
+        saveName:ClearFocus()
         GameTooltip:Hide()
     end)
     return layer
@@ -1692,6 +1777,128 @@ local function JournalEntryTitle(entry)
     return DateLabel(entry[1]) .. "  ·  Level " .. (entry[3] or "?") .. (zone and ("  ·  " .. zone) or "")
 end
 
+local function ChapterChoices(firstLabel)
+    local choices = { { id = "", name = firstLabel } }
+    for _, chapter in ipairs(ns.JournalChapters()) do choices[#choices + 1] = chapter end
+    return choices
+end
+
+local function JournalModal(title, width, height)
+    local layer = CreateFrame("Frame", nil, win)
+    layer:SetAllPoints(); layer:SetFrameLevel((win:GetFrameLevel() or 0) + 15); layer:EnableMouse(true); layer:Hide()
+    local dim = W.Fill(layer, { 0.06, 0.04, 0.02, 0.66 })
+    dim:SetPoint("TOPLEFT", 1, -HEADER_H); dim:SetPoint("BOTTOMRIGHT", -1, FOOTER_H)
+    local panel = W.Window(layer)
+    panel:SetSize(width, height); panel:SetPoint("CENTER"); panel:EnableMouse(true)
+    local heading = W.Text(panel, 16, T.amber)
+    heading:SetPoint("TOPLEFT", 13, -12); heading:SetText(title)
+    local close = W.FlatButton(panel, "Done", 76, 22)
+    close:SetPoint("BOTTOMRIGHT", -13, 11); close:SetScript("OnClick", function() layer:Hide() end)
+    local status = W.Text(panel, 11, T.dim, nil, "LEFT")
+    status:SetPoint("BOTTOMLEFT", 13, 16); status:SetPoint("RIGHT", close, "LEFT", -8, 0)
+    return layer, panel, status
+end
+
+local function CreateChapterManager()
+    local layer, panel, status = JournalModal("Journal chapters", 560, 370)
+    local selected, list
+    local label = W.Text(panel, 12, T.text); label:SetPoint("TOPLEFT", 13, -51); label:SetText("Chapter name")
+    local box = W.Panel(panel, T.bg); box:SetPoint("TOPLEFT", 108, -44); box:SetSize(436, 25)
+    local name = CreateFrame("EditBox", nil, box)
+    name:SetPoint("TOPLEFT", 7, 0); name:SetPoint("BOTTOMRIGHT", -7, 0)
+    name:SetFont(W.FONT, 12, ""); name:SetTextColor(T.text[1], T.text[2], T.text[3]); name:SetAutoFocus(false)
+    local create = W.FlatButton(panel, "Create", 85, 23); create:SetPoint("TOPLEFT", 13, -78)
+    local rename = W.FlatButton(panel, "Rename selected", 128, 23); rename:SetPoint("LEFT", create, "RIGHT", 8, 0)
+    local delete = W.FlatButton(panel, "Delete selected", 128, 23); delete:SetPoint("LEFT", rename, "RIGHT", 8, 0)
+    local parent = CreateFrame("Frame", nil, panel); parent:SetPoint("TOPLEFT", 13, -113)
+    local function Refresh(message)
+        local rows, found = {}, false
+        for _, chapter in ipairs(ns.JournalChapters()) do
+            local assigned = 0
+            for _, entry in ipairs(ns.char.journal or {}) do
+                if ns.JournalChapter(entry) == chapter.id then assigned = assigned + 1 end
+            end
+            rows[#rows + 1] = { chapter.name, tostring(assigned), id = chapter.id, tip = chapter.name }
+            if chapter.id == selected then found = true end
+        end
+        if not found then selected = nil end
+        rename:SetEnabled(found); delete:SetEnabled(found)
+        list:SetData(rows, true)
+        status:SetText(message or "Deleting a chapter keeps its entries and notes.")
+    end
+    list = W.Table(parent, 534, 205, { { "CHAPTER", 407, kind = "text" }, { "ENTRIES", 0, kind = "num" } }, function(row)
+        selected = row.id; name:SetText(row[1]); Refresh()
+    end, "Create a chapter for part of your story.")
+    create:SetScript("OnClick", function()
+        local id, why = ns.CreateJournalChapter(name:GetText() or "")
+        if id then selected = id; ns.RefreshWindow() end
+        Refresh(id and "Chapter created." or why)
+    end)
+    rename:SetScript("OnClick", function()
+        local ok, why = ns.RenameJournalChapter(selected, name:GetText() or "")
+        if ok then ns.RefreshWindow() end
+        Refresh(ok and "Chapter renamed." or why)
+    end)
+    delete:SetScript("OnClick", function()
+        local ok, why = ns.DeleteJournalChapter(selected)
+        if ok then selected = nil; name:SetText(""); ns.RefreshWindow() end
+        Refresh(ok and "Chapter deleted. Its entries and notes are kept." or why)
+    end)
+    name:SetScript("OnEnterPressed", name.ClearFocus); name:SetScript("OnEscapePressed", function() layer:Hide() end)
+    layer:SetScript("OnShow", function() Refresh(); name:SetFocus() end)
+    layer:SetScript("OnHide", function() name:ClearFocus(); GameTooltip:Hide() end)
+    return layer
+end
+
+local function OpenChapterManager()
+    if not chapterLayer then chapterLayer = CreateChapterManager() end
+    chapterLayer:Show()
+end
+
+local function CreateSessionClosing()
+    local layer, panel, status = JournalModal("Session closing page", 650, 474)
+    local currentSession = true
+    local total = W.Text(panel, 14, T.text, nil, "LEFT")
+    total:SetPoint("TOPLEFT", 13, -80); total:SetWidth(624); total:SetWordWrap(true)
+    local parent = CreateFrame("Frame", nil, panel); parent:SetPoint("TOPLEFT", 13, -122)
+    local list = W.Table(parent, 624, 305, { { "SECTION", 142, kind = "text" }, { "YOUR SESSION", 0, kind = "text" } },
+        nil, "Your session will unfold here.")
+    local function Refresh()
+        local data = ns.SessionClosingData(currentSession)
+        local counts = data.c or {}
+        total:SetText(string.format("%s · %s\n%s quests · %s enemies slain · %s deaths", data.title, Time(data.elapsed),
+            Int(counts.quests_done or 0), Int((counts.kills_npc or 0) + (counts.kills_pvp or 0)), Int(counts.deaths or 0)))
+        local rows = {}
+        local function Add(section, entries, empty)
+            if #entries == 0 then rows[#rows + 1] = { section, empty } end
+            for i, text in ipairs(entries) do rows[#rows + 1] = { i == 1 and section or "", text, tipTitle = section, tip = text } end
+        end
+        Add("Places visited", data.zones or {}, "No places recorded.")
+        if data.zoneOverflow then rows[#rows + 1] = { "", "More places beyond the saved limit." } end
+        Add("Bosses defeated", data.bosses or {}, "No bosses recorded.")
+        if data.bossOverflow then rows[#rows + 1] = { "", "More bosses beyond the saved limit." } end
+        Add("New records", data.highlights or {}, "No new records recorded.")
+        rows[#rows + 1] = { "Personal notes", string.format("%d entries with note edits this session", data.notes or 0) }
+        list:SetData(rows)
+        status:SetText(data.complete and "A local page from your adventure." or "Earlier details were not recorded for this session.")
+    end
+    local choices = W.Segmented(panel, {
+        { id = "current", label = "Current session", tip = "What has happened in this play session." },
+        { id = "last", label = "Last saved", tip = "The most recently saved completed session." },
+    }, function(id) currentSession = id == "current"; layer.choices:Select(id); Refresh() end)
+    choices:SetPoint("TOPLEFT", 13, -43); layer.choices = choices
+    function layer:Open(current)
+        currentSession = current ~= false; choices:Select(currentSession and "current" or "last"); Refresh(); self:Show()
+    end
+    return layer
+end
+
+function ns.ShowSessionClosing(current)
+    if not win or not win:IsShown() then ns.OpenPage("journal") end
+    if not closingLayer then closingLayer = CreateSessionClosing() end
+    closingLayer:Open(current)
+end
+
 local function CreateJournalNoteEditor()
     local layer = CreateFrame("Frame", nil, win)
     layer:SetAllPoints()
@@ -1703,7 +1910,7 @@ local function CreateJournalNoteEditor()
 
     local width = 580
     local dlg = W.Window(layer)
-    dlg:SetSize(width, 372)
+    dlg:SetSize(width, 407)
     dlg:SetPoint("CENTER")
     dlg:EnableMouse(true)
     local ink = ns.JournalSkin() and W.JOURNAL or nil
@@ -1739,13 +1946,19 @@ local function CreateJournalNoteEditor()
     local eventText = W.Text(eventBody, 14, T.text, nil, "LEFT")
     eventText:SetPoint("TOPLEFT", meta, "BOTTOMLEFT", 0, -6); eventText:SetWidth(textWidth); eventText:SetWordWrap(true)
 
+    local entry
+    local chapterLabel = W.Text(dlg, 12, T.text); chapterLabel:SetPoint("TOPLEFT", 13, -142); chapterLabel:SetText("Chapter")
+    local selectedChapter
+    local chapterChoice = Choice(dlg, 374, function(id) selectedChapter = id end)
+    chapterChoice:SetPoint("TOPLEFT", 77, -135)
+    local assign = W.FlatButton(dlg, "Assign", 92, 24); assign:SetPoint("LEFT", chapterChoice, "RIGHT", 9, 0)
     local label = W.Text(dlg, 13, ink and ink.gold or T.amber)
-    label:SetPoint("TOPLEFT", 13, -140); label:SetText("Personal note")
+    label:SetPoint("TOPLEFT", 13, -175); label:SetText("Personal note")
     local limit = W.Text(dlg, 11, T.dim)
-    limit:SetPoint("TOPRIGHT", -13, -141)
+    limit:SetPoint("TOPRIGHT", -13, -176)
     limit:SetText(string.format("Up to %d characters", ns.JOURNAL_NOTE_LIMIT))
     local box = W.Panel(dlg, T.bg)
-    box:SetPoint("TOPLEFT", 13, -160); box:SetSize(width - 26, 141)
+    box:SetPoint("TOPLEFT", 13, -195); box:SetSize(width - 26, 141)
     local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 10, -7); scroll:SetPoint("BOTTOMRIGHT", -25, 7)
     scroll.scrollBarHideIfUnscrollable = true
@@ -1779,7 +1992,7 @@ local function CreateJournalNoteEditor()
 
     local privacy = "Saved in this character’s local journal."
     local status = W.Text(dlg, 11, T.dim, nil, "LEFT")
-    status:SetPoint("TOPLEFT", 13, -313); status:SetWidth(width - 26)
+    status:SetPoint("TOPLEFT", 13, -348); status:SetWidth(width - 26)
     local footerRule = W.Line(dlg)
     footerRule:SetPoint("BOTTOMLEFT", 1, 39); footerRule:SetPoint("BOTTOMRIGHT", -1, 39); footerRule:SetHeight(1)
     local save = W.FlatButton(dlg, "Save note", 83, 21)
@@ -1791,7 +2004,12 @@ local function CreateJournalNoteEditor()
     remove:SetPoint("BOTTOMLEFT", 13, 9)
     remove.text:SetTextColor(C.rust[1], C.rust[2], C.rust[3])
 
-    local entry
+    assign:SetScript("OnClick", function()
+        local ok, why = ns.SetJournalChapter(entry, selectedChapter ~= "" and selectedChapter or nil)
+        status:SetTextColor(ok and T.dim[1] or C.rust[1], ok and T.dim[2] or C.rust[2], ok and T.dim[3] or C.rust[3])
+        status:SetText(ok and "Chapter assignment saved." or why)
+        if ok then ns.RefreshWindow() end
+    end)
     local function Apply(text)
         local ok, why = ns.SetJournalNote(entry, text)
         if not ok then
@@ -1813,6 +2031,8 @@ local function CreateJournalNoteEditor()
     function layer:Open(selected)
         entry = selected
         local saved = ns.JournalNote(selected)
+        selectedChapter = ns.JournalChapter(selected) or ""
+        chapterChoice:SetChoices(ChapterChoices("Unassigned"), selectedChapter)
         title:SetText(saved and "Edit journal note" or "Add journal note")
         meta:SetText(JournalEntryTitle(selected))
         eventText:SetText(selected[2])
@@ -1886,6 +2106,19 @@ local function JournalFeed(parent, width, height)
     f.source, f.kindFilter, f.zoneText = f.entries, "all", ""
     local gold = ink and ink.gold or T.amber
     local categories, zoneEdit, toolbarHeight = JournalFilters(f, width)
+    local chapterLabel = W.Text(f, 11, T.text)
+    chapterLabel:SetPoint("TOPLEFT", 9, -toolbarHeight - 12); chapterLabel:SetText("Chapter")
+    local chapterChoice = Choice(f, width - 270, function(id)
+        f.chapterFilter, f.cachedChapter = id, nil
+        f:SetEntries(f.source)
+    end)
+    chapterChoice:SetPoint("TOPLEFT", 66, -toolbarHeight - 5)
+    local manage = W.FlatButton(f, "Chapters…", 89, 24)
+    manage:SetPoint("LEFT", chapterChoice, "RIGHT", 7, 0); manage:SetScript("OnClick", OpenChapterManager)
+    local closing = W.FlatButton(f, "Closing page", 96, 24)
+    closing:SetPoint("LEFT", manage, "RIGHT", 7, 0); closing:SetScript("OnClick", function() ns.ShowSessionClosing(true) end)
+    toolbarHeight = toolbarHeight + 34
+    f.chapterFilter = ""
     f.zoneEdit = zoneEdit
     for i = 1, JOURNAL_PAGE_SIZE do
         local row = CreateFrame("Button", nil, f)
@@ -1980,19 +2213,30 @@ local function JournalFeed(parent, width, height)
         local total = #entries
         local latest = entries[total]
         local sourceChanged = entries ~= self.source
+        local chapters, chapterNames = ChapterChoices("All chapters"), {}
+        for _, chapter in ipairs(chapters) do
+            chapterNames[chapter.id] = true
+        end
+        if not chapterNames[self.chapterFilter] then self.chapterFilter = "" end
+        chapterChoice:SetChoices(chapters, self.chapterFilter)
         local filterChanged = self.kindFilter ~= self.cachedKind or self.zoneText ~= self.cachedZone
-        if not sourceChanged and not filterChanged and total == self.total and latest == self.latest then return end
+            or self.chapterFilter ~= self.cachedChapter
+        local chapterRevision = ns.journalChapterRevision or 0
+        local chaptersChanged = chapterRevision ~= self.chapterRevision
+        if not sourceChanged and not filterChanged and not chaptersChanged and total == self.total and latest == self.latest then return end
         self.source, self.total, self.latest = entries, total, latest
         self.cachedKind, self.cachedZone = self.kindFilter, self.zoneText
+        self.cachedChapter, self.chapterRevision = self.chapterFilter, chapterRevision
 
         local query = JournalZoneLower(self.zoneText:match("^%s*(.-)%s*$"))
         local matches = entries
-        if self.kindFilter ~= "all" or query ~= "" then
+        if self.kindFilter ~= "all" or query ~= "" or self.chapterFilter ~= "" then
             matches = {}
             for _, entry in ipairs(entries) do
                 local kind, zone, alsoKind = ns.JournalEntryInfo(entry)
                 local matchesKind = self.kindFilter == "all" or kind == self.kindFilter or alsoKind == self.kindFilter
-                if matchesKind and (query == "" or (zone and JournalZoneLower(zone):find(query, 1, true))) then
+                if matchesKind and (query == "" or (zone and JournalZoneLower(zone):find(query, 1, true)))
+                    and (self.chapterFilter == "" or ns.JournalChapter(entry) == self.chapterFilter) then
                     matches[#matches + 1] = entry
                 end
             end
@@ -2170,6 +2414,8 @@ function ns.ShowPage(id)
     if id ~= "search" then Settings().lastCategory = id end
     if id ~= "dashboard" and pinLayer then pinLayer:Hide() end
     if id ~= "journal" and noteLayer then noteLayer:Hide() end
+    if id ~= "journal" and chapterLayer then chapterLayer:Hide() end
+    if closingLayer then closingLayer:Hide() end
     win:SetDashboardPinButtonShown(id == "dashboard")
     if current and current ~= pages[id] then current:Hide() end
     if pages[id] ~= current then pages[id].focus = nil end
@@ -2632,6 +2878,8 @@ local function CreateWindow()
         local handled = false
         local modal = pinLayer
         if noteLayer and noteLayer:IsShown() then modal = noteLayer end
+        if chapterLayer and chapterLayer:IsShown() then modal = chapterLayer end
+        if closingLayer and closingLayer:IsShown() then modal = closingLayer end
         if modal and modal:IsShown() then
             if key == "ESCAPE" then modal:Hide(); handled = true end
         elseif self:IsMouseOver() and not win.search:HasFocus() and not pages.journal.story.zoneEdit:HasFocus() then
@@ -2659,6 +2907,8 @@ local function CreateWindow()
         if pages.search then pages.search:ClearTallySearch() end
         if pinLayer then pinLayer:Hide() end
         if noteLayer then noteLayer:Hide() end
+        if chapterLayer then chapterLayer:Hide() end
+        if closingLayer then closingLayer:Hide() end
     end)
     local acc = 0
     win:SetScript("OnUpdate", function(_, el)
@@ -2904,6 +3154,8 @@ local function LayoutBackupDialog(mode, width, height)
     dlg.eb:SetWidth(width - 70)
     local export, restore = mode == "export", mode == "restore"
     dlg.exportModes:SetShown(export)
+    dlg.differences:Hide()
+    dlg.summary:SetHeight(96)
     dlg.summary:Hide()
     dlg.editPaste:Hide()
     dlg.box:Show()
@@ -2973,7 +3225,7 @@ end
 
 local function ShowFullBackupPreview(input, snapshot)
     dlg.previewInput, dlg.previewSnapshot = input, snapshot
-    dlg:SetSize(560, 254)
+    dlg:SetSize(620, 476)
     dlg.title:SetText("Restore full character backup")
     dlg.hint:SetText("This will replace this character’s statistics and saved history.")
     dlg.eb:ClearFocus()
@@ -2982,6 +3234,11 @@ local function ShowFullBackupPreview(input, snapshot)
     dlg.summary.source:SetText("Source: " .. snapshot.character:gsub("|", "||") .. "  ·  This character")
     dlg.summary.saved:SetText(validDate and type(saved) == "string" and "Backed up " .. saved or "Backup date unavailable")
     dlg.summary.counts:SetText(string.format("%d Journal entries  ·  %d personal notes  ·  %d saved sessions", snapshot.journalCount, snapshot.noteCount or 0, snapshot.sessionCount))
+    dlg.summary:SetHeight(96)
+    dlg.differenceText:SetText(table.concat(snapshot.differences or {}, "\n"))
+    dlg.differenceBody:SetHeight(math.max(200, (dlg.differenceText:GetStringHeight() or 0) + 12))
+    dlg.differences:SetVerticalScroll(0)
+    dlg.differences:Show()
     dlg.summary:Show()
     dlg.editPaste:Show()
     dlg.action.text:SetText(L["Replace history"])
@@ -3062,6 +3319,11 @@ local function ApplyBackup(parsed, readError, readingFinished)
         end
         if not dlg.previewInput then
             ShowFullBackupPreview(text, snapshot)
+            return
+        end
+        if snapshot.refreshDifferences and snapshot.refreshDifferences() then
+            ShowFullBackupPreview(text, snapshot)
+            dlg.hint:SetText("Your character data changed. Review the updated comparison before replacing history.")
             return
         end
         local ok, reason = snapshot.apply()
@@ -3164,6 +3426,15 @@ local function CreateDialog()
     dlg.summary.counts = W.Text(dlg.summary, 12, T.text, nil, "LEFT")
     dlg.summary.counts:SetPoint("TOPLEFT", 10, -60); dlg.summary.counts:SetPoint("RIGHT", -10, 0)
     dlg.summary.counts:SetWordWrap(true)
+    dlg.differences = CreateFrame("ScrollFrame", nil, dlg, "UIPanelScrollFrameTemplate")
+    dlg.differences:SetPoint("TOPLEFT", 22, -196); dlg.differences:SetPoint("BOTTOMRIGHT", -35, 51)
+    dlg.differenceBody = CreateFrame("Frame", nil, dlg.differences)
+    dlg.differenceBody:SetSize(560, 200)
+    dlg.differenceBody:SetPoint("TOPLEFT", dlg.differences, "TOPLEFT")
+    dlg.differences:SetScrollChild(dlg.differenceBody)
+    dlg.differenceText = W.Text(dlg.differenceBody, 12, T.text, nil, "LEFT")
+    dlg.differenceText:SetPoint("TOPLEFT"); dlg.differenceText:SetWidth(550); dlg.differenceText:SetWordWrap(true)
+    dlg.differences:Hide()
     local ready = W.Text(dlg.summary, 11, T.dim, nil, "LEFT")
     ready:SetPoint("TOPLEFT", dlg.summary, "BOTTOMLEFT", 0, -9)
     ready:SetText("The backup text is ready. Choose Edit paste to change it.")
