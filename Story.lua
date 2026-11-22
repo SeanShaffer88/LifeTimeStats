@@ -13,6 +13,8 @@ local function SafeStr(v) if S(v) or type(v) ~= "string" or v == "" then return 
 -- ------------------------------------------------------------ journal
 local JOURNAL_CAP = 600
 ns.JOURNAL_NOTE_LIMIT = 500
+ns.JOURNAL_CHAPTER_LIMIT, ns.JOURNAL_CHAPTER_NAME_LIMIT = 40, 80
+local MAX_LOCAL_ID = 9007199254740990
 local JOURNAL_KINDS = { first = true, boss = true, death = true, personalBest = true }
 local firstLabels = {}
 for key, label in pairs(ns.FIRST_LABEL) do firstLabels[label] = key end
@@ -20,6 +22,177 @@ for key, label in pairs(ns.FIRST_LABEL) do firstLabels[label] = key end
 local function ReadableZone(value)
     local name = SafeStr(value)
     if name and name ~= "?" and name:find("%S") then return name end
+end
+
+local function LocalID(value)
+    return not S(value) and not ns.BadNumber(value) and value > 0 and value <= MAX_LOCAL_ID and value % 1 == 0
+end
+
+local function ChapterSerial(id)
+    if not SafeStr(id) then return end
+    local serial = id:match("^chapter:([1-9]%d*)$")
+    serial = serial and tonumber(serial)
+    if LocalID(serial) then return serial end
+end
+
+local function ChapterName(text)
+    if not SafeStr(text) or #text > ns.JOURNAL_CHAPTER_NAME_LIMIT * 4 then
+        return nil, "Enter a chapter name of up to 80 characters."
+    end
+    text = text:match("^%s*(.-)%s*$")
+    if text == "" or text:find("[%z\1-\31\127|]") then return nil, "Enter a chapter name on one line without pipe characters." end
+    local index, characters = 1, 0
+    while index <= #text do
+        local byte, width = text:byte(index), 1
+        if byte >= 194 and byte <= 223 then width = 2
+        elseif byte >= 224 and byte <= 239 then width = 3
+        elseif byte >= 240 and byte <= 244 then width = 4
+        elseif byte >= 128 then return nil, "The chapter name contains invalid text." end
+        local second = text:byte(index + 1) or 0
+        if (byte == 224 and second < 160) or (byte == 237 and second > 159)
+            or (byte == 240 and second < 144) or (byte == 244 and second > 143) then
+            return nil, "The chapter name contains invalid text."
+        end
+        for offset = 1, width - 1 do
+            local continuation = text:byte(index + offset) or 0
+            if continuation < 128 or continuation > 191 then return nil, "The chapter name contains invalid text." end
+        end
+        characters = characters + 1
+        if characters > ns.JOURNAL_CHAPTER_NAME_LIMIT then return nil, "Keep the chapter name to 80 characters or fewer." end
+        index = index + width
+    end
+    return text
+end
+ns.ValidateJournalChapterName = ChapterName
+ns.JournalChapterSerial = ChapterSerial
+
+function ns.JournalChapters()
+    local result, seen = {}, {}
+    local chapters = ns.char and ns.char.chapters
+    if type(chapters) ~= "table" then return result end
+    for _, chapter in ipairs(chapters) do
+        if type(chapter) == "table" and not S(chapter) and ChapterSerial(chapter.id)
+            and ChapterName(chapter.name) and not seen[chapter.id] then
+            result[#result + 1], seen[chapter.id] = chapter, true
+            if #result == ns.JOURNAL_CHAPTER_LIMIT then break end
+        end
+    end
+    return result
+end
+
+local function FindChapter(id)
+    if not ChapterSerial(id) then return end
+    for _, chapter in ipairs(ns.JournalChapters()) do if chapter.id == id then return chapter end end
+end
+
+local function HasJournalEntry(entry)
+    if type(entry) ~= "table" or S(entry) then return false end
+    for _, row in ipairs((ns.char and ns.char.journal) or {}) do
+        if rawequal(row, entry) then return true end
+    end
+    return false
+end
+
+function ns.CreateJournalChapter(name)
+    if not ns.char then return nil, "The active character is unavailable." end
+    local clean, reason = ChapterName(name)
+    if not clean then return nil, reason end
+    local chapters = ns.JournalChapters()
+    if #chapters >= ns.JOURNAL_CHAPTER_LIMIT then return nil, "You can keep up to 40 chapters." end
+    local serial = LocalID(ns.char.meta.chapterSerial) and ns.char.meta.chapterSerial or 0
+    for _, chapter in ipairs(chapters) do serial = math.max(serial, ChapterSerial(chapter.id)) end
+    if serial >= MAX_LOCAL_ID then return nil, "No more chapter IDs are available." end
+    serial = serial + 1
+    local id = "chapter:" .. string.format("%.0f", serial)
+    chapters[#chapters + 1] = { id = id, name = clean, created = time() }
+    ns.char.chapters, ns.char.meta.chapterSerial = chapters, serial
+    ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    return id
+end
+
+function ns.RenameJournalChapter(id, name)
+    local chapter = FindChapter(id)
+    if not chapter then return false, "This chapter is no longer available." end
+    local clean, reason = ChapterName(name)
+    if not clean then return false, reason end
+    chapter.name = clean
+    ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    return true
+end
+
+function ns.DeleteJournalChapter(id)
+    if not FindChapter(id) then return false, "This chapter is no longer available." end
+    local chapters = ns.JournalChapters()
+    for index, chapter in ipairs(chapters) do
+        if chapter.id == id then table.remove(chapters, index); break end
+    end
+    for _, entry in ipairs(ns.char.journal or {}) do
+        if entry.chapter == id then entry.chapter = nil end
+    end
+    ns.char.chapters = chapters
+    ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    return true
+end
+
+function ns.JournalChapter(entry)
+    if type(entry) == "table" and not S(entry) and FindChapter(entry.chapter) then return entry.chapter end
+end
+
+function ns.SetJournalChapter(entry, id)
+    if not HasJournalEntry(entry) then return false, "This Journal entry is no longer available." end
+    if id ~= nil and not FindChapter(id) then return false, "This chapter is no longer available." end
+    entry.chapter = id
+    ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
+    return true
+end
+
+local function ClosingName(value)
+    return SafeStr(value) and #value <= 512 and not value:find("[%z\1-\31\127]") and value or nil
+end
+
+function ns.CopySessionClosing(value)
+    local result = { zones = {}, bosses = {}, notes = 0, complete = false }
+    if type(value) ~= "table" or S(value) then return result end
+    result.complete = not S(value.complete) and value.complete == true
+    for _, spec in ipairs({ { "zones", 40, "zoneOverflow" }, { "bosses", 20, "bossOverflow" } }) do
+        local seen = {}
+        local list = type(value[spec[1]]) == "table" and not S(value[spec[1]]) and value[spec[1]] or {}
+        for index = 1, math.min(#list, spec[2]) do
+            local name = list[index]
+            if ClosingName(name) and not seen[name] then
+                result[spec[1]][#result[spec[1]] + 1] = name
+                seen[name] = true
+            end
+        end
+        if #list > spec[2] or (not S(value[spec[3]]) and value[spec[3]] == true) then result[spec[3]] = true end
+    end
+    if not S(value.notes) and not ns.BadNumber(value.notes) and value.notes >= 0 and value.notes <= MAX_LOCAL_ID then
+        result.notes = math.floor(value.notes)
+    end
+    return result
+end
+
+local function Closing()
+    if not ns.session or not LocalID(ns.session.id) then return end
+    if type(ns.session.closing) ~= "table" then ns.session.closing = ns.CopySessionClosing() end
+    return ns.session.closing
+end
+
+local function ObserveClosingName(field, name, limit, overflow)
+    local closing = Closing()
+    name = ClosingName(name)
+    if not closing then return end
+    if not name or name == "?" then closing.complete = false; return end
+    for _, observed in ipairs(closing[field]) do if observed == name then return end end
+    if #closing[field] < limit then closing[field][#closing[field] + 1] = name
+    else closing[overflow] = true end
+end
+
+local function NoteEdited(entry)
+    local closing = Closing()
+    if not closing or entry.noteSession == ns.session.id then return end
+    entry.noteSession = ns.session.id
+    closing.notes = closing.notes + 1
 end
 
 -- The tracker cache is a fallback only when the zone API is unavailable.
@@ -74,7 +247,11 @@ function ns.Journal(text, kind, eventZone)
     if S(level) or type(level) ~= "number" then level = 0 end
     ch.journal = ch.journal or {}
     local j = ch.journal
-    j[#j + 1] = { time(), text, level, kind = kind, zone = ReadableZone(zone) }
+    local entry = { time(), text, level, kind = kind, zone = ReadableZone(zone) }
+    if ns.session and LocalID(ns.session.id) then entry.session = ns.session.id end
+    j[#j + 1] = entry
+    ObserveClosingName("zones", entry.zone, 40, "zoneOverflow")
+    if kind == "boss" then ObserveClosingName("bosses", text:match("^Boss killed: (.+)$"), 20, "bossOverflow") end
     if #j > JOURNAL_CAP then if ns.Retention then ns.Retention.Mark(ns.char, "h", "journal") end; table.remove(j, 1) end
     -- Visible history refreshes on the window tick, coalescing event bursts.
 end
@@ -84,23 +261,12 @@ function ns.JournalNote(entry)
 end
 
 function ns.SetJournalNote(entry, text)
-    local journal = ns.char and ns.char.journal
-    if type(journal) ~= "table" or type(entry) ~= "table" or S(entry) then
-        return false, "This Journal entry is no longer available."
-    end
     -- Entries can be evicted while the editor is open. Timestamps and text
     -- can match another entry, so require the same row object.
-    local found = false
-    for _, row in ipairs(journal) do
-        if rawequal(row, entry) then
-            found = true
-            break
-        end
-    end
-    if not found then return false, "This Journal entry is no longer available." end
+    if not HasJournalEntry(entry) then return false, "This Journal entry is no longer available." end
 
     if text == nil then
-        entry.note = nil
+        if entry.note ~= nil then entry.note = nil; NoteEdited(entry) end
         return true
     end
     if S(text) or type(text) ~= "string" then return false, "The note must be readable text." end
@@ -115,7 +281,7 @@ function ns.SetJournalNote(entry, text)
     -- continuation range, regardless of how many bytes it occupies.
     local _, characters = text:gsub("[^\128-\191]", "")
     if characters > ns.JOURNAL_NOTE_LIMIT then return false, tooLong end
-    entry.note = text
+    if entry.note ~= text then entry.note = text; NoteEdited(entry) end
     return true
 end
 
@@ -199,6 +365,7 @@ end)
 -- ------------------------------------------------------------ travel log: first visit of each zone
 On("ZONE_CHANGED_NEW_AREA", function()
     local z = SafeStr(GetRealZoneText and GetRealZoneText())
+    ObserveClosingName("zones", z, 40, "zoneOverflow")
     if not z or not ns.char then return end
     ns.char.zonelog = ns.char.zonelog or {}
     if not ns.char.zonelog[z] then
@@ -298,6 +465,12 @@ ns.Sampling.Register("story", 1, ns.Guard("story", function(_, el)
 end))
 
 On("PLAYER_ENTERING_WORLD", function(_, isLogin)
+    local zone = ns.GetJournalZone()
+    if zone then ObserveClosingName("zones", zone, 40, "zoneOverflow")
+    else
+        local closing = Closing()
+        if closing then closing.complete = false end
+    end
     if not isLogin or not GetGameTime then return end
     local h = GetGameTime()
     if type(h) ~= "number" or S(h) then return end

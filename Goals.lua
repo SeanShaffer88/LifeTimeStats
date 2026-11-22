@@ -208,17 +208,52 @@ function ns.SessionSummaryText(c, elapsed, title, highlights)
     return table.concat(lines, "\n")
 end
 
-function ns.ShowSessionSummary(current)
-    if not ns.ShowText then return end
-    if current or not (type(LifeTimeStatsCharDB) == "table" and type(LifeTimeStatsCharDB.lastSession) == "table") then
-        local s = ns.session
-        ns.ShowText("This session", "Since you logged in. /lts summary shows it again.",
-            ns.SessionSummaryText(s.c or {}, GetTime() - (s.start or GetTime()), "This session"))
-        return
+function ns.SessionClosingData(current)
+    local last = type(LifeTimeStatsCharDB) == "table" and LifeTimeStatsCharDB.lastSession
+    local previous = current == false
+    local source = previous and type(last) == "table" and last or (not previous and ns.session or nil)
+    local closing = ns.CopySessionClosing(source and source.closing)
+    local data = {
+        title = previous and "Last session" or "This session", c = source and source.c or {},
+        elapsed = 0, highlights = {}, zones = closing.zones, bosses = closing.bosses, notes = closing.notes,
+        complete = closing.complete, zoneOverflow = closing.zoneOverflow, bossOverflow = closing.bossOverflow,
+    }
+    if source then
+        local elapsed = previous and source.elapsed or (GetTime() - (source.start or GetTime()))
+        if not ns.BadNumber(elapsed) then data.elapsed = math.max(0, elapsed) end
+        if previous and type(source.highlights) == "table" then
+            for index = 1, math.min(3, #source.highlights) do
+                local text = source.highlights[index]
+                if type(text) == "string" and not ns.IsSecret(text) then data.highlights[#data.highlights + 1] = text end
+            end
+        elseif ns.SessionRecordHighlights then data.highlights = ns.SessionRecordHighlights(source.rh, 3) end
     end
-    local last = LifeTimeStatsCharDB.lastSession
-    ns.ShowText("Last session", "Shown at login after a session of 10+ minutes (Settings: session recap). /lts summary shows the current one.",
-        ns.SessionSummaryText(last.c or {}, last.elapsed, "Last session", last.highlights))
+    if type(data.c) ~= "table" then data.c = {} end
+    return data
+end
+
+function ns.SessionClosingText(current)
+    local data = ns.SessionClosingData(current)
+    local lines = { ns.SessionSummaryText(data.c, data.elapsed, data.title, data.highlights), "" }
+    if not data.complete then lines[#lines + 1] = "Journal coverage is incomplete for this session." end
+    lines[#lines + 1] = "Zones visited"
+    lines[#lines + 1] = #data.zones > 0 and table.concat(data.zones, ", ") or "No zones recorded."
+    if data.zoneOverflow then lines[#lines + 1] = "Showing the first 40 distinct zones." end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Bosses defeated"
+    lines[#lines + 1] = #data.bosses > 0 and table.concat(data.bosses, ", ") or "No bosses recorded."
+    if data.bossOverflow then lines[#lines + 1] = "Showing the first 20 distinct boss names." end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "Journal notes edited: " .. ns.FormatInt(data.notes)
+    return table.concat(lines, "\n")
+end
+
+function ns.ShowSessionSummary(current)
+    if ns.ShowSessionClosing then ns.ShowSessionClosing(current); return end
+    if ns.ShowText then
+        ns.ShowText(current == false and "Last session" or "This session",
+            "Your local closing page. /lts summary opens the current session.", ns.SessionClosingText(current))
+    end
 end
 
 On("PLAYER_ENTERING_WORLD", function(_, isLogin)

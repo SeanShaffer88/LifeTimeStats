@@ -223,13 +223,17 @@ ns.EnsureRecord = Ensure
 
 local function NewSession(rec)
     local id
+    local closing = { zones = {}, bosses = {}, notes = 0, complete = rec ~= nil }
     if rec then
         local serial = rec.meta.sessionSerial
         id = (ns.BadNumber(serial) and 0 or serial) + 1
         rec.meta.sessionSerial = id
+        local zone = ns.GetJournalZone and ns.GetJournalZone()
+        if zone then closing.zones[1] = zone else closing.complete = false end
     end
     return { c = {}, r = {}, t = {}, u = {}, un = {}, f = {}, fw = {}, fd = {}, first = {}, firstd = {}, rh = {},
-        id = id, start = GetTime(), wallStart = time() }
+        id = id, start = GetTime(), wallStart = time(),
+        closing = closing }
 end
 ns.session = NewSession()
 
@@ -343,6 +347,7 @@ function ns.InitDB()
     if type(saved) == "table" and type(saved.c) == "table" and not ns.BadNumber(saved.savedAt) then
         local sess = NewSession()
         for k in pairs(sess) do if type(saved[k]) == "table" then sess[k] = saved[k] end end
+        sess.closing = ns.CopySessionClosing(saved.closing)
         local elapsed = ns.BadNumber(saved.elapsed) and 0 or math.max(0, saved.elapsed)
         sess.start = GetTime() - elapsed
         sess.wallStart = ns.BadNumber(saved.wallStart) and math.floor(saved.savedAt - elapsed) or saved.wallStart
@@ -406,14 +411,16 @@ function ns.Save()
     db.data = ns.char
     db.session = { c = session.c, r = session.r, t = session.t, u = session.u, un = session.un,
         f = session.f, fw = session.fw, fd = session.fd, first = session.first, firstd = session.firstd,
-        rh = session.rh, id = session.id, wallStart = session.wallStart, elapsed = elapsed, savedAt = savedAt }
+        rh = session.rh, id = session.id, wallStart = session.wallStart, elapsed = elapsed, savedAt = savedAt,
+        closing = ns.CopySessionClosing(session.closing) }
     if ns.SaveFightCorrelation then
         local ok, value = pcall(ns.SaveFightCorrelation)
         if ok then db.session.fightCorrelation = value else ns.LogError("save:fight correlation", value) end
     end
     local ok, recap = pcall(function()
         return { c = session.c, elapsed = elapsed, at = savedAt, top = SessionTopSpell(),
-            highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(session.rh, 3) or {} }
+            highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(session.rh, 3) or {},
+            closing = ns.CopySessionClosing(session.closing) }
     end)
     if ok then db.lastSession = recap
     else db.lastSession = nil; ns.LogError("save:recap", recap) end
@@ -1152,6 +1159,19 @@ SlashCmdList.LIFETIMESTATS = function(msg)
 end
 
 function ns.ResetSession()
+    local previous = ns.session
+    if previous and GetTime() - previous.start >= 5 then
+        if ns.LogSession then ns.LogSession() end
+        if type(LifeTimeStatsCharDB) == "table" then
+            local counters = {}
+            for key, value in pairs(previous.c or {}) do counters[key] = value end
+            LifeTimeStatsCharDB.lastSession = {
+                c = counters, elapsed = GetTime() - previous.start, at = time(), top = SessionTopSpell(),
+                highlights = ns.SessionRecordHighlights and ns.SessionRecordHighlights(previous.rh, 3) or {},
+                closing = ns.CopySessionClosing(previous.closing),
+            }
+        end
+    end
     ns.session = NewSession(ns.char)
     if ns.RefreshWindow then ns.RefreshWindow() end
 end

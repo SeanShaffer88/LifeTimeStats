@@ -427,10 +427,11 @@ local FULL_META = {
     created = Timestamp, achInit = Boolean, achUnseen = Nonnegative, levelMark = Nonnegative,
     levelMarkLevel = Level, levelMarkPartial = Boolean, bgStreak = Nonnegative, repairs = true,
     monthsThrough = function(value) return DayKey(value) end,
+    chapterSerial = function(value) return Integer(value, 0, MAX_IMPORTED_SESSION_ID) end,
 }
 local FULL_FIELDS = {
     "c", "r", "t", "u", "f", "fw", "fd", "first", "firstd", "days", "months", "ach", "achr",
-    "rh", "journal", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog", "meta", "measurement", "retention",
+    "rh", "journal", "chapters", "lvlsnap", "zonelog", "sessionlog", "runlog", "bestiary", "people", "reps", "items", "goals", "quests", "skills", "deathlog", "meta", "measurement", "retention",
 }
 local FULL_FIELD_SET = {}
 for _, field in ipairs(FULL_FIELDS) do FULL_FIELD_SET[field] = true end
@@ -440,7 +441,37 @@ local JOURNAL_ROW = {
     [1] = Timestamp, [2] = function(value) return Text(value) and value ~= "" end,
     [3] = Level, zone = Key, note = Note,
     kind = function(value) return Key(value) and JOURNAL_KINDS[value] end,
+    chapter = function(value) return Key(value) and ns.JournalChapterSerial(value) ~= nil end,
+    session = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
+    noteSession = function(value) return Integer(value, 1, MAX_IMPORTED_SESSION_ID) end,
 }
+local CHAPTER_ROW = {
+    id = function(value) return Key(value) and ns.JournalChapterSerial(value) ~= nil end,
+    name = function(value)
+        return Key(value) and ns.ValidateJournalChapterName(value) == value
+    end,
+    created = Timestamp,
+}
+local function ClosingNames(values, limit)
+    if not PlainTable(values) then return false end
+    local count = 0
+    for index, value in pairs(values) do
+        if not Integer(index, 1, limit) or not Key(value) then return false end
+        count = count + 1
+    end
+    for index = 1, count do if values[index] == nil then return false end end
+    return true
+end
+local function ClosingData(value)
+    if not PlainTable(value) then return false end
+    local rules = {
+        zones = function(v) return ClosingNames(v, 40) end,
+        bosses = function(v) return ClosingNames(v, 20) end,
+        notes = Nonnegative, complete = Boolean, zoneOverflow = Boolean, bossOverflow = Boolean,
+    }
+    for field, item in pairs(value) do if not rules[field] or not rules[field](item) then return false end end
+    return value.zones ~= nil and value.bosses ~= nil and value.notes ~= nil and value.complete ~= nil
+end
 local RECORD_ROW = {
     k = Key, v = Number, at = Timestamp, w = Text,
     d = function(value) return not IsSecret(value) and (value == "min" or value == "max") end,
@@ -465,6 +496,7 @@ local SESSION_ROW = {
     s = Timestamp, d = Timestamp, afk = Timestamp, l = Level, steps = Nonnegative,
     k = Nonnegative, de = Nonnegative, q = Nonnegative, xp = Nonnegative, dmg = Nonnegative, z = Text,
     g = Number, mi = Nonnegative, lv = Nonnegative, it = Nonnegative, gh = Nonnegative,
+    closing = ClosingData,
 }
 local function StandingDates(value)
     if type(value) ~= "table" or IsSecret(value) or getmetatable(value) ~= nil then return false end
@@ -622,6 +654,17 @@ local function StageFullSnapshot(snapshot, exportLegacy, progress)
         if result.note then noteCount = noteCount + 1 end
         return result
     end)
+    local chapterIDs = {}
+    section = "Journal chapters"; record.chapters = Sequence(source.chapters == nil and {} or source.chapters, 40, function(row)
+        local result = Row(row, CHAPTER_ROW, { "id", "name", "created" })
+        local serial = tonumber(result.id:match("^chapter:(%d+)$"))
+        Check(Integer(serial, 1, MAX_IMPORTED_SESSION_ID) and not chapterIDs[result.id])
+        chapterIDs[result.id] = true
+        return result
+    end)
+    for _, entry in ipairs(record.journal) do
+        Check(entry.chapter == nil or chapterIDs[entry.chapter])
+    end
     section = "level history"; record.lvlsnap = Map(source.lvlsnap, function(key)
         return Key(key) and key:match("^%d+$") and Level(tonumber(key))
     end, function(row) return Row(row, LEVEL_ROW, { "t" }) end)
@@ -929,10 +972,24 @@ local function CommitFullBackup(destination, character, staged, uniqueCounts)
             end
         end
     end
+    local lastRow = staged.sessionlog[#staged.sessionlog]
+    for _, entry in ipairs(staged.journal) do
+        for _, id in ipairs({ entry.session or 0, entry.noteSession or 0 }) do
+            serial = math.max(serial, id)
+            if id == liveID and not (lastRow and lastRow.id == liveID and lastRow.s == session.wallStart) then
+                collision = true
+            end
+        end
+    end
     if serial > MAX_ID - (collision and 2 or 1) then
         return false, "The full backup contains an out-of-range session ID."
     end
     if collision then serial = serial + 1 end
+    local chapterSerial = staged.meta.chapterSerial or 0
+    for _, chapter in ipairs(staged.chapters) do
+        chapterSerial = math.max(chapterSerial, tonumber(chapter.id:match("^chapter:(%d+)$")) or 0)
+    end
+    staged.meta.chapterSerial = chapterSerial
 
     -- Swap only durable fields in place. Runs, quest timers, identity,
     -- revision and account settings remain on the existing character object.
@@ -946,8 +1003,52 @@ local function CommitFullBackup(destination, character, staged, uniqueCounts)
     if collision then session.id = serial end
     ns.db.chars[character] = destination
     LifeTimeStatsCharDB.data = destination
+    ns.journalChapterRevision = (ns.journalChapterRevision or 0) + 1
     ns.InvalidateAccount()
     return true
+end
+
+local function FullBackupDifferences(destination, replacement)
+    local decreased, labels = {}, {}
+    for _, category in ipairs(ns.CATEGORIES or {}) do
+        for _, stat in ipairs((ns.STATS or {})[category.id] or {}) do
+            if stat.key and not stat.get and not labels[stat.key] then labels[stat.key] = stat end
+        end
+    end
+    for key, before in pairs(destination.c or {}) do
+        local after = (replacement.c or {})[key] or 0
+        if Number(before) and Number(after) and after < before then
+            decreased[#decreased + 1] = { key = key, before = before, after = after }
+        end
+    end
+    table.sort(decreased, function(a, b) return a.key < b.key end)
+    local lines = { string.format("%d counter totals will decrease.", #decreased) }
+    local known, other = 0, 0
+    for _, change in ipairs(decreased) do
+        local stat = labels[change.key]
+        if stat and known < 6 then
+            local function Format(value)
+                local ok, result = pcall(ns.FormatStat, stat, value)
+                return ok and tostring(result) or string.format("%.6g", value)
+            end
+            lines[#lines + 1] = stat.label .. ": " .. Format(change.before) .. " → " .. Format(change.after)
+            known = known + 1
+        else other = other + 1 end
+    end
+    if other > 0 then lines[#lines + 1] = string.format("%d additional counter decreases.", other) end
+    local function Notes(record)
+        local count = 0
+        for _, entry in ipairs(record.journal or {}) do if type(entry.note) == "string" and entry.note ~= "" then count = count + 1 end end
+        return count
+    end
+    local function Summary(label, before, after)
+        lines[#lines + 1] = string.format("%s replaced: %d current → %d in backup.", label, before, after)
+    end
+    Summary("Journal entries", #(destination.journal or {}), #(replacement.journal or {}))
+    Summary("Personal notes", Notes(destination), Notes(replacement))
+    Summary("Saved sessions", #(destination.sessionlog or {}), #(replacement.sessionlog or {}))
+    Summary("Named chapters", #(destination.chapters or {}), #(replacement.chapters or {}))
+    return lines
 end
 
 -- The preview holds a summary and a one-shot closure, not a mutable record.
@@ -959,9 +1060,10 @@ function ns.ReadFullBackup(text, finished, status)
         local snapshot = ReadFullSnapshot(input, progress)
         local record = snapshot.record
         local counts = CountFullUniques(record, progress)
-        return {
+        local preview = {
             character = snapshot.character, savedAt = snapshot.savedAt,
             noteCount = snapshot.noteCount, journalCount = #record.journal, sessionCount = #record.sessionlog,
+            differences = FullBackupDifferences(destination, record),
             apply = function()
                 if not record then return false, "This preview has already been used." end
                 local staged = record
@@ -969,6 +1071,14 @@ function ns.ReadFullBackup(text, finished, status)
                 return CommitFullBackup(destination, character, staged, counts)
             end,
         }
+        preview.refreshDifferences = function()
+            if not record or ns.char ~= destination or ns.charKey ~= character then return true end
+            local latest = FullBackupDifferences(destination, record)
+            local changed = table.concat(latest, "\n") ~= table.concat(preview.differences, "\n")
+            preview.differences = latest
+            return changed
+        end
+        return preview
     end
     return RunBackupJob(text, Prepare, function(input)
         return Attempt(function() return Prepare(input) end)
